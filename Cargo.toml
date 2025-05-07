@@ -1,0 +1,12 @@
+[package]
+name = "spell"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+env_logger = "0.11.7"
+slint = { version = "1.8.0", features = [
+  "raw-window-handle-06",
+  "renderer-software",
+] }
+smithay-client-toolkit = "0.19.2"
