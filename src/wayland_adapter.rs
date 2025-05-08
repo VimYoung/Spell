@@ -1,9 +1,6 @@
 use std::{cell::Cell, convert::TryInto, rc::Rc};
 
-use slint::{
-    Rgb8Pixel,
-    platform::{PointerEventButton, WindowEvent},
-};
+use slint::platform::{PointerEventButton, WindowEvent, software_renderer::TargetPixel};
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
@@ -39,9 +36,50 @@ use smithay_client_toolkit::{
     shell::wlr_layer::{Anchor, Layer, LayerShell},
 };
 
+pub struct Rgba8Pixel {
+    pub a: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+impl Rgba8Pixel {
+    pub fn new(a: u8, r: u8, g: u8, b: u8) -> Self {
+        Rgba8Pixel { a, r, g, b }
+    }
+}
+
+impl TargetPixel for Rgba8Pixel {
+    fn blend(&mut self, color: slint::platform::software_renderer::PremultipliedRgbaColor) {
+        let a: u16 = (u8::MAX - color.alpha) as u16;
+        // self.a = a as u8;
+        self.r = (self.r as u16 * a / 255) as u8 + color.red;
+        self.g = (self.g as u16 * a / 255) as u8 + color.green;
+        self.b = (self.b as u16 * a / 255) as u8 + color.blue;
+    }
+
+    fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
+        let a = 0xFF;
+        Self::new(a, red, green, blue)
+    }
+
+    fn background() -> Self {
+        // TODO This needs to be decided to see how it should be 0xFF or 0x00;
+        let a: u8 = 0x00;
+        Self::new(a, 0, 0, 0)
+    }
+}
+
+impl std::marker::Copy for Rgba8Pixel {}
+impl std::clone::Clone for Rgba8Pixel {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 pub struct SpellWin {
     pub window: Rc<SpellWinAdapter>,
-    pub slint_buffer: Option<Vec<Rgb8Pixel>>,
+    pub slint_buffer: Option<Vec<Rgba8Pixel>>,
     pub registry_state: RegistryState,
     pub seat_state: SeatState,
     pub output_state: OutputState,
@@ -60,7 +98,7 @@ pub struct SpellWin {
 impl SpellWin {
     fn new(
         window: Rc<SpellWinAdapter>,
-        slint_buffer: Option<Vec<Rgb8Pixel>>,
+        slint_buffer: Option<Vec<Rgba8Pixel>>,
         registry_state: RegistryState,
         seat_state: SeatState,
         output_state: OutputState,
@@ -98,16 +136,16 @@ impl SpellWin {
         name: &str,
         width: u32,
         height: u32,
-        buffer1: &'a mut [Rgb8Pixel],
-        buffer2: &'a mut [Rgb8Pixel],
+        buffer1: &'a mut [Rgba8Pixel],
+        buffer2: &'a mut [Rgba8Pixel],
         anchor: Anchor,
         layer_type: Layer,
         window: Rc<SpellWinAdapter>,
         exclusive_zone: bool,
     ) -> (
         Self,
-        &'a mut [Rgb8Pixel],
-        &'a mut [Rgb8Pixel],
+        &'a mut [Rgba8Pixel],
+        &'a mut [Rgba8Pixel],
         EventQueue<SpellWin>,
     ) {
         //configure wayland to use these bufferes.
@@ -170,7 +208,7 @@ impl SpellWin {
         )
     }
 
-    pub fn set_buffer(&mut self, buffer: Vec<Rgb8Pixel>) {
+    pub fn set_buffer(&mut self, buffer: Vec<Rgba8Pixel>) {
         self.slint_buffer = Some(buffer);
     }
 
@@ -193,7 +231,8 @@ impl SpellWin {
                 .chunks_exact_mut(4)
                 .enumerate()
                 .for_each(|(index, chunk)| {
-                    let a: u8 = 0xFF;
+                    // let a: u8 = 0xFF;
+                    let a = self.slint_buffer.as_ref().unwrap()[index].a;
                     let r = self.slint_buffer.as_ref().unwrap()[index].r;
                     let g = self.slint_buffer.as_ref().unwrap()[index].g;
                     let b = self.slint_buffer.as_ref().unwrap()[index].b;

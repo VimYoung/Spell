@@ -6,18 +6,17 @@ pub mod layer_properties {
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
 
-use slint::Rgb8Pixel;
 use slint_adapter::SpellWinAdapter;
 use smithay_client_toolkit::reexports::client::EventQueue;
 use std::{error::Error, rc::Rc};
-use wayland_adapter::SpellWin;
+use wayland_adapter::{Rgba8Pixel, SpellWin};
 
 pub fn cast_spell<'a>(
     mut waywindow: SpellWin,
     window_adapter: Rc<SpellWinAdapter>,
     mut event_queue: EventQueue<SpellWin>,
-    mut work_buffer: &'a mut [Rgb8Pixel],
-    mut currently_displayed_buffer: &'a mut [Rgb8Pixel],
+    mut work_buffer: &'a mut [Rgba8Pixel],
+    mut currently_displayed_buffer: &'a mut [Rgba8Pixel],
     width: u32,
 ) -> Result<(), Box<dyn Error>> {
     loop {
@@ -33,7 +32,7 @@ pub fn cast_spell<'a>(
                 waywindow.set_buffer(work_buffer.to_vec());
             });
 
-            core::mem::swap::<&mut [Rgb8Pixel]>(&mut work_buffer, &mut currently_displayed_buffer);
+            core::mem::swap::<&mut [Rgba8Pixel]>(&mut work_buffer, &mut currently_displayed_buffer);
         }
         if waywindow.first_configure {
             event_queue.roundtrip(&mut waywindow).unwrap();
@@ -45,9 +44,10 @@ pub fn cast_spell<'a>(
     }
 }
 
-pub fn get_spell_ingredients(width: u32, height: u32) -> (Vec<Rgb8Pixel>, Vec<Rgb8Pixel>) {
+pub fn get_spell_ingredients(width: u32, height: u32) -> (Vec<Rgba8Pixel>, Vec<Rgba8Pixel>) {
+    let a: u8 = 0xFF;
     (
-        vec![Rgb8Pixel::new(0, 0, 0); width as usize * height as usize],
-        vec![Rgb8Pixel::new(0, 0, 0); width as usize * height as usize],
+        vec![Rgba8Pixel::new(a, 0, 0, 0); width as usize * height as usize],
+        vec![Rgba8Pixel::new(a, 0, 0, 0); width as usize * height as usize],
     )
 }
