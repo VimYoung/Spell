@@ -11,7 +11,10 @@ use smithay_client_toolkit::{
             Connection, EventQueue, QueueHandle,
             protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
         },
-        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+        protocols::{
+            wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+            // xdg::shell::client::xdg_positioner::Anchor as XDG_Anchor,
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -53,6 +56,8 @@ impl TargetPixel for Rgba8Pixel {
     fn blend(&mut self, color: slint::platform::software_renderer::PremultipliedRgbaColor) {
         let a: u16 = (u8::MAX - color.alpha) as u16;
         // self.a = a as u8;
+        let out_a = color.alpha as u16 + (self.a as u16 * (255 - color.alpha) as u16) / 255;
+        self.a = out_a as u8;
         self.r = (self.r as u16 * a / 255) as u8 + color.red;
         self.g = (self.g as u16 * a / 255) as u8 + color.green;
         self.b = (self.b as u16 * a / 255) as u8 + color.blue;
@@ -65,6 +70,8 @@ impl TargetPixel for Rgba8Pixel {
 
     fn background() -> Self {
         // TODO This needs to be decided to see how it should be 0xFF or 0x00;
+        // I think there is a bug in slint which is causing the leak of This
+        // value.
         let a: u8 = 0x00;
         Self::new(a, 0, 0, 0)
     }
@@ -87,7 +94,7 @@ pub struct SpellWin {
     pub pool: SlotPool,
     pub layer: LayerSurface,
     pub cursor_shape: CursorShapeManager,
-    pub _keyboard_focus: bool,
+    pub keyboard_focus: bool,
     pub pointer: Option<wl_pointer::WlPointer>,
     pub pointer_data: Option<PointerData>,
     pub exit: bool,
@@ -95,53 +102,44 @@ pub struct SpellWin {
     pub render_again: Cell<bool>,
 }
 
-impl SpellWin {
-    fn new(
-        window: Rc<SpellWinAdapter>,
-        slint_buffer: Option<Vec<Rgba8Pixel>>,
-        registry_state: RegistryState,
-        seat_state: SeatState,
-        output_state: OutputState,
-        shm: Shm,
-        pool: SlotPool,
-        layer: LayerSurface,
-        cursor_shape: CursorShapeManager,
-        _keyboard_focus: bool,
-        pointer: Option<wl_pointer::WlPointer>,
-        pointer_data: Option<PointerData>,
-        exit: bool,
-        first_configure: bool,
-        render_again: Cell<bool>,
-    ) -> Self {
-        SpellWin {
-            window,
-            slint_buffer,
-            registry_state,
-            seat_state,
-            output_state,
-            shm,
-            pool,
-            layer,
-            cursor_shape,
-            _keyboard_focus,
-            pointer,
-            pointer_data,
-            exit,
-            first_configure,
-            render_again,
-        }
-    }
+pub struct WindowConf {
+    width: u32,
+    height: u32,
+    anchor: (Option<Anchor>, Option<Anchor>),
+    margin: (i32, i32, i32, i32),
+    layer_type: Layer,
+    window: Rc<SpellWinAdapter>,
+    exclusive_zone: bool,
+}
 
-    pub fn invoke_spell<'a>(
-        name: &str,
+impl WindowConf {
+    pub fn new(
         width: u32,
         height: u32,
-        buffer1: &'a mut [Rgba8Pixel],
-        buffer2: &'a mut [Rgba8Pixel],
-        anchor: Anchor,
+        anchor: (Option<Anchor>, Option<Anchor>),
+        margin: (i32, i32, i32, i32),
         layer_type: Layer,
         window: Rc<SpellWinAdapter>,
         exclusive_zone: bool,
+    ) -> Self {
+        WindowConf {
+            width,
+            height,
+            anchor,
+            margin,
+            layer_type,
+            window,
+            exclusive_zone,
+        }
+    }
+}
+
+impl SpellWin {
+    pub fn invoke_spell<'a>(
+        name: &str,
+        buffer1: &'a mut [Rgba8Pixel],
+        buffer2: &'a mut [Rgba8Pixel],
+        window_conf: WindowConf,
     ) -> (
         Self,
         &'a mut [Rgba8Pixel],
@@ -165,43 +163,86 @@ impl SpellWin {
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let surface = compositor.create_surface(&qh);
 
-        let layer = layer_shell.create_layer_surface(&qh, surface, layer_type, Some(name), None);
-        layer.set_anchor(anchor);
-        // layer.set_anchor(Anchor::LEFT);
-        // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-        layer.set_size(width, height);
-        if exclusive_zone {
-            match anchor {
-                Anchor::LEFT | Anchor::RIGHT => layer.set_exclusive_zone(width as i32),
-                Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(height as i32),
-                // TODO This needs to be handled.
-                _ => todo!(),
+        let layer = layer_shell.create_layer_surface(
+            &qh,
+            surface,
+            window_conf.layer_type,
+            Some(name),
+            None,
+        );
+
+        match window_conf.anchor.0 {
+            Some(mut first_anchor) => match window_conf.anchor.1 {
+                Some(sec_anchor) => {
+                    first_anchor.set(sec_anchor, true);
+                    layer.set_anchor(first_anchor);
+                }
+                None => {
+                    layer.set_anchor(first_anchor);
+                    if window_conf.exclusive_zone {
+                        match first_anchor {
+                            Anchor::LEFT | Anchor::RIGHT => {
+                                layer.set_exclusive_zone(window_conf.width as i32)
+                            }
+                            Anchor::TOP | Anchor::BOTTOM => {
+                                layer.set_exclusive_zone(window_conf.height as i32)
+                            }
+                            // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                            // in which case no exclusive_zone will be set.
+                            _ => {}
+                        }
+                    }
+                }
+            },
+            None => {
+                if let Some(sec_anchor) = window_conf.anchor.1 {
+                    layer.set_anchor(sec_anchor);
+                    if window_conf.exclusive_zone {
+                        match sec_anchor {
+                            Anchor::LEFT | Anchor::RIGHT => {
+                                layer.set_exclusive_zone(window_conf.width as i32)
+                            }
+                            Anchor::TOP | Anchor::BOTTOM => {
+                                layer.set_exclusive_zone(window_conf.height as i32)
+                            }
+                            // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                            // in which case no exclusive_zone will be set.
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
-        // layer.set_exclusive_zone(400);
+        // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+        layer.set_size(window_conf.width, window_conf.height);
+        layer.set_margin(
+            window_conf.margin.0,
+            window_conf.margin.1,
+            window_conf.margin.2,
+            window_conf.margin.3,
+        );
         layer.commit();
-        let pool =
-            SlotPool::new((width * height * 4) as usize, &shm).expect("Failed to create pool");
+        let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
+            .expect("Failed to create pool");
 
         (
-            SpellWin::new(
-                // (width, height),
-                window,
-                None,
-                RegistryState::new(&globals),
-                SeatState::new(&globals, &qh),
-                OutputState::new(&globals, &qh),
+            SpellWin {
+                window: window_conf.window,
+                slint_buffer: None,
+                registry_state: RegistryState::new(&globals),
+                seat_state: SeatState::new(&globals, &qh),
+                output_state: OutputState::new(&globals, &qh),
                 shm,
                 pool,
                 layer,
-                cursor_manager,
-                false,
-                None,
-                None,
-                false,
-                true,
-                Cell::new(true),
-            ),
+                cursor_shape: cursor_manager,
+                keyboard_focus: false,
+                pointer: None,
+                pointer_data: None,
+                exit: false,
+                first_configure: true,
+                render_again: Cell::new(true),
+            },
             work_buffer,
             currently_displayed_buffer,
             event_queue,

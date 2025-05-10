@@ -1,14 +1,14 @@
 use std::{cell::Cell, rc::Rc};
 
 use slint::{
+    PhysicalSize, Window,
     platform::{
+        Platform, WindowAdapter,
         software_renderer::{
             RepaintBufferType::{self},
             SoftwareRenderer,
         },
-        Platform, WindowAdapter,
     },
-    PhysicalSize, Window,
 };
 
 pub struct SpellWinAdapter {
@@ -63,11 +63,11 @@ impl WindowAdapter for SpellWinAdapter {
     }
 }
 
-pub struct SlintLayerShell {
+pub struct SpellLayerShell {
     pub window_adapter: Rc<SpellWinAdapter>,
 }
 
-impl Platform for SlintLayerShell {
+impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.window_adapter.clone())
     }

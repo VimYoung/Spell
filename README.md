@@ -70,7 +70,7 @@ use spell::{
     cast_spell, get_spell_ingredients,
     layer_properties::{LayerAnchor, LayerType},
     slint_adapter::{SlintLayerShell, SpellWinAdapter},
-    wayland_adapter::SpellWin,
+    wayland_adapter::{SpellWin, WindowConf},
 };
 
 slint::include_modules!();
@@ -82,22 +82,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Creating the Window Adapter and initialising buffers for the window.
     let window_adapter = SpellWinAdapter::new(width, height);
     let (mut buffer1, mut buffer2) = get_spell_ingredients(width, height);
-
-    // Getting the window modified buffers and event_queue for input handling.
-    let (waywindow, work_buffer, currently_displayed_buffer, event_queue) = SpellWin::invoke_spell(
-        "counter widget",
+    let window_conf = WindowConf::new(
         width,
         height,
-        &mut buffer1,
-        &mut buffer2,
-        LayerAnchor::BOTTOM,
+        (Some(LayerAnchor::BOTTOM), None),
+        (0, 0, 50, 0),
         LayerType::Top,
         window_adapter.clone(),
         false,
     );
 
-    // Setting the platform as SlintLayerShell.
-    let platform_setting = slint::platform::set_platform(Box::new(SlintLayerShell {
+    // Getting the window modified buffers and event_queue for input handling.
+    let (waywindow, work_buffer, currently_displayed_buffer, event_queue) = 
+        SpellWin::invoke_spell( "counter widget", &mut buffer1, &mut buffer2, window_conf);
+
+    // Setting the platform as SpellLayerShell.
+    let platform_setting = slint::platform::set_platform(Box::new(SpellLayerShell {
         window_adapter: window_adapter.clone(),
     }));
 
@@ -117,7 +117,6 @@ fn main() -> Result<(), Box<dyn Error>> {
          }
      });
 
-     println!("Casting the Spell");
     // Placing the adapter, window, buffers and event_queue to initialise 
     // and work together. Aka casting the spell.
     cast_spell(
