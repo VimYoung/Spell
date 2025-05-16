@@ -299,6 +299,7 @@ impl SpellWin {
         buffer
             .attach_to(self.layer.wl_surface())
             .expect("buffer attach");
+
         self.layer.commit();
 
         // TODO save and reuse buffer when the window size is unchanged.  This is especially

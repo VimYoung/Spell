@@ -47,11 +47,10 @@ A lot of things are left to be done, but following core things are not implement
 which might cause problem for widget creation.
 
 1. Resize of buffers aren't possible.
-2. The transparency is not implemented internally so if you will set the background of
-`Window` as `transparent`, black will be shown instead of the layer below it.
-3. 2nd point also makes it irrelevant to define `Width` and `Height` of Window, as that
-should be provided directly in your `main` function.
-4. The abstraction for margins from edges is still not provided by spell.
+2. It is irrelevant to define `Width` and `Height` of Window, as that
+should be provided directly in your `main` function. (Though, I must say that recommended way of creating windows with curved borders is to place a `Rectangle` in a transparent window and then define its `border_radius`.)
+3. A major issue has been discovered. `SoftwareRenderer` (provided by slint)
+doesn't support a few key widgets and properties(like using `clip` with `border-radius`, no support for `Path`, `Slider` etc) which I find essential for creating aesthetic widgets. For now, there is no way to change this. I might either contribute to support these features by the renderer or implement a different renderer all together. (Both of the tasks are fairly time consuming).
 
 Having said that,you should try creating static widgets (like showing clock, day etc) at
 this point with `spell` and see how that turns out.
