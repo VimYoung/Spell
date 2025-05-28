@@ -1,15 +1,18 @@
 pub mod slint_adapter;
 pub mod wayland_adapter;
+mod configure;
 pub mod layer_properties {
 
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
+    pub use crate::configure::WindowConf;
 }
 
 use slint_adapter::SpellWinAdapter;
 use smithay_client_toolkit::reexports::client::EventQueue;
 use std::{error::Error, rc::Rc};
-use wayland_adapter::{Rgba8Pixel, SpellWin};
+use wayland_adapter::SpellWin;
+use configure::Rgba8Pixel;
 
 pub fn cast_spell<'a>(
     mut waywindow: SpellWin,

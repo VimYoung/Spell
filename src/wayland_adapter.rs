@@ -1,17 +1,15 @@
 use std::{cell::Cell, convert::TryInto, rc::Rc};
 
-use slint::platform::{
-    PointerEventButton, WindowEvent,
-    software_renderer::{PhysicalRegion, TargetPixel},
-};
+use slint::platform::{PointerEventButton, WindowEvent, software_renderer::PhysicalRegion};
 use smithay_client_toolkit::{
-    compositor::CompositorHandler,
+    compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
     delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
     reexports::{
         client::{
             Connection, EventQueue, QueueHandle,
+            globals::registry_queue_init,
             protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
         },
         protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
@@ -27,62 +25,18 @@ use smithay_client_toolkit::{
     },
     shell::{
         WaylandSurface,
-        wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+        wlr_layer::{Anchor, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
 
-use crate::slint_adapter::SpellWinAdapter;
-use smithay_client_toolkit::{
-    compositor::CompositorState,
-    reexports::client::globals::registry_queue_init,
-    shell::wlr_layer::{Anchor, Layer, LayerShell},
+use crate::{
+    configure::{Rgba8Pixel, WindowConf},
+    slint_adapter::SpellWinAdapter,
 };
 
-pub struct Rgba8Pixel {
-    pub a: u8,
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl Rgba8Pixel {
-    pub fn new(a: u8, r: u8, g: u8, b: u8) -> Self {
-        Rgba8Pixel { a, r, g, b }
-    }
-}
-
-impl TargetPixel for Rgba8Pixel {
-    fn blend(&mut self, color: slint::platform::software_renderer::PremultipliedRgbaColor) {
-        let a: u16 = (u8::MAX - color.alpha) as u16;
-        // self.a = a as u8;
-        let out_a = color.alpha as u16 + (self.a as u16 * (255 - color.alpha) as u16) / 255;
-        self.a = out_a as u8;
-        self.r = (self.r as u16 * a / 255) as u8 + color.red;
-        self.g = (self.g as u16 * a / 255) as u8 + color.green;
-        self.b = (self.b as u16 * a / 255) as u8 + color.blue;
-    }
-
-    fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
-        let a = 0xFF;
-        Self::new(a, red, green, blue)
-    }
-
-    fn background() -> Self {
-        // TODO This needs to be decided to see how it should be 0xFF or 0x00;
-        // I think there is a bug in slint which is causing the leak of This
-        // value.
-        let a: u8 = 0x00;
-        Self::new(a, 0, 0, 0)
-    }
-}
-
-impl std::marker::Copy for Rgba8Pixel {}
-impl std::clone::Clone for Rgba8Pixel {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
+mod window_state;
+use self::window_state::PointerState;
 
 pub struct SpellWin {
     pub window: Rc<SpellWinAdapter>,
@@ -92,47 +46,12 @@ pub struct SpellWin {
     pub output_state: OutputState,
     pub shm: Shm,
     pub pool: SlotPool,
+    pub pointer_state: PointerState,
     pub layer: LayerSurface,
-    pub cursor_shape: CursorShapeManager,
     pub keyboard_focus: bool,
-    pub pointer: Option<wl_pointer::WlPointer>,
-    pub pointer_data: Option<PointerData>,
-    pub exit: bool,
     pub first_configure: bool,
     pub render_again: Cell<bool>,
     pub damaged_part: Option<PhysicalRegion>,
-}
-
-pub struct WindowConf {
-    width: u32,
-    height: u32,
-    anchor: (Option<Anchor>, Option<Anchor>),
-    margin: (i32, i32, i32, i32),
-    layer_type: Layer,
-    window: Rc<SpellWinAdapter>,
-    exclusive_zone: bool,
-}
-
-impl WindowConf {
-    pub fn new(
-        width: u32,
-        height: u32,
-        anchor: (Option<Anchor>, Option<Anchor>),
-        margin: (i32, i32, i32, i32),
-        layer_type: Layer,
-        window: Rc<SpellWinAdapter>,
-        exclusive_zone: bool,
-    ) -> Self {
-        WindowConf {
-            width,
-            height,
-            anchor,
-            margin,
-            layer_type,
-            window,
-            exclusive_zone,
-        }
-    }
 }
 
 impl SpellWin {
@@ -226,6 +145,12 @@ impl SpellWin {
         let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
 
+        let pointer_state = PointerState {
+            pointer: None,
+            pointer_data: None,
+            cursor_shape: cursor_manager,
+        };
+
         (
             SpellWin {
                 window: window_conf.window,
@@ -235,12 +160,9 @@ impl SpellWin {
                 output_state: OutputState::new(&globals, &qh),
                 shm,
                 pool,
+                pointer_state,
                 layer,
-                cursor_shape: cursor_manager,
                 keyboard_focus: false,
-                pointer: None,
-                pointer_data: None,
-                exit: false,
                 first_configure: true,
                 render_again: Cell::new(true),
                 damaged_part: None,
@@ -427,7 +349,7 @@ impl CompositorHandler for SpellWin {
 
 impl LayerShellHandler for SpellWin {
     fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
-        self.exit = true;
+        // self.exit = true;
     }
 
     fn configure(
@@ -476,15 +398,15 @@ impl SeatHandler for SpellWin {
         //     self.keyboard = Some(keyboard);
         // }
         //
-        if capability == Capability::Pointer && self.pointer.is_none() {
+        if capability == Capability::Pointer && self.pointer_state.pointer.is_none() {
             println!("Set pointer capability");
             let pointer = self
                 .seat_state
                 .get_pointer(qh, &seat)
                 .expect("Failed to create pointer");
             let pointer_data = PointerData::new(seat);
-            self.pointer = Some(pointer);
-            self.pointer_data = Some(pointer_data);
+            self.pointer_state.pointer = Some(pointer);
+            self.pointer_state.pointer_data = Some(pointer_data);
         }
     }
 
@@ -500,9 +422,9 @@ impl SeatHandler for SpellWin {
         //     self.keyboard.take().unwrap().release();
         // }
 
-        if capability == Capability::Pointer && self.pointer.is_some() {
+        if capability == Capability::Pointer && self.pointer_state.pointer.is_some() {
             println!("Unset pointer capability");
-            self.pointer.take().unwrap().release();
+            self.pointer_state.pointer.take().unwrap().release();
         }
     }
 
@@ -528,12 +450,17 @@ impl PointerHandler for SpellWin {
                     println!("Pointer entered @{:?}", event.position);
 
                     // TODO this code is redundent, as it doesn't set the cursor shape.
-                    let pointer = &self.pointer.as_ref().unwrap();
-                    let serial_no: Option<u32> =
-                        self.pointer_data.as_ref().unwrap().latest_enter_serial();
+                    let pointer = &self.pointer_state.pointer.as_ref().unwrap();
+                    let serial_no: Option<u32> = self
+                        .pointer_state
+                        .pointer_data
+                        .as_ref()
+                        .unwrap()
+                        .latest_enter_serial();
                     if let Some(no) = serial_no {
                         println!("Cursor Shape set");
-                        self.cursor_shape
+                        self.pointer_state
+                            .cursor_shape
                             .get_shape_device(pointer, qh)
                             .set_shape(no, Shape::Pointer);
                     }
