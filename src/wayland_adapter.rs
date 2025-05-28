@@ -1,6 +1,9 @@
 use std::{cell::Cell, convert::TryInto, rc::Rc};
 
-use slint::platform::{PointerEventButton, WindowEvent, software_renderer::TargetPixel};
+use slint::platform::{
+    PointerEventButton, WindowEvent,
+    software_renderer::{PhysicalRegion, TargetPixel},
+};
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
@@ -11,10 +14,7 @@ use smithay_client_toolkit::{
             Connection, EventQueue, QueueHandle,
             protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
         },
-        protocols::{
-            wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
-            // xdg::shell::client::xdg_positioner::Anchor as XDG_Anchor,
-        },
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -100,6 +100,7 @@ pub struct SpellWin {
     pub exit: bool,
     pub first_configure: bool,
     pub render_again: Cell<bool>,
+    pub damaged_part: Option<PhysicalRegion>,
 }
 
 pub struct WindowConf {
@@ -242,6 +243,7 @@ impl SpellWin {
                 exit: false,
                 first_configure: true,
                 render_again: Cell::new(true),
+                damaged_part: None,
             },
             work_buffer,
             currently_displayed_buffer,
@@ -286,9 +288,20 @@ impl SpellWin {
         }
 
         // Damage the entire window
-        self.layer
-            .wl_surface()
-            .damage_buffer(0, 0, width as i32, height as i32);
+        if self.first_configure {
+            self.layer
+                .wl_surface()
+                .damage_buffer(0, 0, width as i32, height as i32);
+        } else {
+            for region in self.damaged_part.iter() {
+                self.layer.wl_surface().damage_buffer(
+                    region.bounding_box_origin().x,
+                    region.bounding_box_origin().y,
+                    region.bounding_box_size().width as i32,
+                    region.bounding_box_size().height as i32,
+                );
+            }
+        }
 
         // Request our next frame
         self.layer
@@ -307,9 +320,9 @@ impl SpellWin {
         // of the canvas.
     }
 
-    // fn initialise_application(&mut self, mut event_queue: EventQueue<Self>) {
-    //     self.event_queue.blocking_dispatch(self).unwrap();
-    // }
+    pub fn set_damaged(&mut self, physical_region: PhysicalRegion) {
+        self.damaged_part = Some(physical_region);
+    }
 }
 
 delegate_compositor!(SpellWin);

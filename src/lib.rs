@@ -28,7 +28,8 @@ pub fn cast_spell<'a>(
         if waywindow.render_again.replace(false) {
             window_adapter.draw_if_needed(|renderer| {
                 // println!("Rendering");
-                renderer.render(work_buffer, width as usize);
+                let physical_region = renderer.render(work_buffer, width as usize);
+                waywindow.set_damaged(physical_region);
                 waywindow.set_buffer(work_buffer.to_vec());
             });
 
