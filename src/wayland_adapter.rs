@@ -27,7 +27,10 @@ use smithay_client_toolkit::{
         WaylandSurface,
         wlr_layer::{Anchor, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
-    shm::{Shm, ShmHandler, slot::SlotPool},
+    shm::{
+        Shm, ShmHandler,
+        slot::{Buffer, SlotPool},
+    },
 };
 
 use crate::{
@@ -38,15 +41,22 @@ use crate::{
 mod window_state;
 use self::window_state::PointerState;
 
+// Most of the dealings of buffer will take place through this, hence it will manage
+// new buffers when creating new buffers, changing buffer size for reseize info etc.
+pub struct MemoryManger {
+    pub pool: SlotPool,
+    pub shm: Shm,
+    pub slint_buffer: Option<Vec<Rgba8Pixel>>,
+}
+
 pub struct SpellWin {
     pub window: Rc<SpellWinAdapter>,
     pub slint_buffer: Option<Vec<Rgba8Pixel>>,
     pub registry_state: RegistryState,
     pub seat_state: SeatState,
     pub output_state: OutputState,
-    pub shm: Shm,
-    pub pool: SlotPool,
     pub pointer_state: PointerState,
+    pub memory_manager: MemoryManger,
     pub layer: LayerSurface,
     pub keyboard_focus: bool,
     pub first_configure: bool,
@@ -55,21 +65,7 @@ pub struct SpellWin {
 }
 
 impl SpellWin {
-    pub fn invoke_spell<'a>(
-        name: &str,
-        buffer1: &'a mut [Rgba8Pixel],
-        buffer2: &'a mut [Rgba8Pixel],
-        window_conf: WindowConf,
-    ) -> (
-        Self,
-        &'a mut [Rgba8Pixel],
-        &'a mut [Rgba8Pixel],
-        EventQueue<SpellWin>,
-    ) {
-        //configure wayland to use these bufferes.
-        let currently_displayed_buffer: &mut [_] = buffer1;
-        let work_buffer: &mut [_] = buffer2;
-
+    pub fn invoke_spell(name: &str, window_conf: WindowConf) -> (Self, EventQueue<SpellWin>) {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
         let (globals, event_queue) = registry_queue_init(&conn).unwrap();
@@ -145,6 +141,12 @@ impl SpellWin {
         let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
 
+        let memory_manager = MemoryManger {
+            slint_buffer: None,
+            pool,
+            shm,
+        };
+
         let pointer_state = PointerState {
             pointer: None,
             pointer_data: None,
@@ -158,17 +160,14 @@ impl SpellWin {
                 registry_state: RegistryState::new(&globals),
                 seat_state: SeatState::new(&globals, &qh),
                 output_state: OutputState::new(&globals, &qh),
-                shm,
-                pool,
                 pointer_state,
+                memory_manager,
                 layer,
                 keyboard_focus: false,
                 first_configure: true,
                 render_again: Cell::new(true),
                 damaged_part: None,
             },
-            work_buffer,
-            currently_displayed_buffer,
             event_queue,
         )
     }
@@ -196,7 +195,6 @@ impl SpellWin {
                 .chunks_exact_mut(4)
                 .enumerate()
                 .for_each(|(index, chunk)| {
-                    // let a: u8 = 0xFF;
                     let a = self.slint_buffer.as_ref().unwrap()[index].a;
                     let r = self.slint_buffer.as_ref().unwrap()[index].r;
                     let g = self.slint_buffer.as_ref().unwrap()[index].g;
@@ -258,7 +256,7 @@ delegate_layer!(SpellWin);
 
 impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
+        &mut self.memory_manager.shm
     }
 }
 
@@ -360,7 +358,7 @@ impl LayerShellHandler for SpellWin {
         _configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        // THis error
+        // THis error TODO find if it is necessary.
         // self.window.size.width = NonZeroU32::new(configure.new_size.0).map_or(256, NonZeroU32::get);
         // self.window.size.height =
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
