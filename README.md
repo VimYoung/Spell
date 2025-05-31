@@ -63,51 +63,44 @@ on display as spell becomes more mature. As for producing a minimal example, you
 from this github link and replace the main.rs with following contents
 
 ```rust
-use std::error::Error;
+use std::{env, error::Error};
 
 use spell::{
     cast_spell, get_spell_ingredients,
-    layer_properties::{LayerAnchor, LayerType},
-    slint_adapter::{SlintLayerShell, SpellWinAdapter},
-    wayland_adapter::{SpellWin, WindowConf},
+    layer_properties::{LayerAnchor, LayerType, WindowConf},
+    slint_adapter::{SpellLayerShell, SpellWinAdapter},
+    wayland_adapter::SpellWin,
 };
 
 slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
-    // Dimentions of your widget
-    let width: u32 = 400;
-    let height: u32 = 400;
-
-    // Creating the Window Adapter and initialising buffers for the window.
+    let width: u32 = 376;
+    let height: u32 = 576;
     let window_adapter = SpellWinAdapter::new(width, height);
-    let (mut buffer1, mut buffer2) = get_spell_ingredients(width, height);
+    let buffer = get_spell_ingredients(width, height);
     let window_conf = WindowConf::new(
         width,
         height,
-        (Some(LayerAnchor::BOTTOM), None),
-        (0, 0, 50, 0),
+        (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
+        (5, 0, 0, 10),
         LayerType::Top,
         window_adapter.clone(),
         false,
     );
 
-    // Getting the window modified buffers and event_queue for input handling.
-    let (waywindow, work_buffer, currently_displayed_buffer, event_queue) = 
-        SpellWin::invoke_spell( "counter widget", &mut buffer1, &mut buffer2, window_conf);
+    let (waywindow, event_queue) = SpellWin::invoke_spell("counter widget", window_conf);
 
-    // Setting the platform as SpellLayerShell.
     let platform_setting = slint::platform::set_platform(Box::new(SpellLayerShell {
-        window_adapter: window_adapter.clone(),
+        window_adapter: window_adapter,
+        time_since_start: std::time::Instant::now(),
     }));
 
     if let Err(error) = platform_setting {
         panic!("{error}");
     }
+    let ui = Menu::new()?;
 
-    // Creating a slint window.
-    let ui = AppWindow::new()?;
-
-    // Slint Managing Inputs;
+    //Slint Managing Inputs;
      ui.on_request_increase_value({
          let ui_handle = ui.as_weak();
          move || {
@@ -115,17 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
              ui.set_counter(ui.get_counter() + 1);
          }
      });
-
-    // Placing the adapter, window, buffers and event_queue to initialise 
-    // and work together. Aka casting the spell.
-    cast_spell(
-        waywindow,
-        window_adapter,
-        event_queue,
-        work_buffer,
-        currently_displayed_buffer,
-        width,
-    )
+    cast_spell( waywindow, event_queue, buffer)
 }
 ```
 

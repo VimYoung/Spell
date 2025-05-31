@@ -1,4 +1,4 @@
-use std::{cell::Cell, convert::TryInto, rc::Rc};
+use std::{convert::TryInto, rc::Rc, time::Instant};
 
 use slint::platform::{PointerEventButton, WindowEvent, software_renderer::PhysicalRegion};
 use smithay_client_toolkit::{
@@ -12,10 +12,7 @@ use smithay_client_toolkit::{
             globals::registry_queue_init,
             protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
         },
-        protocols::wp::{
-            cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
-            input_method::zv1::client::zwp_input_panel_surface_v1::Position,
-        },
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -50,6 +47,13 @@ pub struct MemoryManger {
     pub pool: SlotPool,
     pub shm: Shm,
     pub slint_buffer: Option<Vec<Rgba8Pixel>>,
+    pub ren_buffer: Box<[Rgba8Pixel]>,
+}
+
+impl MemoryManger {
+    pub fn set_ren_buffers(&mut self, ren_buffer: Box<[Rgba8Pixel]>) {
+        self.ren_buffer = ren_buffer;
+    }
 }
 
 pub struct SpellWin {
@@ -65,7 +69,6 @@ pub struct SpellWin {
     pub layer: LayerSurface,
     pub keyboard_focus: bool,
     pub first_configure: bool,
-    pub render_again: Cell<bool>,
     pub damaged_part: Option<PhysicalRegion>,
 }
 
@@ -75,65 +78,23 @@ impl SpellWin {
         let conn = Connection::connect_to_env().unwrap();
         let (globals, event_queue) = registry_queue_init(&conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
-
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
+        let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
+            .expect("Failed to create pool");
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
+        let stride = window_conf.window.size.width as i32 * 4;
         let surface = compositor.create_surface(&qh);
-
-        let layer = layer_shell.create_layer_surface(
+        let mut layer = layer_shell.create_layer_surface(
             &qh,
             surface,
             window_conf.layer_type,
             Some(name),
             None,
         );
-
-        match window_conf.anchor.0 {
-            Some(mut first_anchor) => match window_conf.anchor.1 {
-                Some(sec_anchor) => {
-                    first_anchor.set(sec_anchor, true);
-                    layer.set_anchor(first_anchor);
-                }
-                None => {
-                    layer.set_anchor(first_anchor);
-                    if window_conf.exclusive_zone {
-                        match first_anchor {
-                            Anchor::LEFT | Anchor::RIGHT => {
-                                layer.set_exclusive_zone(window_conf.width as i32)
-                            }
-                            Anchor::TOP | Anchor::BOTTOM => {
-                                layer.set_exclusive_zone(window_conf.height as i32)
-                            }
-                            // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                            // in which case no exclusive_zone will be set.
-                            _ => {}
-                        }
-                    }
-                }
-            },
-            None => {
-                if let Some(sec_anchor) = window_conf.anchor.1 {
-                    layer.set_anchor(sec_anchor);
-                    if window_conf.exclusive_zone {
-                        match sec_anchor {
-                            Anchor::LEFT | Anchor::RIGHT => {
-                                layer.set_exclusive_zone(window_conf.width as i32)
-                            }
-                            Anchor::TOP | Anchor::BOTTOM => {
-                                layer.set_exclusive_zone(window_conf.height as i32)
-                            }
-                            // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                            // in which case no exclusive_zone will be set.
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
         // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
         layer.set_size(window_conf.width, window_conf.height);
         layer.set_margin(
@@ -142,17 +103,15 @@ impl SpellWin {
             window_conf.margin.2,
             window_conf.margin.3,
         );
+        set_anchor(&window_conf, &mut layer);
         layer.commit();
-        let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
-            .expect("Failed to create pool");
 
         let mut memory_manager = MemoryManger {
             slint_buffer: None,
             pool,
             shm,
+            ren_buffer: Box::new([Rgba8Pixel::default()]),
         };
-
-        let stride = window_conf.window.size.width as i32 * 4;
 
         let (primary_buffer, _) = memory_manager
             .pool
@@ -194,7 +153,6 @@ impl SpellWin {
                 layer,
                 keyboard_focus: false,
                 first_configure: true,
-                render_again: Cell::new(true),
                 damaged_part: None,
             },
             event_queue,
@@ -208,6 +166,26 @@ impl SpellWin {
     fn converter(&mut self, qh: &QueueHandle<Self>) {
         let width = self.window.size.width;
         let height = self.window.size.height;
+        let window_adapter = self.window.clone();
+        let mut work_buffer = self.memory_manager.ren_buffer.clone();
+
+        slint::platform::update_timers_and_animations();
+        let time_ren = Instant::now();
+        window_adapter.draw_if_needed(|renderer| {
+            // println!("Rendering");
+            let physical_region = renderer.render(&mut work_buffer, width as usize);
+            self.set_damaged(physical_region);
+            self.set_buffer(work_buffer.to_vec());
+        });
+        println!("Render Time: {}", time_ren.elapsed().as_millis());
+
+        // let time_gone = now.elapsed().as_millis();
+        // println!("Render time: {}", time_gone);
+        // core::mem::swap::<&mut [Rgba8Pixel]>(
+        //     &mut &mut *work_buffer,
+        //     &mut &mut *currently_displayed_buffer,
+        // );
+
         let pool = &mut self.memory_manager.pool;
         let buffer = &self.primary_buffer;
         let sec_buffer = &self.secondary_buffer;
@@ -246,10 +224,10 @@ impl SpellWin {
                 .damage_buffer(0, 0, width as i32, height as i32);
         } else {
             for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
-                println!(
-                    "{}, {}, {}, {}",
-                    position.x, position.y, size.width as i32, size.height as i32,
-                );
+                // println!(
+                //     "{}, {}, {}, {}",
+                //     position.x, position.y, size.width as i32, size.height as i32,
+                // );
                 // if size.width != width && size.height != height {
                 self.layer.wl_surface().damage_buffer(
                     position.x,
@@ -360,7 +338,6 @@ impl CompositorHandler for SpellWin {
     ) {
         // println!("Frame is called");
         self.converter(qh);
-        self.render_again.set(true);
         // println!("Next draws called");
     }
 
@@ -406,7 +383,6 @@ impl LayerShellHandler for SpellWin {
         // Initiate the first draw.
         if self.first_configure {
             self.converter(qh);
-            self.render_again.set(true);
             // println!("First draw called");
         }
     }
@@ -522,7 +498,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Press { button, .. } => {
-                    // println!("Press {:x} @ {:?}", button, event.position);
+                    println!("Press {:x} @ {:?}", button, event.position);
                     self.window
                         .window
                         .try_dispatch_event(WindowEvent::PointerPressed {
@@ -535,7 +511,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Release { button, .. } => {
-                    // println!("Release {:x} @ {:?}", button, event.position);
+                    println!("Release {:x} @ {:?}", button, event.position);
                     self.window
                         .window
                         .try_dispatch_event(WindowEvent::PointerReleased {
@@ -553,7 +529,7 @@ impl PointerHandler for SpellWin {
                     ..
                 } => {
                     // TODO Axis and Scroll events are still to be mapped.
-                    // println!("Scroll H:{horizontal:?}, V:{vertical:?}");
+                    println!("Scroll H:{horizontal:?}, V:{vertical:?}");
                 }
             }
         }
@@ -566,4 +542,49 @@ impl ProvidesRegistryState for SpellWin {
         &mut self.registry_state
     }
     registry_handlers![OutputState, SeatState];
+}
+
+fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
+    match window_conf.anchor.0 {
+        Some(mut first_anchor) => match window_conf.anchor.1 {
+            Some(sec_anchor) => {
+                first_anchor.set(sec_anchor, true);
+                layer.set_anchor(first_anchor);
+            }
+            None => {
+                layer.set_anchor(first_anchor);
+                if window_conf.exclusive_zone {
+                    match first_anchor {
+                        Anchor::LEFT | Anchor::RIGHT => {
+                            layer.set_exclusive_zone(window_conf.width as i32)
+                        }
+                        Anchor::TOP | Anchor::BOTTOM => {
+                            layer.set_exclusive_zone(window_conf.height as i32)
+                        }
+                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                        // in which case no exclusive_zone will be set.
+                        _ => {}
+                    }
+                }
+            }
+        },
+        None => {
+            if let Some(sec_anchor) = window_conf.anchor.1 {
+                layer.set_anchor(sec_anchor);
+                if window_conf.exclusive_zone {
+                    match sec_anchor {
+                        Anchor::LEFT | Anchor::RIGHT => {
+                            layer.set_exclusive_zone(window_conf.width as i32)
+                        }
+                        Anchor::TOP | Anchor::BOTTOM => {
+                            layer.set_exclusive_zone(window_conf.height as i32)
+                        }
+                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                        // in which case no exclusive_zone will be set.
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
 }
