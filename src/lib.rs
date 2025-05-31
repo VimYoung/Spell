@@ -1,18 +1,18 @@
+mod configure;
 pub mod slint_adapter;
 pub mod wayland_adapter;
-mod configure;
 pub mod layer_properties {
 
+    pub use crate::configure::WindowConf;
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
-    pub use crate::configure::WindowConf;
 }
 
+use configure::Rgba8Pixel;
 use slint_adapter::SpellWinAdapter;
 use smithay_client_toolkit::reexports::client::EventQueue;
 use std::{error::Error, rc::Rc};
 use wayland_adapter::SpellWin;
-use configure::Rgba8Pixel;
 
 pub fn cast_spell<'a>(
     mut waywindow: SpellWin,
@@ -23,12 +23,14 @@ pub fn cast_spell<'a>(
     width: u32,
 ) -> Result<(), Box<dyn Error>> {
     loop {
-        slint::platform::update_timers_and_animations();
         // Following line does the updates to the buffer. Now those updates
         // needs to be picked by the compositer/windowing system and then
         // displayed accordingly.
         // println!("Running the loop");
+        let now = std::time::Instant::now();
+
         if waywindow.render_again.replace(false) {
+            slint::platform::update_timers_and_animations();
             window_adapter.draw_if_needed(|renderer| {
                 // println!("Rendering");
                 let physical_region = renderer.render(work_buffer, width as usize);
@@ -37,6 +39,9 @@ pub fn cast_spell<'a>(
             });
 
             core::mem::swap::<&mut [Rgba8Pixel]>(&mut work_buffer, &mut currently_displayed_buffer);
+            let time_gone = now.elapsed().as_millis();
+            println!("Render time: {}", time_gone);
+            waywindow.render_again.set(false);
         }
         if waywindow.first_configure {
             event_queue.roundtrip(&mut waywindow).unwrap();

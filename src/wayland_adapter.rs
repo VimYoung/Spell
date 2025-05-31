@@ -12,7 +12,10 @@ use smithay_client_toolkit::{
             globals::registry_queue_init,
             protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
         },
-        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+        protocols::wp::{
+            cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+            input_method::zv1::client::zwp_input_panel_surface_v1::Position,
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -52,6 +55,8 @@ pub struct MemoryManger {
 pub struct SpellWin {
     pub window: Rc<SpellWinAdapter>,
     pub slint_buffer: Option<Vec<Rgba8Pixel>>,
+    pub primary_buffer: Buffer,
+    pub secondary_buffer: Buffer,
     pub registry_state: RegistryState,
     pub seat_state: SeatState,
     pub output_state: OutputState,
@@ -141,11 +146,33 @@ impl SpellWin {
         let pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
 
-        let memory_manager = MemoryManger {
+        let mut memory_manager = MemoryManger {
             slint_buffer: None,
             pool,
             shm,
         };
+
+        let stride = window_conf.window.size.width as i32 * 4;
+
+        let (primary_buffer, _) = memory_manager
+            .pool
+            .create_buffer(
+                window_conf.width as i32,
+                window_conf.height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+
+        let (secondary_buffer, _) = memory_manager
+            .pool
+            .create_buffer(
+                window_conf.width as i32,
+                window_conf.height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating secondary buffer");
 
         let pointer_state = PointerState {
             pointer: None,
@@ -157,6 +184,8 @@ impl SpellWin {
             SpellWin {
                 window: window_conf.window,
                 slint_buffer: None,
+                primary_buffer,
+                secondary_buffer,
                 registry_state: RegistryState::new(&globals),
                 seat_state: SeatState::new(&globals, &qh),
                 output_state: OutputState::new(&globals, &qh),
@@ -179,19 +208,18 @@ impl SpellWin {
     fn converter(&mut self, qh: &QueueHandle<Self>) {
         let width = self.window.size.width;
         let height = self.window.size.height;
-        let stride = self.window.size.width as i32 * 4;
-        let (buffer, canvas) = self
-            .pool
-            .create_buffer(
-                width as i32,
-                height as i32,
-                stride,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("create buffer");
+        let pool = &mut self.memory_manager.pool;
+        let buffer = &self.primary_buffer;
+        let sec_buffer = &self.secondary_buffer;
+        let mut sec_canvas_data = {
+            let sec_canvas = sec_buffer.canvas(pool).unwrap();
+            sec_canvas.to_vec()
+        };
+        let mut primary_canvas = buffer.canvas(pool).unwrap();
         // Drawing the window
+        let now = std::time::Instant::now();
         {
-            canvas
+            primary_canvas
                 .chunks_exact_mut(4)
                 .enumerate()
                 .for_each(|(index, chunk)| {
@@ -207,19 +235,29 @@ impl SpellWin {
                 });
         }
 
+        let elaspesed_time = now.elapsed().as_millis();
+        println!("{}", elaspesed_time);
+
         // Damage the entire window
         if self.first_configure {
+            self.first_configure = false;
             self.layer
                 .wl_surface()
                 .damage_buffer(0, 0, width as i32, height as i32);
         } else {
-            for region in self.damaged_part.iter() {
-                self.layer.wl_surface().damage_buffer(
-                    region.bounding_box_origin().x,
-                    region.bounding_box_origin().y,
-                    region.bounding_box_size().width as i32,
-                    region.bounding_box_size().height as i32,
+            for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+                println!(
+                    "{}, {}, {}, {}",
+                    position.x, position.y, size.width as i32, size.height as i32,
                 );
+                // if size.width != width && size.height != height {
+                self.layer.wl_surface().damage_buffer(
+                    position.x,
+                    position.y,
+                    size.width as i32,
+                    size.height as i32,
+                );
+                //}
             }
         }
 
@@ -234,6 +272,8 @@ impl SpellWin {
             .expect("buffer attach");
 
         self.layer.commit();
+
+        core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
 
         // TODO save and reuse buffer when the window size is unchanged.  This is especially
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
@@ -365,10 +405,9 @@ impl LayerShellHandler for SpellWin {
 
         // Initiate the first draw.
         if self.first_configure {
-            self.first_configure = false;
             self.converter(qh);
             self.render_again.set(true);
-            println!("First draw called");
+            // println!("First draw called");
         }
     }
 }
@@ -445,7 +484,7 @@ impl PointerHandler for SpellWin {
             }
             match event.kind {
                 Enter { .. } => {
-                    println!("Pointer entered @{:?}", event.position);
+                    // println!("Pointer entered @{:?}", event.position);
 
                     // TODO this code is redundent, as it doesn't set the cursor shape.
                     let pointer = &self.pointer_state.pointer.as_ref().unwrap();
@@ -483,7 +522,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Press { button, .. } => {
-                    println!("Press {:x} @ {:?}", button, event.position);
+                    // println!("Press {:x} @ {:?}", button, event.position);
                     self.window
                         .window
                         .try_dispatch_event(WindowEvent::PointerPressed {
@@ -496,7 +535,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Release { button, .. } => {
-                    println!("Release {:x} @ {:?}", button, event.position);
+                    // println!("Release {:x} @ {:?}", button, event.position);
                     self.window
                         .window
                         .try_dispatch_event(WindowEvent::PointerReleased {
@@ -514,7 +553,7 @@ impl PointerHandler for SpellWin {
                     ..
                 } => {
                     // TODO Axis and Scroll events are still to be mapped.
-                    println!("Scroll H:{horizontal:?}, V:{vertical:?}");
+                    // println!("Scroll H:{horizontal:?}, V:{vertical:?}");
                 }
             }
         }

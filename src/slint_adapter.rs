@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, time::Instant};
 
 use slint::{
     PhysicalSize, Window,
@@ -65,11 +65,17 @@ impl WindowAdapter for SpellWinAdapter {
 
 pub struct SpellLayerShell {
     pub window_adapter: Rc<SpellWinAdapter>,
+    pub time_since_start: Instant,
 }
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.window_adapter.clone())
+    }
+
+    fn duration_since_start(&self) -> core::time::Duration {
+        let time = self.time_since_start;
+        time.elapsed()
     }
 
     // THis function doesn't only run the event loop. It i also responsible for
