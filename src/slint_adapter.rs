@@ -23,7 +23,7 @@ impl SpellWinAdapter {
         Rc::<SpellWinAdapter>::new_cyclic(|adapter| SpellWinAdapter {
             window: Window::new(adapter.clone()),
             rendered: SoftwareRenderer::new_with_repaint_buffer_type(
-                RepaintBufferType::SwappedBuffers,
+                RepaintBufferType::ReusedBuffer,
             ),
             size: PhysicalSize { width, height },
             needs_redraw: Default::default(),
@@ -32,7 +32,6 @@ impl SpellWinAdapter {
 
     pub fn draw_if_needed(&self, render_callback: impl FnOnce(&SoftwareRenderer)) -> bool {
         if self.needs_redraw.replace(false) {
-            // println!("In render.");
             render_callback(&self.rendered);
             true
         } else {

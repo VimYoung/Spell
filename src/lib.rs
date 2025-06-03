@@ -28,8 +28,8 @@ pub fn cast_spell(
         if waywindow.first_configure {
             event_queue.roundtrip(&mut waywindow).unwrap();
         } else {
-            event_queue.flush().unwrap();
-            event_queue.dispatch_pending(&mut waywindow).unwrap();
+            // event_queue.flush().unwrap();
+            // event_queue.dispatch_pending(&mut waywindow).unwrap();
             event_queue.blocking_dispatch(&mut waywindow).unwrap();
         }
     }
