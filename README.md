@@ -50,8 +50,6 @@ which might cause problem for widget creation.
 1. Resize of buffers aren't possible.
 2. It is irrelevant to define `Width` and `Height` of Window, as that
 should be provided directly in your `main` function. (Though, I must say that recommended way of creating windows with curved borders is to place a `Rectangle` in a transparent window and then define its `border_radius`.)
-3. A major issue has been discovered. `SoftwareRenderer` (provided by slint)
-doesn't support a few key widgets and properties(like using `clip` with `border-radius`, no support for `Path`, `Slider` etc) which I find essential for creating aesthetic widgets. For now, there is no way to change this. I might either contribute to support these features by the renderer or implement a different renderer all together. (Both of the tasks are fairly time consuming).
 
 Having said that,you should try creating static widgets (like showing clock, day etc) at
 this point with `spell` and see how that turns out.
@@ -60,16 +58,27 @@ this point with `spell` and see how that turns out.
 
 I am creating my own shell from spell, which is currently private and will soon be shown
 on display as spell becomes more mature. As for producing a minimal example, you can clone
-[slint-rust-template](https://github.com/slint-ui/slint-rust-template/blob/main/src/main.rs) and change the name to your prefered name ( don't forget to modify `Cargo.toml`).Then add spell in dependencies
-from this github link and replace the main.rs with following contents
+[slint-rust-template](https://github.com/slint-ui/slint-rust-template/blob/main/src/main.rs) and change the name to your preferred name ( don't forget to modify `Cargo.toml`).Then add spell in dependencies
+from this github link along with the following patches in the bottom.
+
+```toml
+[patch.crates-io]
+slint = { git = "https://github.com/slint-ui/slint" }
+slint-build = { git = "https://github.com/slint-ui/slint" }
+i-slint-core = { git = "https://github.com/slint-ui/slint" }
+i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
+```
+
+and then replace the `main.rs` with following contents:
 
 ```rust
-use std::{env, error::Error};
+use std::{cell::RefCell, env, error::Error, rc::Rc};
 
 use spell::{
-    cast_spell, get_spell_ingredients,
+    cast_spell,
     layer_properties::{LayerAnchor, LayerType, WindowConf},
-    slint_adapter::{SpellLayerShell, SpellWinAdapter},
+    shared_context::SharedCore,
+    slint_adapter::{SpellLayerShell, SpellSkiaWinAdapter},
     wayland_adapter::SpellWin,
 };
 
@@ -77,14 +86,15 @@ slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
     let width: u32 = 376;
     let height: u32 = 576;
-    let window_adapter = SpellWinAdapter::new(width, height);
-    let buffer = get_spell_ingredients(width, height);
+    let core = Rc::new(RefCell::new(SharedCore::new(width, height)));
+    let window_adapter = SpellSkiaWinAdapter::new(core.clone(), width, height);
     let window_conf = WindowConf::new(
         width,
         height,
         (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
         (5, 0, 0, 10),
         LayerType::Top,
+        core,
         window_adapter.clone(),
         false,
     );
@@ -109,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
              ui.set_counter(ui.get_counter() + 1);
          }
      });
-    cast_spell( waywindow, event_queue, buffer)
+    cast_spell( waywindow, event_queue)
 }
 ```
 

@@ -1,6 +1,5 @@
 mod configure;
 pub mod shared_context;
-pub mod skia_adapter;
 pub mod slint_adapter;
 pub mod wayland_adapter;
 pub mod layer_properties {

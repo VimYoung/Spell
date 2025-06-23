@@ -78,7 +78,7 @@ impl RenderBuffer for SkiaSoftwareBuffer {
 
         let bytes = bytemuck::cast_slice_mut(native_buffer);
         *self.last_dirty_region.borrow_mut() =
-            render_callback(width, height, skia_safe::ColorType::RGBA8888, 1, bytes).unwrap();
+            render_callback(width, height, skia_safe::ColorType::BGRA8888, 1, bytes).unwrap();
 
         // *self.pixels.borrow_mut() = shared_pixel_buffer;
 

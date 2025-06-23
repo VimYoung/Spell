@@ -1,4 +1,4 @@
-use crate::{shared_context::SharedCore, skia_adapter::SpellSkiaWinAdapter};
+use crate::{shared_context::SharedCore, slint_adapter::SpellSkiaWinAdapter};
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, Layer};
 use std::{cell::RefCell, rc::Rc};
