@@ -10,6 +10,7 @@ use slint::{
         },
     },
 };
+use crate::skia_adapter::SpellSkiaWinAdapter;
 
 pub struct SpellWinAdapter {
     pub window: Window,
@@ -63,7 +64,7 @@ impl WindowAdapter for SpellWinAdapter {
 }
 
 pub struct SpellLayerShell {
-    pub window_adapter: Rc<SpellWinAdapter>,
+    pub window_adapter: Rc<SpellSkiaWinAdapter>,
     pub time_since_start: Instant,
 }
 
