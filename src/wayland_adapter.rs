@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{cell::RefCell, rc::Rc};
 
 use slint::{
     PhysicalSize,
@@ -38,7 +38,7 @@ use crate::{
     shared_context::{MemoryManager, SharedCore},
 };
 
-mod window_state;
+pub mod window_state;
 use self::window_state::PointerState;
 
 // This trait helps in defining specifc functions that would be required to run
@@ -141,58 +141,19 @@ impl SpellWin {
     }
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
+        slint::platform::update_timers_and_animations();
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;
         let window_adapter = self.adapter.clone();
-        // let work_buffer = self.memory_manager.ren_buffer.clone();
 
-        slint::platform::update_timers_and_animations();
-        let time_ren = Instant::now();
+        // Rendering from Skia
         window_adapter.draw_if_needed();
-        // window_adapter.draw_if_needed(|renderer| {
-        //     // println!("Rendering");
-        //     let physical_region = renderer.render(&mut work_buffer, width as usize);
-        //     self.set_damaged(physical_region);
-        //     self.set_buffer(work_buffer.to_vec());
-        // });
-        println!("Render Time: {}", time_ren.elapsed().as_millis());
-
-        // core::mem::swap::<&mut [Rgba8Pixel]>(
-        //     &mut &mut *work_buffer,
-        //     &mut &mut *currently_displayed_buffer,
-        // );
 
         let pool = &mut self.memory_manager.pool;
         let buffer = &self.memory_manager.wayland_buffer;
-        // let sec_buffer = &self.adapter.manager.borrow().secondary_buffer;
-        // let mut sec_canvas_data = {
-        //     let sec_canvas = sec_buffer.canvas(pool).unwrap();
-        //     sec_canvas.to_vec()
-        // };
         let primary_canvas = buffer.canvas(pool).unwrap();
-        // println!("{}", primary_canvas.len());
-        // {
-        //     let value = &self.core.borrow().secondary_buffer;
-        //     println!("{}", value.len());
-        // }
         // Drawing the window
         let now = std::time::Instant::now();
-        // {
-        //     primary_canvas
-        //         .chunks_exact_mut(4)
-        //         .enumerate()
-        //         .for_each(|(index, chunk)| {
-        //             let a = self.adapter.buffer.pixels.borrow().unwrap()
-        //             let a = self.slint_buffer.as_ref().unwrap()[index].a;
-        //             let r = self.slint_buffer.as_ref().unwrap()[index].r;
-        //             let g = self.slint_buffer.as_ref().unwrap()[index].g;
-        //             let b = self.slint_buffer.as_ref().unwrap()[index].b;
-        //             let color: u32 =
-        //                 ((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
-        //
-        //             let array: &mut [u8; 4] = chunk.try_into().unwrap();
-        //             *array = color.to_le_bytes();
-        //         });
         {
             primary_canvas
                 .iter_mut()
@@ -237,11 +198,11 @@ impl SpellWin {
         buffer
             .attach_to(self.layer.wl_surface())
             .expect("buffer attach");
-        println!("Buffer Attached");
 
         self.layer.commit();
 
         // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
+        // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
 
         // TODO save and reuse buffer when the window size is unchanged.  This is especially
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
@@ -322,7 +283,6 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _time: u32,
     ) {
-        println!("Frame is called");
         self.converter(qh);
         // println!("Next draws called");
     }
@@ -518,7 +478,7 @@ impl PointerHandler for SpellWin {
     }
 }
 
-// FIND What is the use of registery_handlers here?
+// TODO FIND What is the use of registery_handlers here?
 impl ProvidesRegistryState for SpellWin {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.registry_state
