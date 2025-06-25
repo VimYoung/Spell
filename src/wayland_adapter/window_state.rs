@@ -2,8 +2,8 @@ use smithay_client_toolkit::{
     reexports::client::protocol::wl_pointer,
     seat::pointer::{PointerData, cursor_shape::CursorShapeManager},
 };
-use std::result::Result;
-use zbus::{Connection as BusConn, Result as BusResult, interface};
+use std::{future::pending, result::Result};
+use zbus::{Connection as BusConn, Result as BusResult, fdo::Error as BusError, interface};
 
 pub struct PointerState {
     pub pointer: Option<wl_pointer::WlPointer>,
@@ -15,7 +15,7 @@ pub struct PointerState {
 // macro in the future.
 pub trait ForeignController: Send + Sync {
     fn get_type(&self, key: &str) -> DataType;
-    fn change_val(&mut self, key: &str, val: DataType) -> Result<(), zbus::fdo::Error>;
+    fn change_val(&mut self, key: &str, val: DataType);
 }
 
 // TODO Currently doesn't support brush, this enum needs to be updated to incorporate
@@ -25,6 +25,7 @@ pub enum DataType {
     String(String),
     Boolean(bool),
     Vector(Vec<bool>),
+    Panic,
 }
 
 struct VarHandler {
@@ -32,6 +33,7 @@ struct VarHandler {
 }
 
 // TODO, properly implement the error type for this platform
+// Application of an error type to work across the project is must.
 // #[derive(Debug)]
 // pub enum SpellError {
 //     Buserror(zbus::Error),
@@ -61,9 +63,18 @@ struct VarHandler {
     )
 )]
 impl VarHandler {
-    async fn set_value(&mut self, key: &str, val: &str) -> Result<(), zbus::fdo::Error> {
-        let value: DataType = self.state.get_type(val);
-        self.state.change_val(key, value)?;
+    async fn set_value(&mut self, key: &str, val: &str) -> Result<(), BusError> {
+        let returned_value: DataType = self.state.get_type(val);
+        match returned_value {
+            DataType::Boolean(_) => {
+                if let Ok(con_var) = val.trim().parse::<bool>() {
+                    self.state.change_val(key, DataType::Boolean(con_var));
+                } else {
+                    return Err(BusError::NotSupported("Value is not supported".to_string()));
+                }
+            }
+            _ => panic!("Implement the rest of Types of DataType"),
+        }
         Ok(())
     }
 
@@ -93,5 +104,7 @@ pub async fn deploy_zbus_service(state: Box<dyn ForeignController>) -> BusResult
         .await?;
     connection.request_name("org.VimYoung.Spell").await?;
 
-    loop {}
+    pending::<()>().await;
+
+    Ok(())
 }

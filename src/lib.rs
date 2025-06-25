@@ -14,7 +14,7 @@ pub mod layer_properties {
 
 // use configure::Rgba8Pixel;
 use smithay_client_toolkit::reexports::client::EventQueue;
-use std::{error::Error, thread};
+use std::{error::Error};
 use wayland_adapter::{
     SpellWin,
     window_state::{ForeignController, deploy_zbus_service},

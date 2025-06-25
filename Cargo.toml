@@ -8,7 +8,6 @@ bytemuck = "1.23.1"
 env_logger = "0.11.7"
 i-slint-core = "1.11.0"
 i-slint-renderer-skia = { version = "1.11.0", features = ["wayland"] }
-# skia-safe = { version = "0.86.1", features = ["wayland"] }
 slint = { version = "1.8.0", features = [
   "raw-window-handle-06",
   "renderer-software",
