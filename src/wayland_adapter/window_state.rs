@@ -18,13 +18,18 @@ pub trait ForeignController: Send + Sync {
     fn change_val(&mut self, key: &str, val: DataType);
 }
 
+<<<<<<< HEAD
 // TODO Currently doesn't support brush, this enum needs to be updated to incorporate
 // every type in which slint can convert its values to.
+=======
+// TODO, I can support a vector type which someone might use for using external
+// command outputs to be stored inside.
+#[derive(Debug)]
+>>>>>>> 99095e1 (Dbus interface implemented)
 pub enum DataType {
-    Int(u32),
+    Int(i32),
     String(String),
     Boolean(bool),
-    Vector(Vec<bool>),
     Panic,
 }
 
@@ -64,6 +69,7 @@ struct VarHandler {
 )]
 impl VarHandler {
     async fn set_value(&mut self, key: &str, val: &str) -> Result<(), BusError> {
+<<<<<<< HEAD
         let returned_value: DataType = self.state.get_type(val);
         match returned_value {
             DataType::Boolean(_) => {
@@ -74,6 +80,26 @@ impl VarHandler {
                 }
             }
             _ => panic!("Implement the rest of Types of DataType"),
+=======
+        let returned_value: DataType = self.state.read().unwrap().get_type(key);
+        match returned_value {
+            DataType::Boolean(_) => {
+                if let Ok(con_var) = val.trim().parse::<bool>() {
+                    self.state_updater
+                        .send((key.to_string(), DataType::Boolean(con_var)))
+                        .await?;
+                    Ok(())
+                } else {
+                    Err(BusError::Failed("Error".to_string()))
+                    // Err(BusError::Failed("Value is not a valid boolean".into()))
+                    // panic!("Temporary Panic , remove this code and handle the errors");
+                    // return Err(BusError::NotSupported("Value is not supported".to_string()));
+                }
+            }
+            DataType::Int(_) => {}
+            DataType::String(_) => {}
+            DataType::Panic => "Error from Panic".to_string(),
+>>>>>>> 99095e1 (Dbus interface implemented)
         }
         Ok(())
     }

@@ -147,7 +147,9 @@ impl SpellWin {
         let window_adapter = self.adapter.clone();
 
         // Rendering from Skia
+        let skia_now = std::time::Instant::now();
         window_adapter.draw_if_needed();
+        println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
         let pool = &mut self.memory_manager.pool;
         let buffer = &self.memory_manager.wayland_buffer;
@@ -163,8 +165,7 @@ impl SpellWin {
                 });
         }
 
-        let elaspesed_time = now.elapsed().as_millis();
-        println!("{}", elaspesed_time);
+        println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
 
         // Damage the entire window
         // if self.first_configure {
