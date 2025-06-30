@@ -13,12 +13,6 @@ pub mod layer_properties {
 }
 
 use smithay_client_toolkit::reexports::client::EventQueue;
-<<<<<<< HEAD
-use std::{error::Error};
-use wayland_adapter::{
-    SpellWin,
-    window_state::{ForeignController, deploy_zbus_service},
-=======
 use std::{
     error::Error,
     sync::{Arc, RwLock},
@@ -27,7 +21,6 @@ use tokio::sync::mpsc;
 use wayland_adapter::{
     SpellWin,
     window_state::{DataType, ForeignController, deploy_zbus_service},
->>>>>>> 99095e1 (Dbus interface implemented)
 };
 
 use zbus::Error as BusError;
@@ -35,14 +28,6 @@ use zbus::Error as BusError;
 pub fn cast_spell<F>(
     mut waywindow: SpellWin,
     mut event_queue: EventQueue<SpellWin>,
-<<<<<<< HEAD
-    mut state: Box<dyn ForeignController>,
-) -> Result<(), Box<dyn Error>> {
-    tokio::spawn(async move {
-        println!("deplied zbus serive in thread");
-        deploy_zbus_service(state).await?;
-        Ok::<_, BusError>(())
-=======
     state: Box<dyn ForeignController>,
     set_callback: &mut F,
 ) -> Result<(), Box<dyn Error>>
@@ -66,16 +51,13 @@ where
             deploy_zbus_service(state_clone, tx).await?;
             Ok::<_, BusError>(())
         });
->>>>>>> 99095e1 (Dbus interface implemented)
     });
 
     loop {
-<<<<<<< HEAD
         // Following line does the updates to the buffer. Now those updates
         // needs to be picked by the compositer/windowing system and then
         // displayed accordingly.
         // println!("Running the loop");
-=======
         if let Ok((key, data_type)) = rx.try_recv() {
             println!("received event");
             //Glad I could think of this sub scope for RwLock.
@@ -86,7 +68,6 @@ where
             }
             set_callback(state.clone());
         };
->>>>>>> 99095e1 (Dbus interface implemented)
 
         if waywindow.first_configure {
             event_queue.roundtrip(&mut waywindow).unwrap();

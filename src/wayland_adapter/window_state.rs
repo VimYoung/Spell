@@ -2,7 +2,13 @@ use smithay_client_toolkit::{
     reexports::client::protocol::wl_pointer,
     seat::pointer::{PointerData, cursor_shape::CursorShapeManager},
 };
-use std::{future::pending, result::Result};
+use std::{
+    any::Any,
+    future::pending,
+    result::Result,
+    sync::{Arc, RwLock},
+};
+use tokio::sync::mpsc::Sender;
 use zbus::{Connection as BusConn, Result as BusResult, fdo::Error as BusError, interface};
 
 pub struct PointerState {
@@ -16,16 +22,14 @@ pub struct PointerState {
 pub trait ForeignController: Send + Sync {
     fn get_type(&self, key: &str) -> DataType;
     fn change_val(&mut self, key: &str, val: DataType);
+    fn as_any(&self) -> &dyn Any;
 }
 
-<<<<<<< HEAD
 // TODO Currently doesn't support brush, this enum needs to be updated to incorporate
 // every type in which slint can convert its values to.
-=======
 // TODO, I can support a vector type which someone might use for using external
 // command outputs to be stored inside.
 #[derive(Debug)]
->>>>>>> 99095e1 (Dbus interface implemented)
 pub enum DataType {
     Int(i32),
     String(String),
@@ -34,33 +38,12 @@ pub enum DataType {
 }
 
 struct VarHandler {
-    state: Box<dyn ForeignController>,
+    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state_updater: Sender<(String, DataType)>,
 }
 
-// TODO, properly implement the error type for this platform
-// Application of an error type to work across the project is must.
-// #[derive(Debug)]
-// pub enum SpellError {
-//     Buserror(zbus::Error),
-//     FdoError(zbus::fdo::Error),
-// }
-//
-// impl From<zbus::Error> for SpellError {
-//     fn from(value: zbus::Error) -> Self {
-//         SpellError::Buserror(value)
-//     }
-// }
-//
-// impl From<zbus::fdo::Error> for SpellError {
-//     fn from(value: zbus::fdo::Error) -> Self {
-//         SpellError::FdoError(value)
-//     }
-// }
-//
-// impl zbus::DBusError for SpellError {}
-
 #[interface(
-    name = "org.VimYoung.Spell",
+    name = "org.VimYoung.Spell1",
     proxy(
         gen_blocking = false,
         default_path = "/org/VimYoung/VarHandler/WithProxy",
@@ -69,43 +52,43 @@ struct VarHandler {
 )]
 impl VarHandler {
     async fn set_value(&mut self, key: &str, val: &str) -> Result<(), BusError> {
-<<<<<<< HEAD
-        let returned_value: DataType = self.state.get_type(val);
-        match returned_value {
-            DataType::Boolean(_) => {
-                if let Ok(con_var) = val.trim().parse::<bool>() {
-                    self.state.change_val(key, DataType::Boolean(con_var));
-                } else {
-                    return Err(BusError::NotSupported("Value is not supported".to_string()));
-                }
-            }
-            _ => panic!("Implement the rest of Types of DataType"),
-=======
         let returned_value: DataType = self.state.read().unwrap().get_type(key);
         match returned_value {
             DataType::Boolean(_) => {
                 if let Ok(con_var) = val.trim().parse::<bool>() {
                     self.state_updater
                         .send((key.to_string(), DataType::Boolean(con_var)))
-                        .await?;
-                    Ok(())
+                        .await;
+                    return Ok(());
                 } else {
-                    Err(BusError::Failed("Error".to_string()))
+                    return Err(BusError::NotSupported("Value is not supported".to_string()));
+                }
+            }
+            DataType::Boolean(_) => {
+                if let Ok(con_var) = val.trim().parse::<bool>() {
+                    if let Err(_) = self
+                        .state_updater
+                        .send((key.to_string(), DataType::Boolean(con_var)))
+                        .await
+                    {
+                        return Err(BusError::Failed("Error".to_string()));
+                    };
+                } else {
+                    return Err(BusError::Failed("Error".to_string()));
                     // Err(BusError::Failed("Value is not a valid boolean".into()))
                     // panic!("Temporary Panic , remove this code and handle the errors");
                     // return Err(BusError::NotSupported("Value is not supported".to_string()));
                 }
             }
-            DataType::Int(_) => {}
-            DataType::String(_) => {}
-            DataType::Panic => "Error from Panic".to_string(),
->>>>>>> 99095e1 (Dbus interface implemented)
+            DataType::Int(_) => return Ok(()),
+            DataType::String(_) => return Ok(()),
+            DataType::Panic => return Err(BusError::Failed("Error from Panic".to_string())),
         }
         Ok(())
     }
 
     async fn find_value(&self, key: &str) -> String {
-        let value: DataType = self.state.get_type(key);
+        let value: DataType = self.state.read().unwrap().get_type(key);
         match value {
             DataType::Int(int_value) => int_value.to_string(),
             DataType::Boolean(bool_val) => bool_val.to_string().clone(),
@@ -119,14 +102,23 @@ impl VarHandler {
     // async fn greeted_everyone(emitter: &SignalEmitter<'_>) -> FResult<()>;
 }
 
-pub async fn deploy_zbus_service(state: Box<dyn ForeignController>) -> BusResult<()> {
+pub async fn deploy_zbus_service(
+    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state_updater: Sender<(String, DataType)>,
+) -> BusResult<()> {
     println!("deplied zbus serive");
     let connection = BusConn::session().await?;
 
     //Setting up object server.
     connection
         .object_server()
-        .at("/org/VimYoung/VarHandler", VarHandler { state })
+        .at(
+            "/org/VimYoung/VarHandler",
+            VarHandler {
+                state,
+                state_updater,
+            },
+        )
         .await?;
     connection.request_name("org.VimYoung.Spell").await?;
 
