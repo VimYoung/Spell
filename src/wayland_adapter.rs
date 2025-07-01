@@ -285,7 +285,6 @@ impl CompositorHandler for SpellWin {
         _time: u32,
     ) {
         self.converter(qh);
-        // println!("Next draws called");
     }
 
     fn surface_enter(

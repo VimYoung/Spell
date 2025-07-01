@@ -2,12 +2,12 @@ use std::{
     env::{self, Args},
     result::Result,
 };
-
 use zbus::{Connection, Result as BusResult, proxy};
 
 #[proxy(
+    default_path = "/org/VimYoung/VarHandler",
     default_service = "org.VimYoung.Spell",
-    default_path = "/org/VimYoung/VarHandler"
+    interface = "org.VimYoung.Spell1"
 )]
 trait SpellClient {
     fn set_value(&mut self, key: &str, val: &str) -> Result<(), SpellError>;
@@ -19,35 +19,122 @@ async fn main() -> Result<(), SpellError> {
     let mut values = env::args();
     values.next();
     if let Some(sub_command) = values.next() {
-        match sub_command.as_str() {
+        let return_value = match sub_command.as_str() {
             "update" => update_value(values).await,
+            "look" => look_value(values).await,
+            // Used for enabling notifications, clients, lockscreen etc.
+            "enable" => Ok(()),
+            // tracing subscriber logs here.
+            "logs" => Ok(()),
+            // A later on added trait which can be configured and then running this command
+            // Will display all the existing features of your shell as configured by the user.
+            // So, when showcasing, he would only need to run this command once.
+            "test" => Ok(()),
+            // Following code will be used for opening clsing respected windows later on once
+            // Spell is made multi-window compatable.
+            "open" => Ok(()),
+            "close" => Ok(()),
+            "toggle" => Ok(()),
+            // List the running instancs of windows and subwindows.
+            "list" => Ok(()),
+            "--help" => show_help(None),
             _ => Err(SpellError::CLI(Cli::BadSubCommand(format!(
-                "This subcommand doesn't exist {}",
-                sub_command
+                "The subcommand \"{sub_command}\"doesn't exist, use `spell --help` to view available commands"
             )))),
         };
+        if let Err(recieved_error) = return_value {
+            // TODO Here the SpellError needs to be matched its each arm and proper messages needs
+            // to be sent.
+            // TODO below code can be avoided by implementing Debug manually for the erum
+            match recieved_error {
+                SpellError::CLI(cli) => match cli {
+                    Cli::BadSubCommand(err) => {
+                        eprintln!("[Bad Sub-command]: {err}");
+                    }
+                    Cli::UndefinedArg(err) => {
+                        eprintln!("[Undefined Arg]: {err}");
+                    }
+                },
+                SpellError::Buserror(bus_error) => match bus_error {
+                    zbus::Error::MethodError(rare_err_1, err_val, rare_err_2) => {
+                        if let Some(value) = err_val {
+                            match value.as_str() {
+                                "Value is not supported" => eprintln!(
+                                    "[Parse Error]: Given Value for key couldn't be parsed."
+                                ),
+                                _ => eprintln!(
+                                    "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes"
+                                ),
+                            }
+                        } else {
+                            let rare_err_value = (rare_err_1, rare_err_2);
+                            eprintln!(
+                                "[Undefined Error]: This error shouldn't be shown, open an issue with following Debug Output: \n {rare_err_value:#?}"
+                            );
+                        }
+                    }
+                    zbus::Error::Unsupported => {
+                        eprintln!("[Parse Error]: Given Value for key couldn't be parsed.");
+                    }
+                    _ => eprintln!("[Undocumented Error]: {bus_error}"),
+                },
+            }
+            // eprintln!("[Error] : \n {recieved_error:?}");
+        }
+    } else {
+        let _ = show_help(None);
     }
+    Ok(())
+}
+
+const MAIN_HELP: &str = "
+This is the help of Spell which needs to be written proeperly.
+";
+
+fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
+    match sub_command {
+        // TODO Add help commands messages for sub-commands.
+        Some(_sub_comm) => Ok(()),
+        None => {
+            println!("{MAIN_HELP}");
+            Ok(())
+        }
+    }
+}
+
+async fn look_value(mut values: Args) -> Result<(), SpellError> {
+    let remain_arg: String = values
+        .next()
+        .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
+        .clone();
+    let conn = Connection::session().await?;
+    let proxy = SpellClientProxy::new(&conn).await?;
+    proxy.find_value(&remain_arg).await?;
     Ok(())
 }
 
 async fn update_value(values: Args) -> Result<(), SpellError> {
     let remain_arg: Vec<String> = values.collect();
-    if remain_arg.len() != 2 {
-        println!("Got the errrrrorrr");
+    if remain_arg.len() < 2 {
         Err(SpellError::CLI(Cli::UndefinedArg(
-            "Undefined arguments after update, only provide {{key}} and {{Value}}".to_string(),
+            "Less arguments given, provide {{key}} and {{Value}}".to_string(),
+        )))
+    } else if remain_arg.len() > 2 {
+        Err(SpellError::CLI(Cli::UndefinedArg(
+            "More than 2 arg given. Only provide {{key}} and {{Value}}".to_string(),
         )))
     } else {
         let conn = Connection::session().await?;
         let mut proxy = SpellClientProxy::new(&conn).await?;
-        let reply = proxy.set_value(&remain_arg[0], &remain_arg[1]).await?;
-        dbg!(reply);
+        proxy.set_value(&remain_arg[0], &remain_arg[1]).await?;
         Ok(())
     }
 }
 
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
+// Currently Buserror is not being used. THis requires type implementations
+// of variant on Cli.
 #[derive(Debug)]
 pub enum SpellError {
     Buserror(zbus::Error),
@@ -69,3 +156,6 @@ impl From<zbus::Error> for SpellError {
 
 // TODO write man docs for the command line tool and its Config if expanded further.
 // Have to improve error handling by introduction of custom error type.
+// TODO I have to set up panic hooks for .expect statements.
+// TODO add --verbose argument in base command for directly passing the error
+// outputs without matching/mapping/manipulating them.

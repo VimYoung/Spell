@@ -35,6 +35,7 @@ pub struct SkiaSoftwareBuffer {
     pub last_dirty_region: RefCell<Option<i_slint_core::item_rendering::DirtyRegion>>,
 }
 
+#[allow(unused_variables)]
 impl RenderBuffer for SkiaSoftwareBuffer {
     fn with_buffer(
         &self,

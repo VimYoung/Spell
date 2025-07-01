@@ -46,8 +46,8 @@ struct VarHandler {
     name = "org.VimYoung.Spell1",
     proxy(
         gen_blocking = false,
-        default_path = "/org/VimYoung/VarHandler/WithProxy",
-        default_service = "org.VimYoung.Spell.WithProxy",
+        // default_path = "/org/VimYoung/VarHandler/WithProxy",
+        // default_service = "org.VimYoung.Spell.WithProxy",
     )
 )]
 impl VarHandler {
@@ -56,35 +56,20 @@ impl VarHandler {
         match returned_value {
             DataType::Boolean(_) => {
                 if let Ok(con_var) = val.trim().parse::<bool>() {
-                    self.state_updater
-                        .send((key.to_string(), DataType::Boolean(con_var)))
-                        .await;
-                    return Ok(());
-                } else {
-                    return Err(BusError::NotSupported("Value is not supported".to_string()));
-                }
-            }
-            DataType::Boolean(_) => {
-                if let Ok(con_var) = val.trim().parse::<bool>() {
-                    if let Err(_) = self
+                    //TODO this needs to be handled once graceful shutdown is implemented.
+                    let _ = self
                         .state_updater
                         .send((key.to_string(), DataType::Boolean(con_var)))
-                        .await
-                    {
-                        return Err(BusError::Failed("Error".to_string()));
-                    };
+                        .await;
+                    Ok(())
                 } else {
-                    return Err(BusError::Failed("Error".to_string()));
-                    // Err(BusError::Failed("Value is not a valid boolean".into()))
-                    // panic!("Temporary Panic , remove this code and handle the errors");
-                    // return Err(BusError::NotSupported("Value is not supported".to_string()));
+                    Err(BusError::NotSupported("Value is not supported".to_string()))
                 }
             }
-            DataType::Int(_) => return Ok(()),
-            DataType::String(_) => return Ok(()),
-            DataType::Panic => return Err(BusError::Failed("Error from Panic".to_string())),
+            DataType::Int(_) => Ok(()),
+            DataType::String(_) => Ok(()),
+            DataType::Panic => Err(BusError::Failed("Error from Panic".to_string())),
         }
-        Ok(())
     }
 
     async fn find_value(&self, key: &str) -> String {
