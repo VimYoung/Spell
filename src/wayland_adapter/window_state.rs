@@ -11,6 +11,7 @@ use std::{
 use tokio::sync::mpsc::Sender;
 use zbus::{Connection as BusConn, Result as BusResult, fdo::Error as BusError, interface};
 
+#[derive(Debug)]
 pub struct PointerState {
     pub pointer: Option<wl_pointer::WlPointer>,
     pub pointer_data: Option<PointerData>,
@@ -37,9 +38,14 @@ pub enum DataType {
     Panic,
 }
 
+pub enum InternalHandle {
+    StateValChange((String, DataType)),
+    ShowWinAgain,
+}
+
 struct VarHandler {
     state: Arc<RwLock<Box<dyn ForeignController>>>,
-    state_updater: Sender<(String, DataType)>,
+    state_updater: Sender<InternalHandle>,
 }
 
 #[interface(
@@ -59,7 +65,10 @@ impl VarHandler {
                     //TODO this needs to be handled once graceful shutdown is implemented.
                     let _ = self
                         .state_updater
-                        .send((key.to_string(), DataType::Boolean(con_var)))
+                        .send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::Boolean(con_var),
+                        )))
                         .await;
                     Ok(())
                 } else {
@@ -82,6 +91,14 @@ impl VarHandler {
         }
     }
 
+    async fn show_window_back(&self) -> Result<(), BusError> {
+        self.state_updater
+            .send(InternalHandle::ShowWinAgain)
+            .await
+            .unwrap();
+        Ok(())
+    }
+
     // A signal; the implementation is provided by the macro.
     // #[zbus(signal)]
     // async fn greeted_everyone(emitter: &SignalEmitter<'_>) -> FResult<()>;
@@ -89,7 +106,7 @@ impl VarHandler {
 
 pub async fn deploy_zbus_service(
     state: Arc<RwLock<Box<dyn ForeignController>>>,
-    state_updater: Sender<(String, DataType)>,
+    state_updater: Sender<InternalHandle>,
 ) -> BusResult<()> {
     println!("deplied zbus serive");
     let connection = BusConn::session().await?;

@@ -49,6 +49,7 @@ impl std::clone::Clone for Rgba8Pixel {
     }
 }
 
+#[derive(Debug)]
 pub struct WindowConf {
     pub width: u32,
     pub height: u32,
@@ -61,6 +62,7 @@ pub struct WindowConf {
 }
 
 impl WindowConf {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         width: u32,
         height: u32,

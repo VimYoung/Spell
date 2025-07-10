@@ -14,6 +14,7 @@ slint = { version = "1.8.0", features = [
 ] }
 smithay-client-toolkit = "0.19.2"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
+tracing = "0.1.41"
 zbus = "5.7.1"
 
 [patch.crates-io]

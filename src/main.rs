@@ -1,3 +1,4 @@
+use spell::constantvals::MAIN_HELP;
 use std::{
     env::{self, Args},
     result::Result,
@@ -12,16 +13,20 @@ use zbus::{Connection, Result as BusResult, proxy};
 trait SpellClient {
     fn set_value(&mut self, key: &str, val: &str) -> Result<(), SpellError>;
     fn find_value(&self, key: &str) -> BusResult<String>;
+    fn show_window_back(&self) -> Result<(), SpellError>;
 }
 
 #[tokio::main]
 async fn main() -> Result<(), SpellError> {
     let mut values = env::args();
     values.next();
+    let conn = Connection::session().await?;
+    let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.as_str() {
-            "update" => update_value(values).await,
-            "look" => look_value(values).await,
+            "update" => update_value(values, proxy).await,
+            "look" => look_value(values, proxy).await,
+            "show" => proxy.show_window_back().await,
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
             // tracing subscriber logs here.
@@ -63,7 +68,7 @@ async fn main() -> Result<(), SpellError> {
                                     "[Parse Error]: Given Value for key couldn't be parsed."
                                 ),
                                 _ => eprintln!(
-                                    "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes"
+                                    "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes."
                                 ),
                             }
                         } else {
@@ -87,10 +92,6 @@ async fn main() -> Result<(), SpellError> {
     Ok(())
 }
 
-const MAIN_HELP: &str = "
-This is the help of Spell which needs to be written proeperly.
-";
-
 fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     match sub_command {
         // TODO Add help commands messages for sub-commands.
@@ -102,18 +103,17 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     }
 }
 
-async fn look_value(mut values: Args) -> Result<(), SpellError> {
+async fn look_value(mut values: Args, proxy: SpellClientProxy<'_>) -> Result<(), SpellError> {
     let remain_arg: String = values
         .next()
         .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
         .clone();
-    let conn = Connection::session().await?;
-    let proxy = SpellClientProxy::new(&conn).await?;
-    proxy.find_value(&remain_arg).await?;
+    let value:String = proxy.find_value(&remain_arg).await?;
+    println!("{value}");
     Ok(())
 }
 
-async fn update_value(values: Args) -> Result<(), SpellError> {
+async fn update_value(values: Args, mut proxy: SpellClientProxy<'_>) -> Result<(), SpellError> {
     let remain_arg: Vec<String> = values.collect();
     if remain_arg.len() < 2 {
         Err(SpellError::CLI(Cli::UndefinedArg(
@@ -124,8 +124,6 @@ async fn update_value(values: Args) -> Result<(), SpellError> {
             "More than 2 arg given. Only provide {{key}} and {{Value}}".to_string(),
         )))
     } else {
-        let conn = Connection::session().await?;
-        let mut proxy = SpellClientProxy::new(&conn).await?;
         proxy.set_value(&remain_arg[0], &remain_arg[1]).await?;
         Ok(())
     }
@@ -159,3 +157,5 @@ impl From<zbus::Error> for SpellError {
 // TODO I have to set up panic hooks for .expect statements.
 // TODO add --verbose argument in base command for directly passing the error
 // outputs without matching/mapping/manipulating them.
+// TODO, no answer is showing if the currently running ui doesn't possess the state
+// in slint.

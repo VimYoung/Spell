@@ -125,6 +125,13 @@ impl WindowAdapter for SpellSkiaWinAdapter {
     }
 }
 
+impl std::fmt::Debug for SpellSkiaWinAdapter {
+    // TODO this needs to be implemented properly
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 impl SpellSkiaWinAdapter {
     pub fn new(shared_core: Rc<RefCell<SharedCore>>, width: u32, height: u32) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBuffer {

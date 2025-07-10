@@ -45,11 +45,13 @@ use self::window_state::PointerState;
 // inside the SpellWin. Benefit of this abstraction is that I am sure that every function
 // I am defining works even if inside `Rc`, i.e. only using non interior mutability
 // functions.
-pub trait EventAdapter {
+
+pub trait EventAdapter: std::fmt::Debug {
     fn draw_if_needed(&self) -> bool;
     fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
 }
 
+#[derive(Debug)]
 pub struct SpellWin {
     pub adapter: Rc<dyn EventAdapter>,
     pub core: Rc<RefCell<SharedCore>>,
@@ -62,6 +64,8 @@ pub struct SpellWin {
     pub layer: LayerSurface,
     pub keyboard_focus: bool,
     pub first_configure: bool,
+    pub is_hidden: bool,
+    pub config: WindowConf,
 }
 
 impl SpellWin {
@@ -88,14 +92,7 @@ impl SpellWin {
             None,
         );
         // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-        layer.set_size(window_conf.width, window_conf.height);
-        layer.set_margin(
-            window_conf.margin.0,
-            window_conf.margin.1,
-            window_conf.margin.2,
-            window_conf.margin.3,
-        );
-        set_anchor(&window_conf, &mut layer);
+        set_config(&window_conf, &mut layer);
         layer.commit();
 
         let (wayland_buffer, _) = pool
@@ -121,8 +118,8 @@ impl SpellWin {
 
         (
             SpellWin {
-                adapter: window_conf.adapter,
-                core: window_conf.shared_core,
+                adapter: window_conf.adapter.clone(),
+                core: window_conf.shared_core.clone(),
                 size: PhysicalSize {
                     width: window_conf.width,
                     height: window_conf.height,
@@ -135,9 +132,49 @@ impl SpellWin {
                 layer,
                 keyboard_focus: false,
                 first_configure: true,
+                is_hidden: false,
+                config: window_conf,
             },
             event_queue,
         )
+    }
+
+    pub fn hide(&mut self) {
+        self.is_hidden = true;
+        self.layer.wl_surface().attach(None, 0, 0);
+    }
+
+    // TODO this doesn't seem to trace.
+    #[tracing::instrument]
+    pub fn show_again(&mut self) {
+        let width: u32 = self.size.width;
+        let height: u32 = self.size.height;
+        let pool = &mut self.memory_manager.pool;
+        let (wayland_buffer, _) = pool
+            .create_buffer(
+                width as i32,
+                height as i32,
+                (width * 4) as i32,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+        // tracing::info!("tracing output: {}", buffer.canvas(pool).unwrap().len());
+        {
+            wayland_buffer
+                .canvas(pool)
+                .unwrap()
+                .iter_mut()
+                .enumerate()
+                .for_each(|(index, val)| {
+                    *val = self.core.borrow().primary_buffer[index];
+                });
+        }
+        set_config(&self.config, &mut self.layer);
+
+        // self.memory_manager.wayland_buffer 
+
+        self.is_hidden = false;
+        self.layer.commit();
     }
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
@@ -147,61 +184,63 @@ impl SpellWin {
         let window_adapter = self.adapter.clone();
 
         // Rendering from Skia
-        let skia_now = std::time::Instant::now();
-        window_adapter.draw_if_needed();
-        println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+        if !self.is_hidden {
+            let skia_now = std::time::Instant::now();
+            window_adapter.draw_if_needed();
+            println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
-        let pool = &mut self.memory_manager.pool;
-        let buffer = &self.memory_manager.wayland_buffer;
-        let primary_canvas = buffer.canvas(pool).unwrap();
-        // Drawing the window
-        let now = std::time::Instant::now();
-        {
-            primary_canvas
-                .iter_mut()
-                .enumerate()
-                .for_each(|(index, val)| {
-                    *val = self.core.borrow().primary_buffer[index];
-                });
+            let pool = &mut self.memory_manager.pool;
+            let buffer = &self.memory_manager.wayland_buffer;
+            let primary_canvas = buffer.canvas(pool).unwrap();
+
+            // println!("{}", primary_canvas.len());
+            // Drawing the window
+            let now = std::time::Instant::now();
+            {
+                primary_canvas
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(index, val)| {
+                        *val = self.core.borrow().primary_buffer[index];
+                    });
+            }
+
+            println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
+
+            // Damage the entire window
+            // if self.first_configure {
+            self.first_configure = false;
+            self.layer
+                .wl_surface()
+                .damage_buffer(0, 0, width as i32, height as i32);
+            // } else {
+            //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+            //         // println!(
+            //         //     "{}, {}, {}, {}",
+            //         //     position.x, position.y, size.width as i32, size.height as i32,
+            //         // );
+            //         // if size.width != width && size.height != height {
+            //         self.layer.wl_surface().damage_buffer(
+            //             position.x,
+            //             position.y,
+            //             size.width as i32,
+            //             size.height as i32,
+            //         );
+            //         //}
+            //     }
+            // }
+            self.layer
+                .wl_surface()
+                .attach(Some(buffer.wl_buffer()), 0, 0);
+        } else {
+            println!("Is_hidden is true.");
         }
-
-        println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
-
-        // Damage the entire window
-        // if self.first_configure {
-        self.first_configure = false;
-        self.layer
-            .wl_surface()
-            .damage_buffer(0, 0, width as i32, height as i32);
-        // } else {
-        //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
-        //         // println!(
-        //         //     "{}, {}, {}, {}",
-        //         //     position.x, position.y, size.width as i32, size.height as i32,
-        //         // );
-        //         // if size.width != width && size.height != height {
-        //         self.layer.wl_surface().damage_buffer(
-        //             position.x,
-        //             position.y,
-        //             size.width as i32,
-        //             size.height as i32,
-        //         );
-        //         //}
-        //     }
-        // }
 
         // Request our next frame
         self.layer
             .wl_surface()
             .frame(qh, self.layer.wl_surface().clone());
-
-        // Attach and commit to present.
-        buffer
-            .attach_to(self.layer.wl_surface())
-            .expect("buffer attach");
-
         self.layer.commit();
-
         // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
         // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
 
@@ -253,6 +292,7 @@ impl OutputHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _output: wl_output::WlOutput,
     ) {
+        println!("Output is destroyed");
     }
 }
 
@@ -294,6 +334,7 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _output: &wl_output::WlOutput,
     ) {
+        println!("Surface reentered");
         // Not needed for this example.
     }
 
@@ -304,12 +345,14 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _output: &wl_output::WlOutput,
     ) {
+        println!("Surface left");
         // Not needed for this example.
     }
 }
 
 impl LayerShellHandler for SpellWin {
     fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
+        println!("CLosed of layer called");
         // self.exit = true;
     }
 
@@ -327,6 +370,7 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
+        println!("Config event is called");
         if self.first_configure {
             self.converter(qh);
             println!("First draw called");
@@ -529,6 +573,17 @@ fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
             }
         }
     }
+}
+
+fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
+    layer.set_size(window_conf.width, window_conf.height);
+    layer.set_margin(
+        window_conf.margin.0,
+        window_conf.margin.1,
+        window_conf.margin.2,
+        window_conf.margin.3,
+    );
+    set_anchor(window_conf, layer);
 }
 
 // Technically, there is no requirement of pool once it is used to create the

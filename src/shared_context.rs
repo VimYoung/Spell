@@ -10,6 +10,7 @@ use smithay_client_toolkit::shm::{
 };
 use std::{cell::RefCell, rc::Rc};
 
+#[derive(Debug)]
 pub struct SharedCore {
     pub primary_buffer: Box<[u8]>,
     pub secondary_buffer: Box<[u8]>,
@@ -24,6 +25,7 @@ impl SharedCore {
     }
 }
 
+#[derive(Debug)]
 pub struct MemoryManager {
     pub shm: Shm,
     pub pool: SlotPool,
