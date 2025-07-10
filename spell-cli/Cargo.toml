@@ -1,0 +1,12 @@
+[package]
+name = "spell-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spell = { path = "../spell/" }
+zbus = "5.8.0"
+tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
+
+[build-dependencies]
+slint-build = "1.8.0"

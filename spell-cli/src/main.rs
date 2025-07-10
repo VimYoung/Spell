@@ -159,3 +159,4 @@ impl From<zbus::Error> for SpellError {
 // outputs without matching/mapping/manipulating them.
 // TODO, no answer is showing if the currently running ui doesn't possess the state
 // in slint.
+// Have to connect the logs of tokio with different filters.

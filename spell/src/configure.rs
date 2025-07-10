@@ -1,7 +1,5 @@
-use crate::{shared_context::SharedCore, slint_adapter::SpellSkiaWinAdapter};
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, Layer};
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Default)]
 pub struct Rgba8Pixel {
@@ -56,8 +54,6 @@ pub struct WindowConf {
     pub anchor: (Option<Anchor>, Option<Anchor>),
     pub margin: (i32, i32, i32, i32),
     pub layer_type: Layer,
-    pub shared_core: Rc<RefCell<SharedCore>>,
-    pub adapter: Rc<SpellSkiaWinAdapter>,
     pub exclusive_zone: bool,
 }
 
@@ -69,8 +65,6 @@ impl WindowConf {
         anchor: (Option<Anchor>, Option<Anchor>),
         margin: (i32, i32, i32, i32),
         layer_type: Layer,
-        shared_core: Rc<RefCell<SharedCore>>,
-        adapter: Rc<SpellSkiaWinAdapter>,
         exclusive_zone: bool,
     ) -> Self {
         WindowConf {
@@ -79,8 +73,6 @@ impl WindowConf {
             anchor,
             margin,
             layer_type,
-            shared_core,
-            adapter,
             exclusive_zone,
         }
     }

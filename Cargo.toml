@@ -1,21 +1,6 @@
-[package]
-name = "spell"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-bytemuck = "1.23.1"
-env_logger = "0.11.7"
-i-slint-core = "1.11.0"
-i-slint-renderer-skia = { version = "1.11.0", features = ["wayland"] }
-slint = { version = "1.8.0", features = [
-  "raw-window-handle-06",
-  "renderer-software",
-] }
-smithay-client-toolkit = "0.19.2"
-tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
-tracing = "0.1.41"
-zbus = "5.7.1"
+[workspace]
+resolver = "2"
+members = ["spell", "spell-cli"]
 
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }

@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use slint::{
     PhysicalSize,
     platform::{PlatformError, PointerEventButton, WindowEvent},
@@ -32,10 +30,12 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     configure::WindowConf,
     shared_context::{MemoryManager, SharedCore},
+    slint_adapter::{SpellLayerShell, SpellSkiaWinAdapter},
 };
 
 pub mod window_state;
@@ -116,10 +116,22 @@ impl SpellWin {
             cursor_shape: cursor_manager,
         };
 
+        // Initialisation of slint Components.
+        let core = Rc::new(RefCell::new(SharedCore::new(
+            window_conf.width,
+            window_conf.height,
+        )));
+        let adapter = SpellSkiaWinAdapter::new(core.clone(), window_conf.width, window_conf.height);
+
+        let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
+            window_adapter: adapter.clone(),
+            time_since_start: std::time::Instant::now(),
+        }));
+
         (
             SpellWin {
-                adapter: window_conf.adapter.clone(),
-                core: window_conf.shared_core.clone(),
+                adapter,
+                core,
                 size: PhysicalSize {
                     width: window_conf.width,
                     height: window_conf.height,
@@ -171,7 +183,7 @@ impl SpellWin {
         }
         set_config(&self.config, &mut self.layer);
 
-        // self.memory_manager.wayland_buffer 
+        // self.memory_manager.wayland_buffer
 
         self.is_hidden = false;
         self.layer.commit();

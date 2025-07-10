@@ -87,14 +87,11 @@ where
         if is_first_config {
             event_queue.roundtrip(&mut waywindow).unwrap();
         } else {
-            // println!("Running the loop");
             event_queue.flush().unwrap();
-            // event_queue.roundtrip(&mut waywindow).unwrap();
             event_queue.dispatch_pending(&mut waywindow).unwrap();
             if let Some(read_value) = event_queue.prepare_read() {
                 let _ = read_value.read();
             }
-            // event_queue.blocking_dispatch(&mut waywindow).unwrap();
         }
     }
 }
@@ -104,6 +101,11 @@ where
 // implement state, they wouldn't.
 // TODO see if the above loop can be replaced by callloop for better idomicity and
 // performance in any sense.
+// TODO The project should have a live preview feature. It can be made by leveraging
+// slint's preview and moving the output of debug to spell_cli.
+// TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
+// from CPU to GPU and vice versa.
+// Replace the expect statements in the code with tracing statements.
 
 pub fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
     let a: u8 = 0xFF;
