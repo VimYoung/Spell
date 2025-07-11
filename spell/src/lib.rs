@@ -1,7 +1,8 @@
+#![doc = include_str!("../docs/entry.md")]
+// #[warn(missing_docs)]
 mod configure;
-pub mod constantvals;
-pub mod shared_context;
-pub mod slint_adapter;
+mod shared_context;
+mod slint_adapter;
 pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
@@ -106,6 +107,7 @@ where
 // TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
 // from CPU to GPU and vice versa.
 // Replace the expect statements in the code with tracing statements.
+// TODO needs to have multi monitor support.
 
 pub fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
     let a: u8 = 0xFF;

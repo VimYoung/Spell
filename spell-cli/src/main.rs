@@ -1,9 +1,10 @@
-use spell::constantvals::MAIN_HELP;
+pub mod constantvals;
+use constantvals::MAIN_HELP;
 use std::{
     env::{self, Args},
     result::Result,
 };
-use zbus::{Connection, Result as BusResult, proxy};
+use zbus::{proxy, Connection, Result as BusResult};
 
 #[proxy(
     default_path = "/org/VimYoung/VarHandler",
@@ -108,7 +109,7 @@ async fn look_value(mut values: Args, proxy: SpellClientProxy<'_>) -> Result<(),
         .next()
         .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
         .clone();
-    let value:String = proxy.find_value(&remain_arg).await?;
+    let value: String = proxy.find_value(&remain_arg).await?;
     println!("{value}");
     Ok(())
 }
