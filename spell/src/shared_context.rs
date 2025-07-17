@@ -1,4 +1,3 @@
-use crate::get_spell_ingredients;
 use i_slint_renderer_skia::{
     skia_safe::{self, ColorType},
     software_surface::RenderBuffer,
@@ -87,4 +86,10 @@ impl RenderBuffer for SkiaSoftwareBuffer {
 
         Ok(())
     }
+}
+
+fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
+    let a: u8 = 0xFF;
+    // vec![Rgba8Pixel::new(a, 0, 0, 0); width as usize * height as usize].into_boxed_slice()
+    vec![a; width as usize * height as usize * 4].into_boxed_slice()
 }

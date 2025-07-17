@@ -183,8 +183,6 @@ impl SpellWin {
         }
         set_config(&self.config, &mut self.layer);
 
-        // self.memory_manager.wayland_buffer
-
         self.is_hidden = false;
         self.layer.commit();
     }

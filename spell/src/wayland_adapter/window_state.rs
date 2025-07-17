@@ -41,6 +41,7 @@ pub enum DataType {
 pub enum InternalHandle {
     StateValChange((String, DataType)),
     ShowWinAgain,
+    HideWindow,
 }
 
 struct VarHandler {
@@ -94,6 +95,14 @@ impl VarHandler {
     async fn show_window_back(&self) -> Result<(), BusError> {
         self.state_updater
             .send(InternalHandle::ShowWinAgain)
+            .await
+            .unwrap();
+        Ok(())
+    }
+
+    async fn hide_window(&self) -> Result<(), BusError> {
+        self.state_updater
+            .send(InternalHandle::HideWindow)
             .await
             .unwrap();
         Ok(())

@@ -29,51 +29,58 @@ use zbus::Error as BusError;
 
 pub enum Handle {
     HideWindow,
+    ShowWinAgain
 }
 
 pub fn cast_spell<F>(
     mut waywindow: SpellWin,
     mut event_queue: EventQueue<SpellWin>,
     window_handle: std::sync::mpsc::Receiver<Handle>,
-    state: Box<dyn ForeignController>,
-    set_callback: &mut F,
+    state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
+    mut set_callback: Option<F>,
 ) -> Result<(), Box<dyn Error>>
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
     // TODO I don't know but seems like 5 would be a good size given the low size.
     let (tx, mut rx) = mpsc::channel::<InternalHandle>(20);
-    let state = Arc::new(RwLock::new(state));
-    let state_clone = state.clone();
-    std::thread::spawn(|| {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        // TODO unwrap needs to be handled here.
+    if let Some(ref some_state) = state {
+        let state_clone = some_state.clone();
+        std::thread::spawn(|| {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            // TODO unwrap needs to be handled here.
 
-        // TOTHINK result not handled as value this runnin indefinetly.
-        let _ = rt.block_on(async move {
-            println!("deploied zbus serive in thread");
-            deploy_zbus_service(state_clone, tx).await?;
-            Ok::<_, BusError>(())
+            // TOTHINK result not handled as value this runnin indefinetly.
+            let _ = rt.block_on(async move {
+                println!("deploied zbus serive in thread");
+                deploy_zbus_service(state_clone, tx).await?;
+                Ok::<_, BusError>(())
+            });
         });
-    });
+    }
 
     loop {
-        if let Ok(int_handle) = rx.try_recv() {
-            match int_handle {
-                InternalHandle::StateValChange((key, data_type)) => {
-                    println!("INside statechange");
-                    //Glad I could think of this sub scope for RwLock.
-                    {
-                        let mut state_inst = state.write().unwrap();
-                        state_inst.change_val(&key, data_type);
+        if let Some(ref mut callback) = set_callback
+            && state.is_some()
+        {
+            if let Ok(int_handle) = rx.try_recv() {
+                match int_handle {
+                    InternalHandle::StateValChange((key, data_type)) => {
+                        println!("INside statechange");
+                        //Glad I could think of this sub scope for RwLock.
+                        {
+                            let mut state_inst = state.as_ref().unwrap().write().unwrap();
+                            state_inst.change_val(&key, data_type);
+                        }
+                        callback(state.as_ref().unwrap().clone());
                     }
-                    set_callback(state.clone());
-                }
-                InternalHandle::ShowWinAgain => {
-                    waywindow.show_again();
+                    InternalHandle::ShowWinAgain => {
+                        waywindow.show_again();
+                    }
+                    InternalHandle::HideWindow => waywindow.hide(),
                 }
             }
         };
@@ -81,6 +88,7 @@ where
         if let Ok(handle) = window_handle.try_recv() {
             match handle {
                 Handle::HideWindow => waywindow.hide(),
+                Handle::ShowWinAgain => waywindow.show_again(),
             }
         }
 
@@ -108,9 +116,3 @@ where
 // from CPU to GPU and vice versa.
 // Replace the expect statements in the code with tracing statements.
 // TODO needs to have multi monitor support.
-
-pub fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
-    let a: u8 = 0xFF;
-    // vec![Rgba8Pixel::new(a, 0, 0, 0); width as usize * height as usize].into_boxed_slice()
-    vec![a; width as usize * height as usize * 4].into_boxed_slice()
-}

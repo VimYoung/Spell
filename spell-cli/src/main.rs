@@ -15,6 +15,7 @@ trait SpellClient {
     fn set_value(&mut self, key: &str, val: &str) -> Result<(), SpellError>;
     fn find_value(&self, key: &str) -> BusResult<String>;
     fn show_window_back(&self) -> Result<(), SpellError>;
+    fn hide_window(&self) -> Result<(), SpellError>;
 }
 
 #[tokio::main]
@@ -28,6 +29,7 @@ async fn main() -> Result<(), SpellError> {
             "update" => update_value(values, proxy).await,
             "look" => look_value(values, proxy).await,
             "show" => proxy.show_window_back().await,
+            "hide" => proxy.hide_window().await,
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
             // tracing subscriber logs here.
@@ -161,3 +163,7 @@ impl From<zbus::Error> for SpellError {
 // TODO, no answer is showing if the currently running ui doesn't possess the state
 // in slint.
 // Have to connect the logs of tokio with different filters.
+// TODO set the Debug trait for my enuma and tell that dbus(DBUS_SESSION_BUS_ADDRSS)
+// is not set when the following error comes:
+// Error: Buserror(InputOutput(Os { code: 2, kind: NotFound, message: "No such file or directory" }))
+//

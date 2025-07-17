@@ -72,54 +72,49 @@ i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
 and then replace the `main.rs` with following contents:
 
 ```rust
-use std::{cell::RefCell, env, error::Error, rc::Rc};
-
-use spell::{
-    cast_spell,
-    layer_properties::{LayerAnchor, LayerType, WindowConf},
-    shared_context::SharedCore,
-    slint_adapter::{SpellLayerShell, SpellSkiaWinAdapter},
-    wayland_adapter::SpellWin,
+use std::{
+    env,
+    error::Error,
+    sync::mpsc,
+    sync::{Arc, RwLock},
 };
 
+use slint::ComponentHandle;
+use spell::{
+    cast_spell,
+    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf},
+    wayland_adapter::SpellWin,
+    Handle,
+};
 slint::include_modules!();
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let width: u32 = 376;
-    let height: u32 = 576;
-    let core = Rc::new(RefCell::new(SharedCore::new(width, height)));
-    let window_adapter = SpellSkiaWinAdapter::new(core.clone(), width, height);
+    let (_tx, rx) = mpsc::channel::<Handle>();
     let window_conf = WindowConf::new(
-        width,
-        height,
+        376,
+        576,
         (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
         (5, 0, 0, 10),
         LayerType::Top,
-        core,
-        window_adapter.clone(),
         false,
     );
+    let (waywindow, event_queue) = SpellWin::invoke_spell("counter-widget", window_conf);
 
-    let (waywindow, event_queue) = SpellWin::invoke_spell("counter widget", window_conf);
-
-    let platform_setting = slint::platform::set_platform(Box::new(SpellLayerShell {
-        window_adapter: window_adapter,
-        time_since_start: std::time::Instant::now(),
-    }));
-
-    if let Err(error) = platform_setting {
-        panic!("{error}");
-    }
-    let ui = Menu::new()?;
-
-    //Slint Managing Inputs;
-     ui.on_request_increase_value({
-         let ui_handle = ui.as_weak();
-         move || {
-             let ui = ui_handle.unwrap();
-             ui.set_counter(ui.get_counter() + 1);
-         }
-     });
-    cast_spell( waywindow, event_queue)
+    let ui = AppWindow::new().unwrap();
+    ui.on_request_increase_value({
+        let ui_handle = ui.as_weak();
+        move || {
+            let ui = ui_handle.unwrap();
+            ui.set_counter(ui.get_counter() + 1);
+        }
+    });
+    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(
+        waywindow,
+        event_queue,
+        rx,
+        None,
+        None,
+    )
 }
 ```
 
