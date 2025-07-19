@@ -1,4 +1,5 @@
 use crate::{
+    configure::LayerConf,
     shared_context::{SharedCore, SkiaSoftwareBuffer},
     wayland_adapter::EventAdapter,
 };
@@ -16,7 +17,6 @@ use slint::{
 use std::{
     cell::{Cell, RefCell},
     rc::{Rc, Weak},
-    time::Instant,
 };
 
 pub struct SpellWinAdapter {
@@ -27,7 +27,7 @@ pub struct SpellWinAdapter {
 }
 
 impl SpellWinAdapter {
-    pub fn new(width: u32, height: u32) -> Rc<Self> {
+    fn new(width: u32, height: u32) -> Rc<Self> {
         Rc::<SpellWinAdapter>::new_cyclic(|adapter| SpellWinAdapter {
             window: Window::new(adapter.clone()),
             rendered: SoftwareRenderer::new_with_repaint_buffer_type(
@@ -38,7 +38,7 @@ impl SpellWinAdapter {
         })
     }
 
-    pub fn draw_if_needed(&self, render_callback: impl FnOnce(&SoftwareRenderer)) -> bool {
+    fn draw_if_needed(&self, render_callback: impl FnOnce(&SoftwareRenderer)) -> bool {
         if self.needs_redraw.replace(false) {
             render_callback(&self.rendered);
             true
@@ -72,29 +72,48 @@ impl WindowAdapter for SpellWinAdapter {
 
 pub struct SpellLayerShell {
     pub window_adapter: Rc<SpellSkiaWinAdapter>,
-    pub time_since_start: Instant,
 }
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.window_adapter.clone())
     }
+}
 
-    fn duration_since_start(&self) -> core::time::Duration {
-        let time = self.time_since_start;
-        time.elapsed()
+pub struct SpellMultiLayerShell {
+    pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+}
+
+impl Platform for SpellMultiLayerShell {
+    fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+        let value = self.window_manager.borrow_mut().request_new_window();
+        Ok(value)
     }
+}
 
-    // THis function doesn't only run the event loop. It i also responsible for
-    //the creation of variables and their use in various sector.
-    // fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
-    // }
+pub struct SpellMultiWinHandler {
+    pub windows: Vec<(String, LayerConf)>,
+    pub adapter: Vec<Rc<SpellSkiaWinAdapter>>,
+    pub core: Vec<Rc<RefCell<SharedCore>>>,
+}
+
+impl SpellMultiWinHandler {
+    fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
+        let length = self.adapter.len();
+        let core = &self.core[length];
+        if let LayerConf::Window(conf) = &self.windows[length].1 {
+            let adapter = SpellSkiaWinAdapter::new(core.clone(), conf.width, conf.height);
+            self.adapter.push(adapter.clone());
+            adapter
+        } else {
+            panic!("Panicked here");
+        }
+    }
 }
 
 pub struct SpellSkiaWinAdapter {
     pub window: Window,
     pub size: PhysicalSize,
-    pub skia_buffer: Rc<SkiaSoftwareBuffer>,
     pub renderer: SkiaRenderer,
     pub needs_redraw: Cell<bool>,
 }
@@ -145,7 +164,6 @@ impl SpellSkiaWinAdapter {
         Rc::new_cyclic(|w: &Weak<Self>| Self {
             window: slint::Window::new(w.clone()),
             size: PhysicalSize { width, height },
-            skia_buffer: buffer,
             renderer,
             needs_redraw: Default::default(),
         })

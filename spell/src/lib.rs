@@ -29,7 +29,7 @@ use zbus::Error as BusError;
 
 pub enum Handle {
     HideWindow,
-    ShowWinAgain
+    ShowWinAgain,
 }
 
 pub fn cast_spell<F>(
@@ -116,3 +116,5 @@ where
 // from CPU to GPU and vice versa.
 // Replace the expect statements in the code with tracing statements.
 // TODO needs to have multi monitor support.
+// TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
+// if I want to make use of the dirty region information to strengthen my rendering.

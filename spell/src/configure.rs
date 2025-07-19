@@ -77,3 +77,8 @@ impl WindowConf {
         }
     }
 }
+
+pub enum LayerConf {
+    Window(WindowConf),
+    Windows(Vec<WindowConf>),
+}

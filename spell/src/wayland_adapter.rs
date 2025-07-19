@@ -35,7 +35,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     configure::WindowConf,
     shared_context::{MemoryManager, SharedCore},
-    slint_adapter::{SpellLayerShell, SpellSkiaWinAdapter},
+    slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
 };
 
 pub mod window_state;
@@ -69,6 +69,22 @@ pub struct SpellWin {
 }
 
 impl SpellWin {
+    pub fn conjure_spells(
+        windows: Rc<RefCell<SpellMultiWinHandler>>,
+    ) -> Vec<(Self, EventQueue<SpellWin>)> {
+        let win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
+        // for handler in windows.borrow()
+        let window_length = windows.borrow().windows.len();
+        let adapter_length = windows.borrow().adapter.len();
+        let core_length = windows.borrow().core.len();
+        if window_length == adapter_length && adapter_length == core_length {
+            println!("Lenghts are equal");
+        } else {
+            println!("Not equal");
+        }
+        win_and_queue
+    }
+
     pub fn invoke_spell(name: &str, window_conf: WindowConf) -> (Self, EventQueue<SpellWin>) {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
@@ -125,7 +141,6 @@ impl SpellWin {
 
         let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
             window_adapter: adapter.clone(),
-            time_since_start: std::time::Instant::now(),
         }));
 
         (

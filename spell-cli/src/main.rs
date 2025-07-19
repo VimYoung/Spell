@@ -32,7 +32,7 @@ async fn main() -> Result<(), SpellError> {
             "hide" => proxy.hide_window().await,
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
-            // tracing subscriber logs here.
+            // tracing subscriber logs here plus debug logs of slint here in sub commands.
             "logs" => Ok(()),
             // A later on added trait which can be configured and then running this command
             // Will display all the existing features of your shell as configured by the user.
