@@ -2,11 +2,12 @@
 // #[warn(missing_docs)]
 mod configure;
 mod shared_context;
-mod slint_adapter;
+pub mod slint_adapter;
 pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
-        configure::WindowConf,
+        configure::{LayerConf, WindowConf},
+        shared_context::SharedCore,
         wayland_adapter::window_state::{DataType, ForeignController},
     };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
@@ -30,6 +31,29 @@ use zbus::Error as BusError;
 pub enum Handle {
     HideWindow,
     ShowWinAgain,
+}
+
+pub fn enchant_spells(
+    mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
+) -> Result<(), Box<dyn Error>> {
+    loop {
+        println!("Entered loop");
+        let _: Vec<_> = waywindows
+            .iter_mut()
+            .map(|(waywindow, event_queue)| {
+                let is_first_config = waywindow.first_configure;
+                if is_first_config {
+                    event_queue.roundtrip(waywindow).unwrap();
+                } else {
+                    event_queue.flush().unwrap();
+                    event_queue.dispatch_pending(waywindow).unwrap();
+                    if let Some(read_value) = event_queue.prepare_read() {
+                        let _ = read_value.read();
+                    }
+                }
+            })
+            .collect();
+    }
 }
 
 pub fn cast_spell<F>(

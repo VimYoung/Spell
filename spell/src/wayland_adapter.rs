@@ -33,7 +33,7 @@ use smithay_client_toolkit::{
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    configure::WindowConf,
+    configure::{LayerConf, WindowConf},
     shared_context::{MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
 };
@@ -53,7 +53,7 @@ pub trait EventAdapter: std::fmt::Debug {
 
 #[derive(Debug)]
 pub struct SpellWin {
-    pub adapter: Rc<dyn EventAdapter>,
+    pub(crate) adapter: Rc<dyn EventAdapter>,
     pub core: Rc<RefCell<SharedCore>>,
     pub size: PhysicalSize,
     pub memory_manager: MemoryManager,
@@ -72,15 +72,94 @@ impl SpellWin {
     pub fn conjure_spells(
         windows: Rc<RefCell<SpellMultiWinHandler>>,
     ) -> Vec<(Self, EventQueue<SpellWin>)> {
-        let win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
+        let mut win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
         // for handler in windows.borrow()
         let window_length = windows.borrow().windows.len();
         let adapter_length = windows.borrow().adapter.len();
         let core_length = windows.borrow().core.len();
         if window_length == adapter_length && adapter_length == core_length {
-            println!("Lenghts are equal");
+            let conn = Connection::connect_to_env().unwrap();
+            windows
+                .borrow()
+                .adapter
+                .iter()
+                .enumerate()
+                .for_each(|(index, val)| {
+                    if let LayerConf::Window(window_conf) = &windows.borrow().windows[index].1 {
+                        let (globals, event_queue) = registry_queue_init(&conn).unwrap();
+                        let qh: QueueHandle<SpellWin> = event_queue.handle();
+                        let compositor = CompositorState::bind(&globals, &qh)
+                            .expect("wl_compositor is not available");
+                        let layer_shell =
+                            LayerShell::bind(&globals, &qh).expect("layer shell is not available");
+                        let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
+                        let mut pool = SlotPool::new(
+                            (window_conf.width * window_conf.height * 4) as usize,
+                            &shm,
+                        )
+                        .expect("Failed to create pool");
+                        let cursor_manager = CursorShapeManager::bind(&globals, &qh)
+                            .expect("cursor shape is not available");
+                        let stride = window_conf.width as i32 * 4;
+                        let surface = compositor.create_surface(&qh);
+                        let mut layer = layer_shell.create_layer_surface(
+                            &qh,
+                            surface,
+                            window_conf.layer_type,
+                            Some(windows.borrow().windows[index].0.clone()),
+                            None,
+                        );
+                        // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+                        set_config(window_conf, &mut layer);
+                        layer.commit();
+                        let (wayland_buffer, _) = pool
+                            .create_buffer(
+                                window_conf.width as i32,
+                                window_conf.height as i32,
+                                stride,
+                                wl_shm::Format::Argb8888,
+                            )
+                            .expect("Creating Buffer");
+
+                        let memory_manager = MemoryManager {
+                            pool,
+                            shm,
+                            wayland_buffer,
+                        };
+
+                        let pointer_state = PointerState {
+                            pointer: None,
+                            pointer_data: None,
+                            cursor_shape: cursor_manager,
+                        };
+
+                        win_and_queue.push((
+                            SpellWin {
+                                adapter: val.clone(),
+                                core: windows.borrow().core[index].clone(),
+                                size: PhysicalSize {
+                                    width: window_conf.width,
+                                    height: window_conf.height,
+                                },
+                                memory_manager,
+                                registry_state: RegistryState::new(&globals),
+                                seat_state: SeatState::new(&globals, &qh),
+                                output_state: OutputState::new(&globals, &qh),
+                                pointer_state,
+                                layer,
+                                keyboard_focus: false,
+                                first_configure: true,
+                                is_hidden: false,
+                                config: window_conf.clone(),
+                            },
+                            event_queue,
+                        ));
+                    }
+                });
         } else {
-            println!("Not equal");
+            panic!(
+                "The length of window configs and shared cores is not equal to activated windows"
+            );
         }
         win_and_queue
     }

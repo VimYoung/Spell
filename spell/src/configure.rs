@@ -47,7 +47,7 @@ impl std::clone::Clone for Rgba8Pixel {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WindowConf {
     pub width: u32,
     pub height: u32,
