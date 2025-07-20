@@ -1,5 +1,5 @@
 use crate::{
-    configure::LayerConf,
+    configure::{LayerConf, WindowConf},
     shared_context::{SharedCore, SkiaSoftwareBuffer},
     wayland_adapter::EventAdapter,
 };
@@ -27,7 +27,7 @@ pub struct SpellWinAdapter {
 }
 
 impl SpellWinAdapter {
-    fn new(width: u32, height: u32) -> Rc<Self> {
+    pub fn new(width: u32, height: u32) -> Rc<Self> {
         Rc::<SpellWinAdapter>::new_cyclic(|adapter| SpellWinAdapter {
             window: Window::new(adapter.clone()),
             rendered: SoftwareRenderer::new_with_repaint_buffer_type(
@@ -98,6 +98,24 @@ pub struct SpellMultiWinHandler {
 }
 
 impl SpellMultiWinHandler {
+    pub fn new(windows: Vec<(&str, WindowConf)>) -> Rc<RefCell<Self>> {
+        let new_windows: Vec<(String, LayerConf)> = windows
+            .iter()
+            .map(|(layer_name, conf)| (layer_name.to_string(), LayerConf::Window(conf.clone())))
+            .collect();
+
+        let cores: Vec<Rc<RefCell<SharedCore>>> = windows
+            .iter()
+            .map(|(_, conf)| Rc::new(RefCell::new(SharedCore::new(conf.width, conf.height))))
+            .collect();
+
+        Rc::new(RefCell::new(SpellMultiWinHandler {
+            windows: new_windows,
+            adapter: Vec::new(),
+            core: cores,
+        }))
+    }
+
     fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
         let length = self.adapter.len();
         let core = &self.core[length];
@@ -165,7 +183,7 @@ impl SpellSkiaWinAdapter {
             window: slint::Window::new(w.clone()),
             size: PhysicalSize { width, height },
             renderer,
-            needs_redraw: Default::default(),
+            needs_redraw: Cell::new(true),
         })
     }
 

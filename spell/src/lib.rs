@@ -6,7 +6,7 @@ pub mod slint_adapter;
 pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
-        configure::{LayerConf, WindowConf},
+        configure::WindowConf,
         shared_context::SharedCore,
         wayland_adapter::window_state::{DataType, ForeignController},
     };
@@ -31,13 +31,30 @@ use zbus::Error as BusError;
 pub enum Handle {
     HideWindow,
     ShowWinAgain,
+    ToggleWindow,
 }
 
 pub fn enchant_spells(
     mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
+    window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
 ) -> Result<(), Box<dyn Error>> {
     loop {
-        println!("Entered loop");
+        if window_handles.len() == waywindows.len() {
+            window_handles
+                .iter()
+                .enumerate()
+                .for_each(|(index, window_handle_option)| {
+                    if let Some(window_handle) = window_handle_option {
+                        if let Ok(handle) = window_handle.try_recv() {
+                            match handle {
+                                Handle::HideWindow => waywindows[index].0.hide(),
+                                Handle::ShowWinAgain => waywindows[index].0.show_again(),
+                                Handle::ToggleWindow => waywindows[index].0.toggle(),
+                            }
+                        }
+                    }
+                });
+        }
         let _: Vec<_> = waywindows
             .iter_mut()
             .map(|(waywindow, event_queue)| {
@@ -66,7 +83,6 @@ pub fn cast_spell<F>(
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
-    // TODO I don't know but seems like 5 would be a good size given the low size.
     let (tx, mut rx) = mpsc::channel::<InternalHandle>(20);
     if let Some(ref some_state) = state {
         let state_clone = some_state.clone();
@@ -113,6 +129,7 @@ where
             match handle {
                 Handle::HideWindow => waywindow.hide(),
                 Handle::ShowWinAgain => waywindow.show_again(),
+                Handle::ToggleWindow => waywindow.toggle(),
             }
         }
 
@@ -142,3 +159,7 @@ where
 // TODO needs to have multi monitor support.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
+// TODO scroll action is not implemented in Pointer touch event.
+// A Bug effects multi widget setup where is invoke_callback is called, first draw 
+// keeps on drawing on the closed window, can only be debugged after window wise logs
+// are enabled. example is saved in a bin file called bug_multi.rs

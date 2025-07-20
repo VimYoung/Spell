@@ -250,6 +250,14 @@ impl SpellWin {
         self.layer.wl_surface().attach(None, 0, 0);
     }
 
+    pub fn toggle(&mut self) {
+        if self.is_hidden {
+            self.show_again();
+        } else {
+            self.hide();
+        }
+    }
+
     // TODO this doesn't seem to trace.
     #[tracing::instrument]
     pub fn show_again(&mut self) {
@@ -290,7 +298,7 @@ impl SpellWin {
         // Rendering from Skia
         if !self.is_hidden {
             let skia_now = std::time::Instant::now();
-            window_adapter.draw_if_needed();
+            let redraw_val: bool = window_adapter.draw_if_needed();
             println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
             let pool = &mut self.memory_manager.pool;
@@ -300,15 +308,16 @@ impl SpellWin {
             // println!("{}", primary_canvas.len());
             // Drawing the window
             let now = std::time::Instant::now();
-            {
-                primary_canvas
-                    .iter_mut()
-                    .enumerate()
-                    .for_each(|(index, val)| {
-                        *val = self.core.borrow().primary_buffer[index];
-                    });
+            if redraw_val || self.first_configure {
+                {
+                    primary_canvas
+                        .iter_mut()
+                        .enumerate()
+                        .for_each(|(index, val)| {
+                            *val = self.core.borrow().primary_buffer[index];
+                        });
+                }
             }
-
             println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
 
             // Damage the entire window
@@ -333,6 +342,10 @@ impl SpellWin {
             //         //}
             //     }
             // }
+            // Request our next frame
+            self.layer
+                .wl_surface()
+                .frame(qh, self.layer.wl_surface().clone());
             self.layer
                 .wl_surface()
                 .attach(Some(buffer.wl_buffer()), 0, 0);
@@ -340,10 +353,6 @@ impl SpellWin {
             println!("Is_hidden is true.");
         }
 
-        // Request our next frame
-        self.layer
-            .wl_surface()
-            .frame(qh, self.layer.wl_surface().clone());
         self.layer.commit();
         // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
         // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
@@ -475,10 +484,12 @@ impl LayerShellHandler for SpellWin {
 
         // Initiate the first draw.
         println!("Config event is called");
-        if self.first_configure {
-            self.converter(qh);
+        if !self.first_configure {
+            self.first_configure = true;
+        } else {
             println!("First draw called");
         }
+        self.converter(qh);
     }
 }
 
