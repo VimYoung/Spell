@@ -1,30 +1,31 @@
 #![doc = include_str!("../docs/entry.md")]
 // #[warn(missing_docs)]
 mod configure;
+mod dbus_window_state;
+pub mod forge;
 mod shared_context;
 pub mod slint_adapter;
+pub mod vault;
 pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
         configure::WindowConf,
-        shared_context::SharedCore,
-        wayland_adapter::window_state::{DataType, ForeignController},
+        // shared_context::SharedCore,
+        dbus_window_state::{DataType, ForeignController},
     };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
     pub use zbus::fdo::Error as BusError;
 }
 
+use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
 use smithay_client_toolkit::reexports::client::EventQueue;
 use std::{
     error::Error,
     sync::{Arc, RwLock},
 };
 use tokio::sync::mpsc;
-use wayland_adapter::{
-    SpellWin,
-    window_state::{ForeignController, InternalHandle, deploy_zbus_service},
-};
+use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
 
@@ -160,6 +161,6 @@ where
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
 // TODO scroll action is not implemented in Pointer touch event.
-// A Bug effects multi widget setup where is invoke_callback is called, first draw 
+// A Bug effects multi widget setup where is invoke_callback is called, first draw
 // keeps on drawing on the closed window, can only be debugged after window wise logs
 // are enabled. example is saved in a bin file called bug_multi.rs

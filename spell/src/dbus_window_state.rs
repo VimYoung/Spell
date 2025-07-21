@@ -1,6 +1,10 @@
+use crate::wayland_adapter::SpellWin;
 use smithay_client_toolkit::{
-    reexports::client::protocol::wl_pointer,
-    seat::pointer::{PointerData, cursor_shape::CursorShapeManager},
+    reexports::client::protocol::{wl_keyboard, wl_pointer},
+    seat::{
+        keyboard::KeyboardData,
+        pointer::{PointerData, cursor_shape::CursorShapeManager},
+    },
 };
 use std::{
     any::Any,
@@ -16,6 +20,12 @@ pub struct PointerState {
     pub pointer: Option<wl_pointer::WlPointer>,
     pub pointer_data: Option<PointerData>,
     pub cursor_shape: CursorShapeManager,
+}
+
+#[derive(Debug)]
+pub struct KeyboardState {
+    pub board: Option<wl_keyboard::WlKeyboard>,
+    pub board_data: Option<KeyboardData<SpellWin>>,
 }
 
 // This a boilerplate trait for connection with CLI, it will be replaced by a procedural

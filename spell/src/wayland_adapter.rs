@@ -1,32 +1,22 @@
 use slint::{
     PhysicalSize,
-    platform::{PlatformError, PointerEventButton, WindowEvent},
+    platform::{PlatformError, WindowEvent},
 };
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
-    delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
-    delegate_seat, delegate_shm,
+    delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
+    delegate_registry, delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
-    reexports::{
-        client::{
-            Connection, EventQueue, QueueHandle,
-            globals::registry_queue_init,
-            protocol::{wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
-        },
-        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+    reexports::client::{
+        Connection, EventQueue, QueueHandle,
+        globals::registry_queue_init,
+        protocol::{wl_output, wl_shm, wl_surface},
     },
-    registry::{ProvidesRegistryState, RegistryState},
-    registry_handlers,
-    seat::{
-        Capability, SeatHandler, SeatState,
-        pointer::{
-            PointerData, PointerEvent, PointerEventKind, PointerHandler,
-            cursor_shape::CursorShapeManager,
-        },
-    },
+    registry::RegistryState,
+    seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
     shell::{
         WaylandSurface,
-        wlr_layer::{Anchor, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+        wlr_layer::{LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
@@ -34,12 +24,13 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     configure::{LayerConf, WindowConf},
+    dbus_window_state::{KeyboardState, PointerState},
     shared_context::{MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
+    wayland_adapter::states_and_handles::set_anchor,
 };
 
-pub mod window_state;
-use self::window_state::PointerState;
+mod states_and_handles;
 
 // This trait helps in defining specifc functions that would be required to run
 // inside the SpellWin. Benefit of this abstraction is that I am sure that every function
@@ -61,6 +52,7 @@ pub struct SpellWin {
     pub seat_state: SeatState,
     pub output_state: OutputState,
     pub pointer_state: PointerState,
+    pub keyboard_state: KeyboardState,
     pub layer: LayerSurface,
     pub keyboard_focus: bool,
     pub first_configure: bool,
@@ -133,6 +125,11 @@ impl SpellWin {
                             cursor_shape: cursor_manager,
                         };
 
+                        let keyboard_state = KeyboardState {
+                            board: None,
+                            board_data: None,
+                        };
+
                         win_and_queue.push((
                             SpellWin {
                                 adapter: val.clone(),
@@ -146,6 +143,7 @@ impl SpellWin {
                                 seat_state: SeatState::new(&globals, &qh),
                                 output_state: OutputState::new(&globals, &qh),
                                 pointer_state,
+                                keyboard_state,
                                 layer,
                                 keyboard_focus: false,
                                 first_configure: true,
@@ -211,6 +209,10 @@ impl SpellWin {
             cursor_shape: cursor_manager,
         };
 
+        let keyboard_state = KeyboardState {
+            board: None,
+            board_data: None,
+        };
         // Initialisation of slint Components.
         let core = Rc::new(RefCell::new(SharedCore::new(
             window_conf.width,
@@ -235,6 +237,7 @@ impl SpellWin {
                 seat_state: SeatState::new(&globals, &qh),
                 output_state: OutputState::new(&globals, &qh),
                 pointer_state,
+                keyboard_state,
                 layer,
                 keyboard_focus: false,
                 first_configure: true,
@@ -368,7 +371,7 @@ delegate_registry!(SpellWin);
 delegate_output!(SpellWin);
 delegate_shm!(SpellWin);
 delegate_seat!(SpellWin);
-// delegate_keyboard!(SpellWin);
+delegate_keyboard!(SpellWin);
 delegate_pointer!(SpellWin);
 delegate_layer!(SpellWin);
 
@@ -490,203 +493,6 @@ impl LayerShellHandler for SpellWin {
             println!("First draw called");
         }
         self.converter(qh);
-    }
-}
-
-impl SeatHandler for SpellWin {
-    fn seat_state(&mut self) -> &mut SeatState {
-        &mut self.seat_state
-    }
-
-    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-
-    fn new_capability(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        // if capability == Capability::Keyboard && self.keyboard.is_none() {
-        //     println!("Set keyboard capability");
-        //     let keyboard = self
-        //         .seat_state
-        //         .get_keyboard(qh, &seat, None)
-        //         .expect("Failed to create keyboard");
-        //     self.keyboard = Some(keyboard);
-        // }
-        //
-        if capability == Capability::Pointer && self.pointer_state.pointer.is_none() {
-            println!("Set pointer capability");
-            let pointer = self
-                .seat_state
-                .get_pointer(qh, &seat)
-                .expect("Failed to create pointer");
-            let pointer_data = PointerData::new(seat);
-            self.pointer_state.pointer = Some(pointer);
-            self.pointer_state.pointer_data = Some(pointer_data);
-        }
-    }
-
-    fn remove_capability(
-        &mut self,
-        _conn: &Connection,
-        _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        // if capability == Capability::Keyboard && self.keyboard.is_some() {
-        //     println!("Unset keyboard capability");
-        //     self.keyboard.take().unwrap().release();
-        // }
-
-        if capability == Capability::Pointer && self.pointer_state.pointer.is_some() {
-            println!("Unset pointer capability");
-            self.pointer_state.pointer.take().unwrap().release();
-        }
-    }
-
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-}
-
-impl PointerHandler for SpellWin {
-    fn pointer_frame(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _pointer: &wl_pointer::WlPointer,
-        events: &[PointerEvent],
-    ) {
-        use PointerEventKind::*;
-        for event in events {
-            // Ignore events for other surfaces
-            if &event.surface != self.layer.wl_surface() {
-                continue;
-            }
-            match event.kind {
-                Enter { .. } => {
-                    // println!("Pointer entered @{:?}", event.position);
-
-                    // TODO this code is redundent, as it doesn't set the cursor shape.
-                    let pointer = &self.pointer_state.pointer.as_ref().unwrap();
-                    let serial_no: Option<u32> = self
-                        .pointer_state
-                        .pointer_data
-                        .as_ref()
-                        .unwrap()
-                        .latest_enter_serial();
-                    if let Some(no) = serial_no {
-                        println!("Cursor Shape set");
-                        self.pointer_state
-                            .cursor_shape
-                            .get_shape_device(pointer, qh)
-                            .set_shape(no, Shape::Pointer);
-                    }
-                }
-                Leave { .. } => {
-                    println!("Pointer left");
-                    self.adapter
-                        .try_dispatch_event(WindowEvent::PointerExited)
-                        .unwrap();
-                }
-                Motion { .. } => {
-                    // println!("Pointer entered @{:?}", event.position);
-                    self.adapter
-                        .try_dispatch_event(WindowEvent::PointerMoved {
-                            position: slint::LogicalPosition {
-                                x: event.position.0 as f32,
-                                y: event.position.1 as f32,
-                            },
-                        })
-                        .unwrap();
-                }
-                Press { button, .. } => {
-                    println!("Press {:x} @ {:?}", button, event.position);
-                    self.adapter
-                        .try_dispatch_event(WindowEvent::PointerPressed {
-                            position: slint::LogicalPosition {
-                                x: event.position.0 as f32,
-                                y: event.position.1 as f32,
-                            },
-                            button: PointerEventButton::Left,
-                        })
-                        .unwrap();
-                }
-                Release { button, .. } => {
-                    println!("Release {:x} @ {:?}", button, event.position);
-                    self.adapter
-                        .try_dispatch_event(WindowEvent::PointerReleased {
-                            position: slint::LogicalPosition {
-                                x: event.position.0 as f32,
-                                y: event.position.1 as f32,
-                            },
-                            button: PointerEventButton::Left,
-                        })
-                        .unwrap();
-                }
-                Axis {
-                    horizontal,
-                    vertical,
-                    ..
-                } => {
-                    // TODO Axis and Scroll events are still to be mapped.
-                    println!("Scroll H:{horizontal:?}, V:{vertical:?}");
-                }
-            }
-        }
-    }
-}
-
-// TODO FIND What is the use of registery_handlers here?
-impl ProvidesRegistryState for SpellWin {
-    fn registry(&mut self) -> &mut RegistryState {
-        &mut self.registry_state
-    }
-    registry_handlers![OutputState, SeatState];
-}
-
-fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
-    match window_conf.anchor.0 {
-        Some(mut first_anchor) => match window_conf.anchor.1 {
-            Some(sec_anchor) => {
-                first_anchor.set(sec_anchor, true);
-                layer.set_anchor(first_anchor);
-            }
-            None => {
-                layer.set_anchor(first_anchor);
-                if window_conf.exclusive_zone {
-                    match first_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
-            }
-        },
-        None => {
-            if let Some(sec_anchor) = window_conf.anchor.1 {
-                layer.set_anchor(sec_anchor);
-                if window_conf.exclusive_zone {
-                    match sec_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
-            }
-        }
     }
 }
 
