@@ -57,6 +57,7 @@ pub struct SpellWin {
     pub keyboard_focus: bool,
     pub first_configure: bool,
     pub is_hidden: bool,
+    pub layer_name: String,
     pub config: WindowConf,
 }
 
@@ -148,6 +149,7 @@ impl SpellWin {
                                 keyboard_focus: false,
                                 first_configure: true,
                                 is_hidden: false,
+                                layer_name: windows.borrow().windows[index].0.clone(),
                                 config: window_conf.clone(),
                             },
                             event_queue,
@@ -181,7 +183,7 @@ impl SpellWin {
             &qh,
             surface,
             window_conf.layer_type,
-            Some(name),
+            Some(name.clone()),
             None,
         );
         // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
@@ -242,6 +244,7 @@ impl SpellWin {
                 keyboard_focus: false,
                 first_configure: true,
                 is_hidden: false,
+                layer_name: name.to_string(),
                 config: window_conf,
             },
             event_queue,
@@ -364,6 +367,11 @@ impl SpellWin {
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
         // of the canvas.
     }
+
+    // fn grab_focus(&self) {
+    //     self.layer
+    //         .set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+    // }
 }
 
 delegate_compositor!(SpellWin);
@@ -504,6 +512,7 @@ fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
         window_conf.margin.2,
         window_conf.margin.3,
     );
+    layer.set_keyboard_interactivity(window_conf.board_interactivity);
     set_anchor(window_conf, layer);
 }
 

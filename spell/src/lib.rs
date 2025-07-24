@@ -14,6 +14,7 @@ pub mod layer_properties {
         dbus_window_state::{DataType, ForeignController},
     };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
+    pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
     pub use zbus::fdo::Error as BusError;
 }
@@ -35,12 +36,70 @@ pub enum Handle {
     ToggleWindow,
 }
 
-pub fn enchant_spells(
+pub fn enchant_spells<F>(
     mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
     window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
-) -> Result<(), Box<dyn Error>> {
-    loop {
-        if window_handles.len() == waywindows.len() {
+    states: Vec<Option<Arc<RwLock<Box<dyn ForeignController>>>>>,
+    mut set_callbacks: Vec<Option<F>>,
+) -> Result<(), Box<dyn Error>>
+where
+    F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
+{
+    if window_handles.len() == waywindows.len()
+        && window_handles.len() == states.len()
+        && window_handles.len() == set_callbacks.len()
+    {
+        let mut internal_recievers: Vec<mpsc::Receiver<InternalHandle>> = Vec::new();
+        states.iter().enumerate().for_each(|(index, state)| {
+            let (tx, rx) = mpsc::channel::<InternalHandle>(20);
+            if let Some(some_state) = state {
+                let state_clone = some_state.clone();
+                let layer_name = waywindows[index].0.layer_name.clone();
+                std::thread::spawn(|| {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+                    // TODO unwrap needs to be handled here.
+
+                    // TOTHINK result not handled as value this runnin indefinetly.
+                    if let Err(error) = rt.block_on(async move {
+                        println!("deploied zbus serive in thread");
+                        deploy_zbus_service(state_clone, tx, layer_name).await?;
+                        Ok::<_, BusError>(())
+                    }) {
+                        println!("Dbus Thread panicked witth the following error. \n {error}");
+                        panic!("All code panicked");
+                    }
+                });
+            }
+            internal_recievers.push(rx);
+        });
+
+        loop {
+            states.iter().enumerate().for_each(|(index, state)| {
+                if let Some(ref mut callback) = set_callbacks[index]
+                    && state.is_some()
+                {
+                    if let Ok(int_handle) = internal_recievers[index].try_recv() {
+                        match int_handle {
+                            InternalHandle::StateValChange((key, data_type)) => {
+                                println!("Inside statechange");
+                                //Glad I could think of this sub scope for RwLock.
+                                {
+                                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
+                                    state_inst.change_val(&key, data_type);
+                                }
+                                callback(state.as_ref().unwrap().clone());
+                            }
+                            InternalHandle::ShowWinAgain => {
+                                waywindows[index].0.show_again();
+                            }
+                            InternalHandle::HideWindow => waywindows[index].0.hide(),
+                        }
+                    }
+                };
+            });
             window_handles
                 .iter()
                 .enumerate()
@@ -55,22 +114,27 @@ pub fn enchant_spells(
                         }
                     }
                 });
-        }
-        let _: Vec<_> = waywindows
-            .iter_mut()
-            .map(|(waywindow, event_queue)| {
-                let is_first_config = waywindow.first_configure;
-                if is_first_config {
-                    event_queue.roundtrip(waywindow).unwrap();
-                } else {
-                    event_queue.flush().unwrap();
-                    event_queue.dispatch_pending(waywindow).unwrap();
-                    if let Some(read_value) = event_queue.prepare_read() {
-                        let _ = read_value.read();
+
+            let _: Vec<_> = waywindows
+                .iter_mut()
+                .map(|(waywindow, event_queue)| {
+                    let is_first_config = waywindow.first_configure;
+                    if is_first_config {
+                        event_queue.roundtrip(waywindow).unwrap();
+                    } else {
+                        event_queue.flush().unwrap();
+                        event_queue.dispatch_pending(waywindow).unwrap();
+                        if let Some(read_value) = event_queue.prepare_read() {
+                            let _ = read_value.read();
+                        }
                     }
-                }
-            })
-            .collect();
+                })
+                .collect();
+        }
+    } else {
+        panic!(
+            "The lengths of given vectors are not equal. \n Make sure that given vector lengths are equal"
+        );
     }
 }
 
@@ -87,19 +151,20 @@ where
     let (tx, mut rx) = mpsc::channel::<InternalHandle>(20);
     if let Some(ref some_state) = state {
         let state_clone = some_state.clone();
+        let layer_name = waywindow.layer_name.clone();
         std::thread::spawn(|| {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
-            // TODO unwrap needs to be handled here.
-
-            // TOTHINK result not handled as value this runnin indefinetly.
-            let _ = rt.block_on(async move {
+            if let Err(error) = rt.block_on(async move {
                 println!("deploied zbus serive in thread");
-                deploy_zbus_service(state_clone, tx).await?;
+                deploy_zbus_service(state_clone, tx, layer_name).await?;
                 Ok::<_, BusError>(())
-            });
+            }) {
+                println!("Dbus Thread panicked witth the following error. \n {error}");
+                panic!("DBus thread panicked");
+            }
         });
     }
 
@@ -110,7 +175,7 @@ where
             if let Ok(int_handle) = rx.try_recv() {
                 match int_handle {
                     InternalHandle::StateValChange((key, data_type)) => {
-                        println!("INside statechange");
+                        println!("Inside statechange");
                         //Glad I could think of this sub scope for RwLock.
                         {
                             let mut state_inst = state.as_ref().unwrap().write().unwrap();

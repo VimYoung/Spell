@@ -12,10 +12,17 @@ use zbus::{proxy, Connection, Result as BusResult};
     interface = "org.VimYoung.Spell1"
 )]
 trait SpellClient {
-    fn set_value(&mut self, key: &str, val: &str) -> Result<(), SpellError>;
-    fn find_value(&self, key: &str) -> BusResult<String>;
-    fn show_window_back(&self) -> Result<(), SpellError>;
-    fn hide_window(&self) -> Result<(), SpellError>;
+    fn set_value(&mut self, layer_name: &str, key: &str, val: &str) -> Result<(), SpellError>;
+    fn find_value(&self, layer_name: &str, key: &str) -> BusResult<String>;
+    fn show_window_back(&self, layer_name: &str) -> Result<(), SpellError>;
+    fn hide_window(&self, layer_name: &str) -> Result<(), SpellError>;
+    #[zbus(signal)]
+    fn layer_var_value_changed(
+        &self,
+        layer_name: &str,
+        var_name: &str,
+        value: &str,
+    ) -> zbus::Result<()>;
 }
 
 #[tokio::main]
@@ -26,10 +33,24 @@ async fn main() -> Result<(), SpellError> {
     let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.as_str() {
-            "update" => update_value(values, proxy).await,
-            "look" => look_value(values, proxy).await,
-            "show" => proxy.show_window_back().await,
-            "hide" => proxy.hide_window().await,
+            "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l `name` sub command".to_string()))),
+            "-l" => match values.next() {
+                Some(layer_value) => match values.next() {
+                    Some(sub_command_after_layer) => match sub_command_after_layer.as_str() {
+                        "update" => update_value(layer_value, values, proxy).await,
+                        "look" => look_value(layer_value, values, proxy).await,
+                        "show" => proxy.show_window_back(&layer_value).await,
+                        "hide" => proxy.hide_window(&layer_value).await,
+                        _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
+                    },
+                    None => Err(SpellError::CLI(Cli::NoSubCommand(
+                        "provide a subcommand like 'update', 'look' etc".to_string(),
+                    ))),
+                },
+                None => Err(SpellError::CLI(Cli::UndefinedArg(
+                    "Provide the value of layer name".to_string(),
+                ))),
+            },
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
             // tracing subscriber logs here plus debug logs of slint here in sub commands.
@@ -46,9 +67,17 @@ async fn main() -> Result<(), SpellError> {
             // List the running instancs of windows and subwindows.
             "list" => Ok(()),
             "--help" => show_help(None),
-            _ => Err(SpellError::CLI(Cli::BadSubCommand(format!(
-                "The subcommand \"{sub_command}\"doesn't exist, use `spell --help` to view available commands"
-            )))),
+            _ => {
+                if sub_command.starts_with('-') || sub_command.starts_with("--") {
+                    Err(SpellError::CLI(Cli::BadSubCommand(format!(
+                "The flag \"{sub_command}\" doesn't exist, use `spell --help` to view available commands"
+            ))))
+                } else {
+                    Err(SpellError::CLI(Cli::BadSubCommand(format!(
+                "The subcommand \"{sub_command}\" doesn't exist, use `spell --help` to view available commands"
+            ))))
+                }
+            }
         };
         if let Err(recieved_error) = return_value {
             // TODO Here the SpellError needs to be matched its each arm and proper messages needs
@@ -62,6 +91,9 @@ async fn main() -> Result<(), SpellError> {
                     Cli::UndefinedArg(err) => {
                         eprintln!("[Undefined Arg]: {err}");
                     }
+                    Cli::NoSubCommand(flag_val) => {
+                        eprintln!("[No Sub-command]: The flag {flag_val} should be followed by a subcommand");
+                    }
                 },
                 SpellError::Buserror(bus_error) => match bus_error {
                     zbus::Error::MethodError(rare_err_1, err_val, rare_err_2) => {
@@ -71,7 +103,7 @@ async fn main() -> Result<(), SpellError> {
                                     "[Parse Error]: Given Value for key couldn't be parsed."
                                 ),
                                 _ => eprintln!(
-                                    "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes."
+                                    "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes. {value}"
                                 ),
                             }
                         } else {
@@ -106,17 +138,25 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     }
 }
 
-async fn look_value(mut values: Args, proxy: SpellClientProxy<'_>) -> Result<(), SpellError> {
+async fn look_value(
+    layer_name: String,
+    mut values: Args,
+    proxy: SpellClientProxy<'_>,
+) -> Result<(), SpellError> {
     let remain_arg: String = values
         .next()
         .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
         .clone();
-    let value: String = proxy.find_value(&remain_arg).await?;
+    let value: String = proxy.find_value(&layer_name, &remain_arg).await?;
     println!("{value}");
     Ok(())
 }
 
-async fn update_value(values: Args, mut proxy: SpellClientProxy<'_>) -> Result<(), SpellError> {
+async fn update_value(
+    layer_name: String,
+    values: Args,
+    mut proxy: SpellClientProxy<'_>,
+) -> Result<(), SpellError> {
     let remain_arg: Vec<String> = values.collect();
     if remain_arg.len() < 2 {
         Err(SpellError::CLI(Cli::UndefinedArg(
@@ -127,7 +167,9 @@ async fn update_value(values: Args, mut proxy: SpellClientProxy<'_>) -> Result<(
             "More than 2 arg given. Only provide {{key}} and {{Value}}".to_string(),
         )))
     } else {
-        proxy.set_value(&remain_arg[0], &remain_arg[1]).await?;
+        proxy
+            .set_value(&layer_name, &remain_arg[0], &remain_arg[1])
+            .await?;
         Ok(())
     }
 }
@@ -147,6 +189,7 @@ pub enum SpellError {
 pub enum Cli {
     BadSubCommand(String),
     UndefinedArg(String),
+    NoSubCommand(String),
 }
 
 impl From<zbus::Error> for SpellError {

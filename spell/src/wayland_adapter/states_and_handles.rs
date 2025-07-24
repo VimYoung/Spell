@@ -1,7 +1,8 @@
-use core::f64;
-
 use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::{
+    SharedString,
+    platform::{PointerEventButton, WindowEvent},
+};
 use smithay_client_toolkit::{
     output::OutputState,
     reexports::{
@@ -27,55 +28,74 @@ use smithay_client_toolkit::{
 impl KeyboardHandler for SpellWin {
     fn enter(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-        serial: u32,
-        raw: &[u32],
-        keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _serial: u32,
+        _raw: &[u32],
+        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
+        println!("Keyboard focus entered");
     }
 
     fn leave(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-        serial: u32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _serial: u32,
     ) {
+        println!("Keyboard focus left");
     }
+
     fn press_key(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        serial: u32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        self.adapter
+            .try_dispatch_event(WindowEvent::KeyPressed {
+                text: SharedString::from(event.utf8.unwrap()),
+            })
+            .unwrap();
     }
 
     fn release_key(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        serial: u32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        let value = event.keysym.key_char();
+        if let Some(val) = value {
+            self.adapter
+                .try_dispatch_event(WindowEvent::KeyReleased {
+                    text: SharedString::from(val),
+                })
+                .unwrap();
+        }
     }
+
+    // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
     fn update_modifiers(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        serial: u32,
-        modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
-        layout: u32,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _layout: u32,
     ) {
     }
 }
+
 impl SeatHandler for SpellWin {
     fn seat_state(&mut self) -> &mut SeatState {
         &mut self.seat_state

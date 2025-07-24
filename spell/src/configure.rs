@@ -1,5 +1,5 @@
 use slint::platform::software_renderer::TargetPixel;
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, Layer};
+use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
 #[derive(Default)]
 pub struct Rgba8Pixel {
@@ -54,6 +54,7 @@ pub struct WindowConf {
     pub anchor: (Option<Anchor>, Option<Anchor>),
     pub margin: (i32, i32, i32, i32),
     pub layer_type: Layer,
+    pub board_interactivity: KeyboardInteractivity,
     pub exclusive_zone: bool,
 }
 
@@ -65,6 +66,7 @@ impl WindowConf {
         anchor: (Option<Anchor>, Option<Anchor>),
         margin: (i32, i32, i32, i32),
         layer_type: Layer,
+        board_interactivity: KeyboardInteractivity,
         exclusive_zone: bool,
     ) -> Self {
         WindowConf {
@@ -73,6 +75,7 @@ impl WindowConf {
             anchor,
             margin,
             layer_type,
+            board_interactivity,
             exclusive_zone,
         }
     }

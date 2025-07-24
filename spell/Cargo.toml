@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 bytemuck = "1.23.1"
 env_logger = "0.11.7"
+event-listener = "5.4.0"
+futures-util = "0.3.31"
 i-slint-core = "1.11.0"
 i-slint-renderer-skia = { version = "1.11.0", features = ["wayland"] }
 slint = { version = "1.8.0", features = [
