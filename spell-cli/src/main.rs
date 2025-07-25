@@ -1,9 +1,6 @@
 pub mod constantvals;
 use constantvals::MAIN_HELP;
-use std::{
-    env::{self, Args},
-    result::Result,
-};
+use std::env::{self, Args};
 use zbus::{proxy, Connection, Result as BusResult};
 
 #[proxy(

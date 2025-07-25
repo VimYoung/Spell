@@ -34,6 +34,8 @@ pub enum Handle {
     HideWindow,
     ShowWinAgain,
     ToggleWindow,
+    GrabKeyboardFocus,
+    RemoveKeyboardFocus,
 }
 
 pub fn enchant_spells<F>(
@@ -110,6 +112,8 @@ where
                                 Handle::HideWindow => waywindows[index].0.hide(),
                                 Handle::ShowWinAgain => waywindows[index].0.show_again(),
                                 Handle::ToggleWindow => waywindows[index].0.toggle(),
+                                Handle::GrabKeyboardFocus => waywindows[index].0.grab_focus(),
+                                Handle::RemoveKeyboardFocus => waywindows[index].0.remove_focus(),
                             }
                         }
                     }
@@ -196,6 +200,8 @@ where
                 Handle::HideWindow => waywindow.hide(),
                 Handle::ShowWinAgain => waywindow.show_again(),
                 Handle::ToggleWindow => waywindow.toggle(),
+                Handle::GrabKeyboardFocus => waywindow.grab_focus(),
+                Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
             }
         }
 

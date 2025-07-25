@@ -16,7 +16,10 @@ use smithay_client_toolkit::{
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
     shell::{
         WaylandSurface,
-        wlr_layer::{LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+        wlr_layer::{
+            KeyboardInteractivity, LayerShell, LayerShellHandler, LayerSurface,
+            LayerSurfaceConfigure,
+        },
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
@@ -183,7 +186,7 @@ impl SpellWin {
             &qh,
             surface,
             window_conf.layer_type,
-            Some(name.clone()),
+            Some(name),
             None,
         );
         // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
@@ -368,10 +371,17 @@ impl SpellWin {
         // of the canvas.
     }
 
-    // fn grab_focus(&self) {
-    //     self.layer
-    //         .set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-    // }
+    pub fn grab_focus(&self) {
+        self.layer
+            .set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+        self.layer.commit();
+    }
+
+    pub fn remove_focus(&self) {
+        self.layer
+            .set_keyboard_interactivity(KeyboardInteractivity::None);
+        self.layer.commit();
+    }
 }
 
 delegate_compositor!(SpellWin);

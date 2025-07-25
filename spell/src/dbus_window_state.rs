@@ -1,4 +1,4 @@
-use crate::{dbus_window_state::second_client::SecondClientProxy, wayland_adapter::SpellWin};
+use crate::{dbus_window_state::second_client::open_internal_clinet, wayland_adapter::SpellWin};
 use smithay_client_toolkit::{
     reexports::client::protocol::{wl_keyboard, wl_pointer},
     seat::{
@@ -14,7 +14,8 @@ use std::{
 };
 use tokio::sync::mpsc::Sender;
 use zbus::{
-    Connection as BusConn, fdo::Error as BusError, interface, object_server::SignalEmitter, proxy,
+    Connection as BusConn, blocking::connection, fdo::Error as BusError, interface,
+    object_server::SignalEmitter, proxy,
 };
 
 mod second_client;
@@ -67,8 +68,8 @@ struct VarHandler {
     name = "org.VimYoung.Spell1",
     proxy(
         gen_blocking = false,
-        // default_path = "/org/VimYoung/VarHandler/WithProxy",
-        // default_service = "org.VimYoung.Spell.WithProxy",
+        // default_service = "org.VimYoung.Spell",
+        // default_path = "/org/VimYoung/VarHandler",
     )
 )]
 impl VarHandler {
@@ -156,32 +157,36 @@ pub async fn deploy_zbus_service(
     let connection = BusConn::session().await?;
 
     //Setting up object server.
+    // TODO This clone might be avoided.
     connection
         .object_server()
         .at(
             "/org/VimYoung/VarHandler",
             VarHandler {
-                state,
-                state_updater,
-                layer_name,
+                state: state.clone(),
+                state_updater: state_updater.clone(),
+                layer_name: layer_name.clone(),
             },
         )
         .await?;
+    // let _ = connection::Builder::session()?
+    //     .name("org.VimYoung.Spell")?
+    //     .serve_at(
+    //         "/org/VimYoung/VarHandler",
+    //         VarHandler {
+    //             state,
+    //             state_updater,
+    //             layer_name,
+    //         },
+    //     )?
+    //     .build();
     if connection.request_name("org.VimYoung.Spell").await.is_err() {
         // An instance of VimYoung Dbus session already exists.
-        open_internal_clinet().await?;
+        open_internal_clinet(state, state_updater, layer_name).await?;
     }
 
     pending::<()>().await;
 
-    Ok(())
-}
-
-async fn open_internal_clinet() -> zbus::Result<()> {
-    let conn = BusConn::session().await?;
-    let signal_reciever = SecondClientProxy::new(&conn);
-
-    // let mut value_change = signal_reciever.
     Ok(())
 }
 
