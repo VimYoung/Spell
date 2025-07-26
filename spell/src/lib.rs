@@ -10,7 +10,6 @@ pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
         configure::WindowConf,
-        // shared_context::SharedCore,
         dbus_window_state::{DataType, ForeignController},
     };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
@@ -20,6 +19,7 @@ pub mod layer_properties {
 }
 
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
+use slint::PhysicalSize;
 use smithay_client_toolkit::reexports::client::EventQueue;
 use std::{
     error::Error,
@@ -36,8 +36,10 @@ pub enum Handle {
     ToggleWindow,
     GrabKeyboardFocus,
     RemoveKeyboardFocus,
+    WidgetResize(PhysicalSize),
 }
 
+// TODO this implementation needs to be improved via calloop if possible so.
 pub fn enchant_spells<F>(
     mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
     window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
@@ -86,7 +88,7 @@ where
                     if let Ok(int_handle) = internal_recievers[index].try_recv() {
                         match int_handle {
                             InternalHandle::StateValChange((key, data_type)) => {
-                                println!("Inside statechange");
+                                // println!("Inside statechange");
                                 //Glad I could think of this sub scope for RwLock.
                                 {
                                     let mut state_inst = state.as_ref().unwrap().write().unwrap();
@@ -114,6 +116,9 @@ where
                                 Handle::ToggleWindow => waywindows[index].0.toggle(),
                                 Handle::GrabKeyboardFocus => waywindows[index].0.grab_focus(),
                                 Handle::RemoveKeyboardFocus => waywindows[index].0.remove_focus(),
+                                Handle::WidgetResize(size) => {
+                                    waywindows[index].0.adapter.set_widget_size(size)
+                                }
                             }
                         }
                     }
@@ -141,6 +146,8 @@ where
         );
     }
 }
+// TODO the series of vectors needs to be changed to a HashMap implementation
+// for better function.
 
 pub fn cast_spell<F>(
     mut waywindow: SpellWin,
@@ -179,7 +186,8 @@ where
             if let Ok(int_handle) = rx.try_recv() {
                 match int_handle {
                     InternalHandle::StateValChange((key, data_type)) => {
-                        println!("Inside statechange");
+                        // println!("Inside statechange sdjkfnjksbvdkxbjz cj snvd");
+                        // println!("key: {}, value: {:?}", key, data_type);
                         //Glad I could think of this sub scope for RwLock.
                         {
                             let mut state_inst = state.as_ref().unwrap().write().unwrap();
@@ -202,6 +210,7 @@ where
                 Handle::ToggleWindow => waywindow.toggle(),
                 Handle::GrabKeyboardFocus => waywindow.grab_focus(),
                 Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
+                Handle::WidgetResize(size) => waywindow.adapter.set_widget_size(size),
             }
         }
 
@@ -231,7 +240,6 @@ where
 // TODO needs to have multi monitor support.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
-// TODO scroll action is not implemented in Pointer touch event.
-// A Bug effects multi widget setup where is invoke_callback is called, first draw
+// TODO A Bug effects multi widget setup where is invoke_callback is called, first draw
 // keeps on drawing on the closed window, can only be debugged after window wise logs
 // are enabled. example is saved in a bin file called bug_multi.rs

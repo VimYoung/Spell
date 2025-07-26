@@ -30,7 +30,7 @@ use crate::{
     dbus_window_state::{KeyboardState, PointerState},
     shared_context::{MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::states_and_handles::set_anchor,
+    wayland_adapter::{self, states_and_handles::set_anchor},
 };
 
 mod states_and_handles;
@@ -43,6 +43,8 @@ mod states_and_handles;
 pub trait EventAdapter: std::fmt::Debug {
     fn draw_if_needed(&self) -> bool;
     fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
+    fn size(&self) -> PhysicalSize;
+    fn set_widget_size(&self, size: PhysicalSize);
 }
 
 #[derive(Debug)]
@@ -300,6 +302,26 @@ impl SpellWin {
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
         slint::platform::update_timers_and_animations();
+        // Check if window size changed
+        if self.adapter.size().width != self.size.width
+            || self.adapter.size().height != self.size.height
+        {
+            //sync properties and render new buffer.
+            self.size = self.adapter.size();
+
+            let (wayland_buffer, _) = self
+                .memory_manager
+                .pool
+                .create_buffer(
+                    self.size.width as i32,
+                    self.size.height as i32,
+                    (self.size.width * 4) as i32,
+                    wl_shm::Format::Argb8888,
+                )
+                .expect("Creating Buffer");
+            self.memory_manager.wayland_buffer = wayland_buffer;
+        };
+
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;
         let window_adapter = self.adapter.clone();

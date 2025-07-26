@@ -133,6 +133,7 @@ pub struct SpellSkiaWinAdapter {
     pub window: Window,
     pub size: PhysicalSize,
     pub renderer: SkiaRenderer,
+    pub buffer: Rc<RefCell<SharedCore>>,
     pub needs_redraw: Cell<bool>,
 }
 
@@ -149,14 +150,17 @@ impl WindowAdapter for SpellSkiaWinAdapter {
         &self.renderer
     }
 
-    // fn set_size(&self, size: slint::WindowSize) {
-    //     self.size.set(size.to_physical(1.));
-    //     self.window
-    //         .dispatch_event(slint::platform::WindowEvent::Resized {
-    //             size: size.to_logical(1.),
-    //         })
-    // }
-    //
+    fn set_size(&self, size: slint::WindowSize) {
+        let physical_size = size.to_physical(1.);
+        self.buffer
+            .borrow_mut()
+            .resize(physical_size.width, physical_size.height);
+        self.window
+            .dispatch_event(slint::platform::WindowEvent::Resized {
+                size: size.to_logical(1.),
+            })
+    }
+
     fn request_redraw(&self) {
         self.needs_redraw.set(true);
     }
@@ -172,7 +176,7 @@ impl std::fmt::Debug for SpellSkiaWinAdapter {
 impl SpellSkiaWinAdapter {
     pub fn new(shared_core: Rc<RefCell<SharedCore>>, width: u32, height: u32) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBuffer {
-            core: shared_core,
+            core: shared_core.clone(),
             last_dirty_region: Default::default(),
         });
         let renderer = SkiaRenderer::new_with_surface(
@@ -183,6 +187,7 @@ impl SpellSkiaWinAdapter {
             window: slint::Window::new(w.clone()),
             size: PhysicalSize { width, height },
             renderer,
+            buffer: shared_core,
             needs_redraw: Cell::new(true),
         })
     }
@@ -220,5 +225,16 @@ impl EventAdapter for SpellSkiaWinAdapter {
         event: slint::platform::WindowEvent,
     ) -> Result<(), slint::PlatformError> {
         self.window.try_dispatch_event(event)
+    }
+
+    // An idea could be gathered by multiplying core's width
+    // and height but that doesn't help in reciezing involving only dimention
+    // changes.
+    fn size(&self) -> PhysicalSize {
+        self.size
+    }
+
+    fn set_widget_size(&self, size: PhysicalSize) {
+        self.set_size(size.into());
     }
 }

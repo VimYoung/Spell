@@ -22,6 +22,11 @@ impl SharedCore {
             secondary_buffer: get_spell_ingredients(width, height),
         }
     }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.primary_buffer = get_spell_ingredients(width, height);
+        self.secondary_buffer = get_spell_ingredients(width, height);
+    }
 }
 
 #[derive(Debug)]
