@@ -38,6 +38,11 @@ pub enum Handle {
     RemoveKeyboardFocus,
 }
 
+pub enum Special {
+    Revealer,
+    Resizeable(Vec<(i32, i32, i32, i32)>),
+}
+
 pub fn enchant_spells<F>(
     mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
     window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,

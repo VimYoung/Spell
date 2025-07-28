@@ -410,6 +410,7 @@ impl OutputHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _output: wl_output::WlOutput,
     ) {
+        println!("New Output Source Added");
     }
 
     fn update_output(

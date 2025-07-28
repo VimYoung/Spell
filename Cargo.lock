@@ -4190,7 +4190,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "spell"
+name = "spell-cli"
+version = "0.1.0"
+dependencies = [
+ "slint-build",
+ "spell-framework",
+ "tokio",
+ "zbus",
+]
+
+[[package]]
+name = "spell-framework"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
@@ -4203,16 +4213,6 @@ dependencies = [
  "smithay-client-toolkit",
  "tokio",
  "tracing",
- "zbus",
-]
-
-[[package]]
-name = "spell-cli"
-version = "0.1.0"
-dependencies = [
- "slint-build",
- "spell",
- "tokio",
  "zbus",
 ]
 

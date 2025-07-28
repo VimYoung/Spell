@@ -27,10 +27,7 @@ in rust.
 ## Installation and Usage
 
 > [!WARNING]
-> The crate is under active development and is not ready for use. I have encountered a
-> few walls while optimising the renderer, which may require some changes to slint itself.
-> I have to first understand SIMD myself and then pull a few PRs to make the slint adapter
-> compatible. Then only the animations would be smooth and frame rates would improve.
+> The crate is under active development and is not ready for use.
 
 Since, the crate has not yet been published, you can only use it from the github link in
 your `Cargo.toml` file.
