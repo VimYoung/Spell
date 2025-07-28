@@ -133,7 +133,7 @@ The same frontend code for this example can also be found in [slint-rust-templat
 
 ## Spell CLI
 
-Spell CLI is a utility for managing and handling remotly running windows/widgets. It provides various features like hiding/opening the widget, toggling the widget, remotely setting variables with new/changed values, seeing logs etc. CLI's commands can be combined with your wayland compositor's configuration file to make keybind for your windows. Read more about it in its documentation.
+Spell CLI is a utility for managing and handling remotely running windows/widgets. It provides various features like hiding/opening the widget, toggling the widget, remotely setting variables with new/changed values, seeing logs etc. CLI's commands can be combined with your wayland compositor's configuration file to make keybind for your windows. Read more about it in its documentation.
 
 ## Inspiration
 

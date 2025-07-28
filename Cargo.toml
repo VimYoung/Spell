@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["spell", "spell-cli"]
+members = ["spell-framework", "spell-cli"]
 
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }

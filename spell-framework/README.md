@@ -11,7 +11,8 @@ rust.
 
 ## When can we expect a stable release?
 
-No promises but I think I can push it to a release in 3-4 months.
+No promises but I think I can push it to a stable release (i.e. 1.0.0) in 2-3 months.
+You can find change logs for both spell-framework and CLI in [CHANGELOG](https://github.com/VimYoung/Spell/blob/main/CHANGELOG.md).
 
 ## Inspiration
 
