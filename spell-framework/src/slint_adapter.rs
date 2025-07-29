@@ -1,9 +1,12 @@
+//! This module contains relevent structs for slint side backend configurations. Apart
+//! from [SpellMultiLayerShell] and [SpellMultiWinHandler], rest of the structs mentioned are
+//! either internal or not used anymore. Still their implementation is public because they had be
+//! set by the user of library in intial iterations of spell_framework.
 use crate::{
     configure::{LayerConf, WindowConf},
     shared_context::{SharedCore, SkiaSoftwareBuffer},
     wayland_adapter::EventAdapter,
 };
-use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
 use slint::{
     PhysicalSize, Window,
     platform::{
@@ -19,6 +22,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
+/// This was the previous struct used internally for rendering, its use is stopped in favour of
+/// [SpellSkiaWinAdapter] which provides faster and more reliable rendering. It implements slint's
+/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
 pub struct SpellWinAdapter {
     pub window: Window,
     pub rendered: SoftwareRenderer,
@@ -26,8 +32,10 @@ pub struct SpellWinAdapter {
     pub needs_redraw: Cell<bool>,
 }
 
+// TODO this dead code needs to be either removed or imporoved.
+#[allow(dead_code)]
 impl SpellWinAdapter {
-    pub fn new(width: u32, height: u32) -> Rc<Self> {
+    fn new(width: u32, height: u32) -> Rc<Self> {
         Rc::<SpellWinAdapter>::new_cyclic(|adapter| SpellWinAdapter {
             window: Window::new(adapter.clone()),
             rendered: SoftwareRenderer::new_with_repaint_buffer_type(
@@ -70,7 +78,10 @@ impl WindowAdapter for SpellWinAdapter {
     }
 }
 
+/// Previously needed to be implemented, now this struct is called and set internally
+/// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
+    /// An instance of [SpellSkiaWinAdapter].
     pub window_adapter: Rc<SpellSkiaWinAdapter>,
 }
 
@@ -80,7 +91,18 @@ impl Platform for SpellLayerShell {
     }
 }
 
+/// This struct needs to be set when multiple windows are to be started together. It is
+/// used in combination with [`conjure_spells`](crate::wayland_adapter::SpellWin::conjure_spells)
+/// and is required to be set before any other initialisation with an instance of [SpellMultiWinHandler].
+/// It implements slint's [Platform](https://docs.rs/slint/latest/slint/platform/trait.Platform.html) trait.
+/// Example of setting it is as follows:
+/// ```rust
+/// slint::platform::set_platform(Box::new(SpellMultiLayerShell {
+///     window_manager: windows_handler.clone(),
+/// })).unwrap();
+/// ```
 pub struct SpellMultiLayerShell {
+    /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
 }
 
@@ -91,10 +113,13 @@ impl Platform for SpellMultiLayerShell {
     }
 }
 
+/// Used for the initialisation of [SpellMultiLayerShell], this struct is responsible
+/// for handling, initialising, updating and maintaing of various widgets that are being
+/// rendered simultaneously. It uses [SpellSkiaWinAdapter] internally.
 pub struct SpellMultiWinHandler {
-    pub windows: Vec<(String, LayerConf)>,
-    pub adapter: Vec<Rc<SpellSkiaWinAdapter>>,
-    pub core: Vec<Rc<RefCell<SharedCore>>>,
+    pub(crate) windows: Vec<(String, LayerConf)>,
+    pub(crate) adapter: Vec<Rc<SpellSkiaWinAdapter>>,
+    pub(crate) core: Vec<Rc<RefCell<SharedCore>>>,
 }
 
 impl SpellMultiWinHandler {
@@ -129,11 +154,18 @@ impl SpellMultiWinHandler {
     }
 }
 
+#[cfg(feature = "i-slint-renderer-skia")]
+use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
+#[cfg(feature = "i-slint-renderer-skia")]
+/// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
+/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
+/// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
+/// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 pub struct SpellSkiaWinAdapter {
-    pub window: Window,
-    pub size: PhysicalSize,
-    pub renderer: SkiaRenderer,
-    pub needs_redraw: Cell<bool>,
+    pub(crate) window: Window,
+    pub(crate) size: PhysicalSize,
+    pub(crate) renderer: SkiaRenderer,
+    pub(crate) needs_redraw: Cell<bool>,
 }
 
 impl WindowAdapter for SpellSkiaWinAdapter {

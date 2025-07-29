@@ -1,12 +1,18 @@
 #![doc = include_str!("../docs/entry.md")]
-// #[warn(missing_docs)]
+#[warn(missing_docs)]
 mod configure;
 mod dbus_window_state;
 pub mod forge;
+#[cfg(feature = "i-slint-renderer-skia")]
 mod shared_context;
+#[cfg(feature = "i-slint-renderer-skia")]
 pub mod slint_adapter;
 pub mod vault;
 pub mod wayland_adapter;
+/// It contains related enums and struct which are used to manage,
+/// define and update various properties of a widget(viz a viz layer). You can import necessary
+/// types from this module to implement relevant features. See docs of related objects for
+/// their overview.
 pub mod layer_properties {
     pub use crate::{
         configure::WindowConf,
@@ -16,11 +22,11 @@ pub mod layer_properties {
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
-    pub use zbus::fdo::Error as BusError;
+    // pub use zbus::fdo::Error as BusError;
 }
 
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
-use smithay_client_toolkit::reexports::client::EventQueue;
+use smithay_client_toolkit::reexports::client::{DispatchError, EventQueue, backend};
 use std::{
     error::Error,
     sync::{Arc, RwLock},
@@ -67,9 +73,6 @@ where
                         .enable_all()
                         .build()
                         .unwrap();
-                    // TODO unwrap needs to be handled here.
-
-                    // TOTHINK result not handled as value this runnin indefinetly.
                     if let Err(error) = rt.block_on(async move {
                         println!("deploied zbus serive in thread");
                         deploy_zbus_service(state_clone, tx, layer_name).await?;
@@ -212,7 +215,11 @@ where
 
         let is_first_config = waywindow.first_configure;
         if is_first_config {
-            event_queue.roundtrip(&mut waywindow).unwrap();
+            // Primary erros are handled here in the first configration itself.
+            if let Err(err_value) = event_queue.roundtrip(&mut waywindow) {
+                report_error(err_value);
+            }
+            // event_queue.roundtrip(&mut waywindow).unwrap();
         } else {
             event_queue.flush().unwrap();
             event_queue.dispatch_pending(&mut waywindow).unwrap();
@@ -220,6 +227,24 @@ where
                 let _ = read_value.read();
             }
         }
+    }
+}
+
+fn report_error(error_value: DispatchError) {
+    match error_value {
+        DispatchError::Backend(backend) => match backend {
+            backend::WaylandError::Io(std_error) => panic!("{}", std_error),
+            backend::WaylandError::Protocol(protocol) => {
+                if protocol.code == 2 && protocol.object_id == 6 {
+                    panic!("Maybe the width or height zero");
+                }
+            }
+        },
+        DispatchError::BadMessage {
+            sender_id,
+            interface,
+            opcode,
+        } => panic!("BadMessage Error: sender: {sender_id} interface: {interface} opcode {opcode}"),
     }
 }
 // TODO it is necessary to call join unwrap on spawned threads to ensure

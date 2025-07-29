@@ -13,8 +13,10 @@ env_logger = "0.11.7"
 event-listener = "5.4.0"
 futures-util = "0.3.31"
 i-slint-core = "1.11.0"
-i-slint-renderer-skia = { version = "1.11.0", features = ["wayland"] }
-slint = { version = "1.8.0", features = [
+i-slint-renderer-skia = { version = "1.11.0", features = [
+  "wayland",
+], optional = true }
+slint = { version = "1.12.0", features = [
   "raw-window-handle-06",
   "renderer-software",
 ] }
@@ -22,3 +24,11 @@ smithay-client-toolkit = "0.19.2"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
 tracing = "0.1.41"
 zbus = "5.7.1"
+#
+# [package.metadata.docs.rs]
+# no-default-features = true
+# features = ["docs-only"]
+
+[features]
+default = ["i-slint-renderer-skia"]
+docs-only = []

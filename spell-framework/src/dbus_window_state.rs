@@ -14,8 +14,7 @@ use std::{
 };
 use tokio::sync::mpsc::Sender;
 use zbus::{
-    Connection as BusConn, blocking::connection, fdo::Error as BusError, interface,
-    object_server::SignalEmitter, proxy,
+    Connection as BusConn, fdo::Error as BusError, interface, object_server::SignalEmitter,
 };
 
 mod second_client;
@@ -32,8 +31,8 @@ pub struct KeyboardState {
     pub board_data: Option<KeyboardData<SpellWin>>,
 }
 
-// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
-// macro in the future.
+/// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
+/// macro in the future.
 pub trait ForeignController: Send + Sync {
     fn get_type(&self, key: &str) -> DataType;
     fn change_val(&mut self, key: &str, val: DataType);

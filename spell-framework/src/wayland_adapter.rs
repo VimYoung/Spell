@@ -1,3 +1,7 @@
+//! It provides various widget types for implementing properties
+//! across various functionalities for your shell. The most common and only workable widget (or
+//! window as called by many) is [SpellWin] now. Future implementation of mentioned struct will
+//! take place in near future.
 use slint::{
     PhysicalSize,
     platform::{PlatformError, WindowEvent},
@@ -39,29 +43,43 @@ mod states_and_handles;
 // inside the SpellWin. Benefit of this abstraction is that I am sure that every function
 // I am defining works even if inside `Rc`, i.e. only using non interior mutability
 // functions.
-
-pub trait EventAdapter: std::fmt::Debug {
+pub(crate) trait EventAdapter: std::fmt::Debug {
     fn draw_if_needed(&self) -> bool;
     fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
 }
 
+/// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
+/// implementation, thus providing various available features. Methods of this struct can't be
+/// accessed directly as it stores non-sharable types and states inside, which binds it to a single
+/// instant passed to the event loop. Hence, its methods are accessed indirectly via
+/// [Handle](crate::Handle) passed through a mpsc Sender. Another possible solution would be the
+/// usage of `Rc<RefCell<SpellWin>>` which was avoided, as it introduces a lot of boilerplate while
+/// using the library and also internally. Future effort will try to implement Copy trait on it, or
+/// a better alternative to call struct methods.
+///
+/// ## Panics
+///
+/// The constructor method [conjure_spells](crate::wayland_adapter::SpellWin::conjure_spells) will
+/// panic if the number of WindowConfs provided is not equal to the amount of widgets that are
+/// initialised in the scope. The solution to avoid panic is to add more `let _ =
+/// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
+/// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
 #[derive(Debug)]
 pub struct SpellWin {
     pub(crate) adapter: Rc<dyn EventAdapter>,
-    pub core: Rc<RefCell<SharedCore>>,
-    pub size: PhysicalSize,
-    pub memory_manager: MemoryManager,
-    pub registry_state: RegistryState,
-    pub seat_state: SeatState,
-    pub output_state: OutputState,
-    pub pointer_state: PointerState,
-    pub keyboard_state: KeyboardState,
-    pub layer: LayerSurface,
-    pub keyboard_focus: bool,
-    pub first_configure: bool,
-    pub is_hidden: bool,
-    pub layer_name: String,
-    pub config: WindowConf,
+    pub(crate) core: Rc<RefCell<SharedCore>>,
+    pub(crate) size: PhysicalSize,
+    pub(crate) memory_manager: MemoryManager,
+    pub(crate) registry_state: RegistryState,
+    pub(crate) seat_state: SeatState,
+    pub(crate) output_state: OutputState,
+    pub(crate) pointer_state: PointerState,
+    pub(crate) keyboard_state: KeyboardState,
+    pub(crate) layer: LayerSurface,
+    pub(crate) first_configure: bool,
+    pub(crate) is_hidden: bool,
+    pub(crate) layer_name: String,
+    pub(crate) config: WindowConf,
 }
 
 impl SpellWin {
@@ -149,7 +167,6 @@ impl SpellWin {
                                 pointer_state,
                                 keyboard_state,
                                 layer,
-                                keyboard_focus: false,
                                 first_configure: true,
                                 is_hidden: false,
                                 layer_name: windows.borrow().windows[index].0.clone(),
@@ -244,7 +261,6 @@ impl SpellWin {
                 pointer_state,
                 keyboard_state,
                 layer,
-                keyboard_focus: false,
                 first_configure: true,
                 is_hidden: false,
                 layer_name: name.to_string(),
@@ -527,6 +543,7 @@ fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
     set_anchor(window_conf, layer);
 }
 
-// Technically, there is no requirement of pool once it is used to create the
-// buffers for the window, but it may be possible that later somewhere we can
-// use it to share the resources between windows.
+/// Furture lock screen implementation will be on this type. Currently, it is redundent.
+pub struct SpellLock;
+/// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
+pub struct SpellBoard;

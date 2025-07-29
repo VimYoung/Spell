@@ -1,7 +1,3 @@
-use i_slint_renderer_skia::{
-    skia_safe::{self, ColorType},
-    software_surface::RenderBuffer,
-};
 use slint::{PhysicalSize, Window};
 use smithay_client_toolkit::shm::{
     Shm,
@@ -31,6 +27,13 @@ pub struct MemoryManager {
     pub wayland_buffer: Buffer,
 }
 
+#[cfg(feature = "i-slint-renderer-skia")]
+use i_slint_renderer_skia::{
+    skia_safe::{self, ColorType},
+    software_surface::RenderBuffer,
+};
+
+#[cfg(feature = "i-slint-renderer-skia")]
 pub struct SkiaSoftwareBuffer {
     pub core: Rc<RefCell<SharedCore>>,
     pub last_dirty_region: RefCell<Option<i_slint_core::item_rendering::DirtyRegion>>,

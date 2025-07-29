@@ -142,15 +142,3 @@ The inspiration for making spell came from various weird places. First and forem
 ## Slint part of Spell
 
 This is future work and here is a note to it. As some more base functionalities will be complete I will also create a slint counterpart of "components" which are most commonly used in the process of widget creation.
-
-## Rough Content
-
-Spell github link maybe wrong and needs to be fixed.
-Add Spell CLI link and instructions to download after publishing the cli.
-
-[positional parameters](std::fmt#formatting-parameters)
-
-This is a [`Handle`]
-<div class="warning">
-  This is a warning.
-</div>

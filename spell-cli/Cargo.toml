@@ -8,9 +8,13 @@ repository = "https://github.com/VimYoung/Spell"
 keywords = ["widget", "spell-framework", "spell", "slint", "wayland"]
 
 [dependencies]
-spell-framework = { version = "0.1.0", path = "../spell-framework/" }
+spell-framework = { version = "0.1.1", path = "../spell-framework/" }
 zbus = "5.8.0"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
+
+[package.metadata.docs.rs]
+no-default-features = true
+features = ["docs-only"]
 
 [build-dependencies]
 slint-build = "1.8.0"

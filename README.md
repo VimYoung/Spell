@@ -130,6 +130,4 @@ Docs can be found [here](https://docs.rs/crate/spell-framework/).
 
 ## Contributing
 
-I should say that at this point, the crate is not ready for contributions but people can open
-issues for suggestions. Bugs and feature-requests will be ignored for now. As soon as a stable
-release happens, I will restructure my workflow for issues and PR.
+The library is still in an early stage. Yet I will encourage you try it out, feel free to open issues and even better PRs for issues. Feature requests can be posted in the issues section itself, but since a lot of things are planned already, they will take a lower priority.

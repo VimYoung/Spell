@@ -1,6 +1,8 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
+/// Unused Internal struct representation of a pixel, it is similar to slint's
+/// representation of [pixel]() but implement few more trait. Currently, redundent
 #[derive(Default)]
 pub struct Rgba8Pixel {
     pub a: u8,
@@ -47,18 +49,43 @@ impl std::clone::Clone for Rgba8Pixel {
     }
 }
 
+/// WindowConf is an essential struct passed on to widget constructor functions (like [invoke_spell](crate::wayland_adapter::SpellWin::invoke_spell))
+/// for defining the specifications of the widget.
+///
+/// ## Panics
+///
+/// event_loop will panic if 0 is provided as width and height.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
+    /// Defines the widget width in pixels. On setting values greater than the provided pixels of
+    /// monitor, the widget offsets from monitor's prectangular monitor space.
     pub width: u32,
+    /// Defines the widget height in pixels. On setting values greater than the provided pixels of
+    /// monitor, the widget offsets from monitor's prectangular monitor space.
     pub height: u32,
+    /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
+    /// related explaination of usage. If both values are None, then widget is displayed in the
+    /// center of screen.
     pub anchor: (Option<Anchor>, Option<Anchor>),
+    /// Defines the margin of widget from monitor edges, negative values make the widget go outside
+    /// of monitor pixels if anchored to some edge(s). Otherwise, the widget moves to the opposite
+    /// direction to the given pixels.
     pub margin: (i32, i32, i32, i32),
+    /// Defines the possible layer on which to define the widget. View [`Layer`] for more details.
     pub layer_type: Layer,
+    /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`] for more
+    /// details.
     pub board_interactivity: KeyboardInteractivity,
+    /// Defines if the widget is exclusive of not, if marked true, further laying of widgets in the
+    /// same area is avoided. View [wayland docs](https://wayland.app/protocols/wlr-layer-shell-unstable-v1#zwlr_layer_surface_v1:request:set_exclusive_zone)
+    /// for details. By default, spell takes the value of width if anchored at top or bottom and
+    /// height if anchored left or right and set that to the exclusive zone.
+    /// TOTEST, define the case when widget is resizeable.
     pub exclusive_zone: bool,
 }
 
 impl WindowConf {
+    /// constructor method for initialising an instance of WindowConf.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         width: u32,
@@ -81,6 +108,9 @@ impl WindowConf {
     }
 }
 
+// TODO this will be made public when multiple widgets in the same layer is supported.
+// Likely it will be easy after the resize action is implemented
+#[allow(dead_code)]
 pub enum LayerConf {
     Window(WindowConf),
     Windows(Vec<WindowConf>),
