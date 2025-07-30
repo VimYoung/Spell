@@ -80,6 +80,7 @@ pub struct SpellWin {
     pub(crate) is_hidden: bool,
     pub(crate) layer_name: String,
     pub(crate) config: WindowConf,
+    pub(crate) current_display_specs: (usize, usize, usize, usize),
 }
 
 impl SpellWin {
@@ -171,6 +172,12 @@ impl SpellWin {
                                 is_hidden: false,
                                 layer_name: windows.borrow().windows[index].0.clone(),
                                 config: window_conf.clone(),
+                                current_display_specs: (
+                                    0,
+                                    0,
+                                    window_conf.width as usize,
+                                    window_conf.height as usize,
+                                ),
                             },
                             event_queue,
                         ));
@@ -184,7 +191,11 @@ impl SpellWin {
         win_and_queue
     }
 
-    pub fn invoke_spell(name: &str, window_conf: WindowConf) -> (Self, EventQueue<SpellWin>) {
+    pub fn invoke_spell(
+        name: &str,
+        window_conf: WindowConf,
+        current_display_specs: (usize, usize, usize, usize),
+    ) -> (Self, EventQueue<SpellWin>) {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
         let (globals, event_queue) = registry_queue_init(&conn).unwrap();
@@ -193,11 +204,12 @@ impl SpellWin {
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
+        // let mut pool = SlotPool::new(current_display_specs.2 * current_display_specs.3 * 4, &shm)
         let mut pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
-        let stride = window_conf.width as i32 * 4;
+        let stride = current_display_specs.2 as i32 * 4;
         let surface = compositor.create_surface(&qh);
         let mut layer = layer_shell.create_layer_surface(
             &qh,
@@ -212,8 +224,8 @@ impl SpellWin {
 
         let (wayland_buffer, _) = pool
             .create_buffer(
-                window_conf.width as i32,
-                window_conf.height as i32,
+                current_display_specs.2 as i32,
+                current_display_specs.3 as i32,
                 stride,
                 wl_shm::Format::Argb8888,
             )
@@ -265,6 +277,7 @@ impl SpellWin {
                 is_hidden: false,
                 layer_name: name.to_string(),
                 config: window_conf,
+                current_display_specs,
             },
             event_queue,
         )
@@ -283,7 +296,34 @@ impl SpellWin {
         }
     }
 
+    pub fn resize_display(&mut self, x: usize, y: usize, width: usize, height: usize) {
+        self.current_display_specs = (x, y, width, height);
+        let pool = &mut self.memory_manager.pool;
+        let (wayland_buffer, _) = pool
+            .create_buffer(
+                width as i32,
+                height as i32,
+                width as i32 * 4,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+        {
+            render_replace(
+                wayland_buffer.canvas(pool).unwrap(),
+                &self.core.borrow().primary_buffer,
+                self.current_display_specs,
+                (width as u32, height as u32),
+            );
+        }
+        println!("Window Resized");
+        // self.memory_manager.prima
+        self.memory_manager.wayland_buffer = wayland_buffer;
+        set_config(&self.config, &mut self.layer);
+        self.layer.commit();
+    }
+
     // TODO this doesn't seem to trace.
+    // TODO have to fix buffer creation for resizeable windows.
     #[tracing::instrument]
     pub fn show_again(&mut self) {
         let width: u32 = self.size.width;
@@ -297,6 +337,7 @@ impl SpellWin {
                 wl_shm::Format::Argb8888,
             )
             .expect("Creating Buffer");
+        set_config(&self.config, &mut self.layer);
         // tracing::info!("tracing output: {}", buffer.canvas(pool).unwrap().len());
         {
             wayland_buffer
@@ -335,12 +376,12 @@ impl SpellWin {
             let now = std::time::Instant::now();
             if redraw_val || self.first_configure {
                 {
-                    primary_canvas
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(index, val)| {
-                            *val = self.core.borrow().primary_buffer[index];
-                        });
+                    render_replace(
+                        primary_canvas,
+                        &self.core.borrow().primary_buffer,
+                        self.current_display_specs,
+                        (width, height),
+                    );
                 }
             }
             println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
@@ -532,7 +573,8 @@ impl LayerShellHandler for SpellWin {
 }
 
 fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
-    layer.set_size(window_conf.width, window_conf.height);
+    // layer.set_size(window_conf.width, window_conf.height);
+    layer.set_size(376, 576);
     layer.set_margin(
         window_conf.margin.0,
         window_conf.margin.1,
@@ -541,6 +583,36 @@ fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
     );
     layer.set_keyboard_interactivity(window_conf.board_interactivity);
     set_anchor(window_conf, layer);
+}
+
+// TODO poor workable function, needs to be improved after reading dsa.
+fn render_replace(
+    primary_canvas: &mut [u8],
+    shared_core: &[u8],
+    mut dimenstions: (usize, usize, usize, usize),
+    mut shared_core_original_dimentions: (u32, u32),
+) {
+    let (ref mut core_width, ref mut core_height) = shared_core_original_dimentions;
+    let (ref mut x, ref mut y, ref mut width, ref mut height) = dimenstions;
+    *width *= 4;
+    *x *= 4;
+    *core_width *= 4;
+    let mut shared_buffer_index = (*y * *core_width as usize) + *x;
+    let mut wayland_buffer_index = 0;
+    let jump = (*core_width as usize) - *width;
+    for _ in 0..*height as u32 {
+        // println!("pixel_line: {pixel_line}");
+        for _ in 0..(*width as u32) / 4 {
+            // println!("pixel: {pixel}");
+            primary_canvas[wayland_buffer_index] = shared_core[shared_buffer_index];
+            primary_canvas[wayland_buffer_index + 1] = shared_core[shared_buffer_index + 1];
+            primary_canvas[wayland_buffer_index + 2] = shared_core[shared_buffer_index + 2];
+            primary_canvas[wayland_buffer_index + 3] = shared_core[shared_buffer_index + 3];
+            shared_buffer_index += 4;
+            wayland_buffer_index += 4;
+        }
+        shared_buffer_index += jump;
+    }
 }
 
 /// Furture lock screen implementation will be on this type. Currently, it is redundent.
