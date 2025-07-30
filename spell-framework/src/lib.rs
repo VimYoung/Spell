@@ -123,7 +123,9 @@ where
                                 Handle::ToggleWindow => waywindows[index].0.toggle(),
                                 Handle::GrabKeyboardFocus => waywindows[index].0.grab_focus(),
                                 Handle::RemoveKeyboardFocus => waywindows[index].0.remove_focus(),
-                                Handle::Resize(_, _, _, _) => todo!(),
+                                Handle::Resize(x, y, width, height) => {
+                                    waywindows[index].0.resize_display(x, y, width, height)
+                                }
                             }
                         }
                     }

@@ -86,13 +86,17 @@ pub struct SpellWin {
 impl SpellWin {
     pub fn conjure_spells(
         windows: Rc<RefCell<SpellMultiWinHandler>>,
+        current_display_specs: Vec<(usize, usize, usize, usize)>,
     ) -> Vec<(Self, EventQueue<SpellWin>)> {
         let mut win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
         // for handler in windows.borrow()
         let window_length = windows.borrow().windows.len();
         let adapter_length = windows.borrow().adapter.len();
         let core_length = windows.borrow().core.len();
-        if window_length == adapter_length && adapter_length == core_length {
+        if window_length == adapter_length
+            && adapter_length == core_length
+            && adapter_length == current_display_specs.len()
+        {
             let conn = Connection::connect_to_env().unwrap();
             windows
                 .borrow()
@@ -115,7 +119,7 @@ impl SpellWin {
                         .expect("Failed to create pool");
                         let cursor_manager = CursorShapeManager::bind(&globals, &qh)
                             .expect("cursor shape is not available");
-                        let stride = window_conf.width as i32 * 4;
+                        let stride = current_display_specs[index].2 as i32 * 4;
                         let surface = compositor.create_surface(&qh);
                         let mut layer = layer_shell.create_layer_surface(
                             &qh,
@@ -129,8 +133,8 @@ impl SpellWin {
                         layer.commit();
                         let (wayland_buffer, _) = pool
                             .create_buffer(
-                                window_conf.width as i32,
-                                window_conf.height as i32,
+                                current_display_specs[index].2 as i32,
+                                current_display_specs[index].3 as i32,
                                 stride,
                                 wl_shm::Format::Argb8888,
                             )
@@ -172,12 +176,7 @@ impl SpellWin {
                                 is_hidden: false,
                                 layer_name: windows.borrow().windows[index].0.clone(),
                                 config: window_conf.clone(),
-                                current_display_specs: (
-                                    0,
-                                    0,
-                                    window_conf.width as usize,
-                                    window_conf.height as usize,
-                                ),
+                                current_display_specs: current_display_specs[index],
                             },
                             event_queue,
                         ));
@@ -586,6 +585,7 @@ fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
 }
 
 // TODO poor workable function, needs to be improved after reading dsa.
+// Have to account for changes when the inner rectangle goes put of outer rectangle region.
 fn render_replace(
     primary_canvas: &mut [u8],
     shared_core: &[u8],
@@ -593,17 +593,15 @@ fn render_replace(
     mut shared_core_original_dimentions: (u32, u32),
 ) {
     let (ref mut core_width, ref mut core_height) = shared_core_original_dimentions;
-    let (ref mut x, ref mut y, ref mut width, ref mut height) = dimenstions;
+    let (ref mut x, y, ref mut width, height) = dimenstions;
     *width *= 4;
     *x *= 4;
     *core_width *= 4;
-    let mut shared_buffer_index = (*y * *core_width as usize) + *x;
+    let mut shared_buffer_index = (y * *core_width as usize) + *x;
     let mut wayland_buffer_index = 0;
     let jump = (*core_width as usize) - *width;
-    for _ in 0..*height as u32 {
-        // println!("pixel_line: {pixel_line}");
+    for _ in 0..height as u32 {
         for _ in 0..(*width as u32) / 4 {
-            // println!("pixel: {pixel}");
             primary_canvas[wayland_buffer_index] = shared_core[shared_buffer_index];
             primary_canvas[wayland_buffer_index + 1] = shared_core[shared_buffer_index + 1];
             primary_canvas[wayland_buffer_index + 2] = shared_core[shared_buffer_index + 2];
