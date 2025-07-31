@@ -261,7 +261,13 @@ impl ProvidesRegistryState for SpellWin {
     registry_handlers![OutputState, SeatState];
 }
 
-pub(super) fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
+pub(super) fn set_anchor(
+    window_conf: &WindowConf,
+    layer: &mut LayerSurface,
+    width: i32,
+    height: i32,
+    first_configure: bool,
+) {
     match window_conf.anchor.0 {
         Some(mut first_anchor) => match window_conf.anchor.1 {
             Some(sec_anchor) => {
@@ -270,14 +276,10 @@ pub(super) fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
             }
             None => {
                 layer.set_anchor(first_anchor);
-                if window_conf.exclusive_zone {
+                if window_conf.exclusive_zone && first_configure {
                     match first_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
+                        Anchor::LEFT | Anchor::RIGHT => layer.set_exclusive_zone(width),
+                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.
                         _ => {}
@@ -288,14 +290,10 @@ pub(super) fn set_anchor(window_conf: &WindowConf, layer: &mut LayerSurface) {
         None => {
             if let Some(sec_anchor) = window_conf.anchor.1 {
                 layer.set_anchor(sec_anchor);
-                if window_conf.exclusive_zone {
+                if window_conf.exclusive_zone && first_configure {
                     match sec_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
+                        Anchor::LEFT | Anchor::RIGHT => layer.set_exclusive_zone(width),
+                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.
                         _ => {}

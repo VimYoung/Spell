@@ -58,10 +58,14 @@ impl std::clone::Clone for Rgba8Pixel {
 #[derive(Debug, Clone)]
 pub struct WindowConf {
     /// Defines the widget width in pixels. On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's prectangular monitor space.
+    /// monitor, the widget offsets from monitor's prectangular monitor space. It is important to
+    /// note that the value should be the maximum width the widget will ever attain, not the
+    /// current width in case of resizeable widgets.
     pub width: u32,
     /// Defines the widget height in pixels. On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's prectangular monitor space.
+    /// monitor, the widget offsets from monitor's prectangular monitor space. It is important to
+    /// note that the value should be the maximum width the widget will ever attain, not the
+    /// current width in case of resizeable widgets.
     pub height: u32,
     /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
     /// related explaination of usage. If both values are None, then widget is displayed in the
@@ -88,8 +92,8 @@ impl WindowConf {
     /// constructor method for initialising an instance of WindowConf.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        width: u32,
-        height: u32,
+        max_width: u32,
+        max_height: u32,
         anchor: (Option<Anchor>, Option<Anchor>),
         margin: (i32, i32, i32, i32),
         layer_type: Layer,
@@ -97,8 +101,8 @@ impl WindowConf {
         exclusive_zone: bool,
     ) -> Self {
         WindowConf {
-            width,
-            height,
+            width: max_width,
+            height: max_height,
             anchor,
             margin,
             layer_type,

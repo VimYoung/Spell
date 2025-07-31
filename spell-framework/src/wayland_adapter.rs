@@ -27,7 +27,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, env::current_exe, rc::Rc};
 
 use crate::{
     configure::{LayerConf, WindowConf},
@@ -128,8 +128,7 @@ impl SpellWin {
                             Some(windows.borrow().windows[index].0.clone()),
                             None,
                         );
-                        // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-                        set_config(window_conf, &mut layer);
+                        set_config(window_conf, &mut layer, current_display_specs[index], true);
                         layer.commit();
                         let (wayland_buffer, _) = pool
                             .create_buffer(
@@ -217,8 +216,7 @@ impl SpellWin {
             Some(name),
             None,
         );
-        // layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-        set_config(&window_conf, &mut layer);
+        set_config(&window_conf, &mut layer, current_display_specs, true);
         layer.commit();
 
         let (wayland_buffer, _) = pool
@@ -317,7 +315,12 @@ impl SpellWin {
         println!("Window Resized");
         // self.memory_manager.prima
         self.memory_manager.wayland_buffer = wayland_buffer;
-        set_config(&self.config, &mut self.layer);
+        set_config(
+            &self.config,
+            &mut self.layer,
+            self.current_display_specs,
+            self.first_configure,
+        );
         self.layer.commit();
     }
 
@@ -336,7 +339,12 @@ impl SpellWin {
                 wl_shm::Format::Argb8888,
             )
             .expect("Creating Buffer");
-        set_config(&self.config, &mut self.layer);
+        set_config(
+            &self.config,
+            &mut self.layer,
+            self.current_display_specs,
+            self.first_configure,
+        );
         // tracing::info!("tracing output: {}", buffer.canvas(pool).unwrap().len());
         {
             wayland_buffer
@@ -348,7 +356,12 @@ impl SpellWin {
                     *val = self.core.borrow().primary_buffer[index];
                 });
         }
-        set_config(&self.config, &mut self.layer);
+        set_config(
+            &self.config,
+            &mut self.layer,
+            self.current_display_specs,
+            self.first_configure,
+        );
 
         self.is_hidden = false;
         self.layer.commit();
@@ -571,9 +584,17 @@ impl LayerShellHandler for SpellWin {
     }
 }
 
-fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
-    // layer.set_size(window_conf.width, window_conf.height);
-    layer.set_size(376, 576);
+fn set_config(
+    window_conf: &WindowConf,
+    layer: &mut LayerSurface,
+    current_display_specs: (usize, usize, usize, usize),
+    first_configure: bool,
+) {
+    layer.set_size(
+        current_display_specs.2 as u32,
+        current_display_specs.3 as u32,
+    );
+    // layer.set_size(376, 576);
     layer.set_margin(
         window_conf.margin.0,
         window_conf.margin.1,
@@ -581,7 +602,13 @@ fn set_config(window_conf: &WindowConf, layer: &mut LayerSurface) {
         window_conf.margin.3,
     );
     layer.set_keyboard_interactivity(window_conf.board_interactivity);
-    set_anchor(window_conf, layer);
+    set_anchor(
+        window_conf,
+        layer,
+        current_display_specs.2 as i32,
+        current_display_specs.3 as i32,
+        first_configure,
+    );
 }
 
 // TODO poor workable function, needs to be improved after reading dsa.
