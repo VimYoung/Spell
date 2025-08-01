@@ -27,7 +27,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::SlotPool},
 };
-use std::{cell::RefCell, env::current_exe, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     configure::{LayerConf, WindowConf},

@@ -4,7 +4,7 @@
 //! set by the user of library in intial iterations of spell_framework.
 use crate::{
     configure::{LayerConf, WindowConf},
-    shared_context::{SharedCore, SkiaSoftwareBuffer},
+    shared_context::SharedCore,
     wayland_adapter::EventAdapter,
 };
 use slint::{
@@ -19,8 +19,22 @@ use slint::{
 };
 use std::{
     cell::{Cell, RefCell},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
+
+#[cfg(not(docsrs))]
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::skia_non_docs::SpellSkiaWinAdapterReal;
+
+#[cfg(not(docsrs))]
+#[cfg(feature = "i-slint-renderer-skia")]
+pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterReal;
+
+#[cfg(docsrs)]
+use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
+
+#[cfg(docsrs)]
+pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 
 /// This was the previous struct used internally for rendering, its use is stopped in favour of
 /// [SpellSkiaWinAdapter] which provides faster and more reliable rendering. It implements slint's
@@ -152,94 +166,6 @@ impl SpellMultiWinHandler {
             panic!("Panicked here");
         }
     }
-}
-
-#[cfg(feature = "i-slint-renderer-skia")]
-use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
-#[cfg(feature = "i-slint-renderer-skia")]
-/// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
-/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
-/// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
-/// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
-pub struct SpellSkiaWinAdapter {
-    pub(crate) window: Window,
-    pub(crate) size: PhysicalSize,
-    pub(crate) renderer: SkiaRenderer,
-    pub(crate) needs_redraw: Cell<bool>,
-}
-
-impl WindowAdapter for SpellSkiaWinAdapter {
-    fn window(&self) -> &slint::Window {
-        &self.window
-    }
-
-    fn size(&self) -> PhysicalSize {
-        self.size
-    }
-
-    fn renderer(&self) -> &dyn slint::platform::Renderer {
-        &self.renderer
-    }
-
-    // fn set_size(&self, size: slint::WindowSize) {
-    //     self.size.set(size.to_physical(1.));
-    //     self.window
-    //         .dispatch_event(slint::platform::WindowEvent::Resized {
-    //             size: size.to_logical(1.),
-    //         })
-    // }
-    //
-    fn request_redraw(&self) {
-        self.needs_redraw.set(true);
-    }
-}
-
-impl std::fmt::Debug for SpellSkiaWinAdapter {
-    // TODO this needs to be implemented properly
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-impl SpellSkiaWinAdapter {
-    pub fn new(shared_core: Rc<RefCell<SharedCore>>, width: u32, height: u32) -> Rc<Self> {
-        let buffer = Rc::new(SkiaSoftwareBuffer {
-            core: shared_core,
-            last_dirty_region: Default::default(),
-        });
-        let renderer = SkiaRenderer::new_with_surface(
-            &SkiaSharedContext::default(),
-            Box::new(SoftwareSurface::from(buffer.clone())),
-        );
-        Rc::new_cyclic(|w: &Weak<Self>| Self {
-            window: slint::Window::new(w.clone()),
-            size: PhysicalSize { width, height },
-            renderer,
-            needs_redraw: Cell::new(true),
-        })
-    }
-
-    pub fn draw(&self) -> bool {
-        if self.needs_redraw.replace(false) {
-            self.renderer.render().unwrap();
-            true
-        } else {
-            false
-        }
-    }
-
-    // fn last_dirty_region_bounding_box_size(&self) -> Option<slint::LogicalSize> {
-    //     self.buffer.last_dirty_region.borrow().as_ref().map(|r| {
-    //         let size = r.bounding_rect().size;
-    //         slint::LogicalSize::new(size.width as _, size.height as _)
-    //     })
-    // }
-    // fn last_dirty_region_bounding_box_origin(&self) -> Option<slint::LogicalPosition> {
-    //     self.buffer.last_dirty_region.borrow().as_ref().map(|r| {
-    //         let origin = r.bounding_rect().origin;
-    //         slint::LogicalPosition::new(origin.x as _, origin.y as _)
-    //     })
-    // }
 }
 
 impl EventAdapter for SpellSkiaWinAdapter {

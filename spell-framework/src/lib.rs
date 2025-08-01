@@ -2,10 +2,14 @@
 #[warn(missing_docs)]
 mod configure;
 mod dbus_window_state;
+#[cfg(docsrs)]
+mod dummy_skia_docs;
 pub mod forge;
-#[cfg(feature = "i-slint-renderer-skia")]
 mod shared_context;
 #[cfg(feature = "i-slint-renderer-skia")]
+#[doc(hidden)]
+#[cfg(not(docsrs))]
+mod skia_non_docs;
 pub mod slint_adapter;
 pub mod vault;
 pub mod wayland_adapter;
