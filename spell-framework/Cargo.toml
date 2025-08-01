@@ -1,6 +1,6 @@
 [package]
 name = "spell-framework"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Make desktop widgets by the Mystic Arts of Spell"
 license = "GPL-3.0-or-later"

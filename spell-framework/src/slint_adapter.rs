@@ -26,6 +26,10 @@ use std::{
 #[cfg(feature = "i-slint-renderer-skia")]
 use crate::skia_non_docs::SpellSkiaWinAdapterReal;
 
+/// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
+/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
+/// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
+/// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterReal;
@@ -33,6 +37,10 @@ pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterReal;
 #[cfg(docsrs)]
 use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
 
+/// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
+/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
+/// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
+/// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 #[cfg(docsrs)]
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 

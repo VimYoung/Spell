@@ -4200,7 +4200,7 @@ dependencies = [
 
 [[package]]
 name = "spell-framework"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytemuck",
  "env_logger",
