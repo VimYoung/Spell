@@ -47,11 +47,10 @@ pub enum Handle {
     GrabKeyboardFocus,
     RemoveKeyboardFocus,
     Resize(usize, usize, usize, usize),
-}
-
-pub enum Special {
-    Revealer,
-    Resizeable(Vec<(i32, i32, i32, i32)>),
+    AddInputRegion(i32, i32, i32, i32),
+    SubtractInputRegion(i32, i32, i32, i32),
+    AddOpaqueRegion(i32, i32, i32, i32),
+    SubtractOpaqueRegion(i32, i32, i32, i32),
 }
 
 pub fn enchant_spells<F>(
@@ -129,6 +128,22 @@ where
                                 Handle::RemoveKeyboardFocus => waywindows[index].0.remove_focus(),
                                 Handle::Resize(x, y, width, height) => {
                                     waywindows[index].0.resize_display(x, y, width, height)
+                                }
+                                Handle::AddInputRegion(x, y, width, height) => {
+                                    waywindows[index].0.add_input_region(x, y, width, height);
+                                }
+                                Handle::SubtractInputRegion(x, y, width, height) => {
+                                    waywindows[index]
+                                        .0
+                                        .subtract_input_region(x, y, width, height);
+                                }
+                                Handle::AddOpaqueRegion(x, y, width, height) => {
+                                    waywindows[index].0.add_opaque_region(x, y, width, height);
+                                }
+                                Handle::SubtractOpaqueRegion(x, y, width, height) => {
+                                    waywindows[index]
+                                        .0
+                                        .subtract_opaque_region(x, y, width, height);
                                 }
                             }
                         }
@@ -220,6 +235,18 @@ where
                 Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
                 Handle::Resize(x, y, width, height) => {
                     waywindow.resize_display(x, y, width, height)
+                }
+                Handle::AddInputRegion(x, y, width, height) => {
+                    waywindow.add_input_region(x, y, width, height);
+                }
+                Handle::SubtractInputRegion(x, y, width, height) => {
+                    waywindow.subtract_input_region(x, y, width, height);
+                }
+                Handle::AddOpaqueRegion(x, y, width, height) => {
+                    waywindow.add_opaque_region(x, y, width, height);
+                }
+                Handle::SubtractOpaqueRegion(x, y, width, height) => {
+                    waywindow.subtract_opaque_region(x, y, width, height);
                 }
             }
         }

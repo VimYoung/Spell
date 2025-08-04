@@ -7,14 +7,14 @@ use slint::{
     platform::{PlatformError, WindowEvent},
 };
 use smithay_client_toolkit::{
-    compositor::{CompositorHandler, CompositorState},
+    compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
     reexports::client::{
         Connection, EventQueue, QueueHandle,
         globals::registry_queue_init,
-        protocol::{wl_output, wl_shm, wl_surface},
+        protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
     },
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
@@ -81,6 +81,8 @@ pub struct SpellWin {
     pub(crate) layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) current_display_specs: (usize, usize, usize, usize),
+    pub(crate) input_region: Region,
+    pub(crate) opaque_region: Region,
 }
 
 impl SpellWin {
@@ -117,6 +119,10 @@ impl SpellWin {
                             &shm,
                         )
                         .expect("Failed to create pool");
+                        let input_region =
+                            Region::new(&compositor).expect("Couldn't create region");
+                        let opaque_region =
+                            Region::new(&compositor).expect("Couldn't create opaque region");
                         let cursor_manager = CursorShapeManager::bind(&globals, &qh)
                             .expect("cursor shape is not available");
                         let stride = current_display_specs[index].2 as i32 * 4;
@@ -128,7 +134,16 @@ impl SpellWin {
                             Some(windows.borrow().windows[index].0.clone()),
                             None,
                         );
-                        set_config(window_conf, &mut layer, current_display_specs[index], true);
+                        set_config(
+                            window_conf,
+                            &mut layer,
+                            current_display_specs[index],
+                            true,
+                            None,
+                            None
+                            // Some(&input_region.wl_region()),
+                            // Some(&opaque_region.wl_region()),
+                        );
                         layer.commit();
                         let (wayland_buffer, _) = pool
                             .create_buffer(
@@ -176,6 +191,8 @@ impl SpellWin {
                                 layer_name: windows.borrow().windows[index].0.clone(),
                                 config: window_conf.clone(),
                                 current_display_specs: current_display_specs[index],
+                                input_region,
+                                opaque_region,
                             },
                             event_queue,
                         ));
@@ -205,6 +222,8 @@ impl SpellWin {
         // let mut pool = SlotPool::new(current_display_specs.2 * current_display_specs.3 * 4, &shm)
         let mut pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
+        let input_region = Region::new(&compositor).expect("Couldn't create region");
+        let opaque_region = Region::new(&compositor).expect("Couldn't create opaque region");
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let stride = current_display_specs.2 as i32 * 4;
@@ -216,7 +235,14 @@ impl SpellWin {
             Some(name),
             None,
         );
-        set_config(&window_conf, &mut layer, current_display_specs, true);
+        set_config(
+            &window_conf,
+            &mut layer,
+            current_display_specs,
+            true,
+            None,
+            None,
+        );
         layer.commit();
 
         let (wayland_buffer, _) = pool
@@ -275,6 +301,8 @@ impl SpellWin {
                 layer_name: name.to_string(),
                 config: window_conf,
                 current_display_specs,
+                input_region,
+                opaque_region,
             },
             event_queue,
         )
@@ -291,6 +319,30 @@ impl SpellWin {
         } else {
             self.hide();
         }
+    }
+
+    pub fn add_input_region(&mut self, x: i32, y: i32, width: i32, height: i32) {
+        self.input_region.add(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    pub fn subtract_input_region(&mut self, x: i32, y: i32, width: i32, height: i32) {
+        self.input_region.subtract(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    pub fn add_opaque_region(&mut self, x: i32, y: i32, width: i32, height: i32) {
+        self.opaque_region.add(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    pub fn subtract_opaque_region(&mut self, x: i32, y: i32, width: i32, height: i32) {
+        self.opaque_region.subtract(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
     }
 
     pub fn resize_display(&mut self, x: usize, y: usize, width: usize, height: usize) {
@@ -315,12 +367,7 @@ impl SpellWin {
         println!("Window Resized");
         // self.memory_manager.prima
         self.memory_manager.wayland_buffer = wayland_buffer;
-        set_config(
-            &self.config,
-            &mut self.layer,
-            self.current_display_specs,
-            self.first_configure,
-        );
+        self.set_config_internal();
         self.layer.commit();
     }
 
@@ -339,12 +386,9 @@ impl SpellWin {
                 wl_shm::Format::Argb8888,
             )
             .expect("Creating Buffer");
-        set_config(
-            &self.config,
-            &mut self.layer,
-            self.current_display_specs,
-            self.first_configure,
-        );
+        // TODO this was previously set, if rendering causes issues, uncomment this.
+        // self.set_config_internal();
+
         // tracing::info!("tracing output: {}", buffer.canvas(pool).unwrap().len());
         {
             wayland_buffer
@@ -356,15 +400,20 @@ impl SpellWin {
                     *val = self.core.borrow().primary_buffer[index];
                 });
         }
+        self.set_config_internal();
+        self.is_hidden = false;
+        self.layer.commit();
+    }
+
+    fn set_config_internal(&mut self) {
         set_config(
             &self.config,
             &mut self.layer,
             self.current_display_specs,
             self.first_configure,
+            Some(self.input_region.wl_region()),
+            Some(self.opaque_region.wl_region()),
         );
-
-        self.is_hidden = false;
-        self.layer.commit();
     }
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
@@ -578,7 +627,7 @@ impl LayerShellHandler for SpellWin {
         if !self.first_configure {
             self.first_configure = true;
         } else {
-            println!("First draw called");
+            println!("[{}]: First draw called", self.layer_name);
         }
         self.converter(qh);
     }
@@ -589,6 +638,8 @@ fn set_config(
     layer: &mut LayerSurface,
     current_display_specs: (usize, usize, usize, usize),
     first_configure: bool,
+    input_region: Option<&WlRegion>,
+    opaque_region: Option<&WlRegion>,
 ) {
     layer.set_size(
         current_display_specs.2 as u32,
@@ -602,6 +653,12 @@ fn set_config(
         window_conf.margin.3,
     );
     layer.set_keyboard_interactivity(window_conf.board_interactivity);
+    if let Some(in_region) = input_region {
+        layer.set_input_region(Some(in_region));
+    }
+    if let Some(op_region) = opaque_region {
+        layer.set_opaque_region(Some(op_region));
+    }
     set_anchor(
         window_conf,
         layer,
@@ -611,8 +668,6 @@ fn set_config(
     );
 }
 
-// TODO poor workable function, needs to be improved after reading dsa.
-// Have to account for changes when the inner rectangle goes put of outer rectangle region.
 fn render_replace(
     primary_canvas: &mut [u8],
     shared_core: &[u8],
@@ -620,14 +675,20 @@ fn render_replace(
     mut shared_core_original_dimentions: (u32, u32),
 ) {
     let (ref mut core_width, ref mut core_height) = shared_core_original_dimentions;
-    let (ref mut x, y, ref mut width, height) = dimenstions;
+    let (ref mut x, y, ref mut width, ref mut height) = dimenstions;
+    if *x + *width > *core_width as usize {
+        *width = *core_width as usize - *x
+    } else if y + *height > *core_height as usize {
+        *height = *core_height as usize - y
+    }
+
     *width *= 4;
     *x *= 4;
     *core_width *= 4;
     let mut shared_buffer_index = (y * *core_width as usize) + *x;
     let mut wayland_buffer_index = 0;
     let jump = (*core_width as usize) - *width;
-    for _ in 0..height as u32 {
+    for _ in 0..*height as u32 {
         for _ in 0..(*width as u32) / 4 {
             primary_canvas[wayland_buffer_index] = shared_core[shared_buffer_index];
             primary_canvas[wayland_buffer_index + 1] = shared_core[shared_buffer_index + 1];
