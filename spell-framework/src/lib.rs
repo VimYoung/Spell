@@ -68,101 +68,32 @@ where
     {
         let mut internal_recievers: Vec<mpsc::Receiver<InternalHandle>> = Vec::new();
         states.iter().enumerate().for_each(|(index, state)| {
-            let (tx, rx) = mpsc::channel::<InternalHandle>(20);
-            if let Some(some_state) = state {
-                let state_clone = some_state.clone();
-                let layer_name = waywindows[index].0.layer_name.clone();
-                std::thread::spawn(|| {
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .unwrap();
-                    if let Err(error) = rt.block_on(async move {
-                        println!("deploied zbus serive in thread");
-                        deploy_zbus_service(state_clone, tx, layer_name).await?;
-                        Ok::<_, BusError>(())
-                    }) {
-                        println!("Dbus Thread panicked witth the following error. \n {error}");
-                        panic!("All code panicked");
-                    }
-                });
-            }
-            internal_recievers.push(rx);
+            internal_recievers.push(helper_fn_for_deploy(
+                waywindows[index].0.layer_name.clone(),
+                state,
+            ));
         });
 
         loop {
             states.iter().enumerate().for_each(|(index, state)| {
-                if let Some(ref mut callback) = set_callbacks[index]
-                    && state.is_some()
-                {
-                    if let Ok(int_handle) = internal_recievers[index].try_recv() {
-                        match int_handle {
-                            InternalHandle::StateValChange((key, data_type)) => {
-                                println!("Inside statechange");
-                                //Glad I could think of this sub scope for RwLock.
-                                {
-                                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
-                                    state_inst.change_val(&key, data_type);
-                                }
-                                callback(state.as_ref().unwrap().clone());
-                            }
-                            InternalHandle::ShowWinAgain => {
-                                waywindows[index].0.show_again();
-                            }
-                            InternalHandle::HideWindow => waywindows[index].0.hide(),
-                        }
-                    }
-                };
+                helper_fn_internal_handle(
+                    state,
+                    &mut set_callbacks[index],
+                    &mut internal_recievers[index],
+                    &mut waywindows[index].0,
+                );
             });
             window_handles
                 .iter()
                 .enumerate()
                 .for_each(|(index, window_handle_option)| {
-                    if let Some(window_handle) = window_handle_option {
-                        if let Ok(handle) = window_handle.try_recv() {
-                            match handle {
-                                Handle::HideWindow => waywindows[index].0.hide(),
-                                Handle::ShowWinAgain => waywindows[index].0.show_again(),
-                                Handle::ToggleWindow => waywindows[index].0.toggle(),
-                                Handle::GrabKeyboardFocus => waywindows[index].0.grab_focus(),
-                                Handle::RemoveKeyboardFocus => waywindows[index].0.remove_focus(),
-                                Handle::Resize(x, y, width, height) => {
-                                    waywindows[index].0.resize_display(x, y, width, height)
-                                }
-                                Handle::AddInputRegion(x, y, width, height) => {
-                                    waywindows[index].0.add_input_region(x, y, width, height);
-                                }
-                                Handle::SubtractInputRegion(x, y, width, height) => {
-                                    waywindows[index]
-                                        .0
-                                        .subtract_input_region(x, y, width, height);
-                                }
-                                Handle::AddOpaqueRegion(x, y, width, height) => {
-                                    waywindows[index].0.add_opaque_region(x, y, width, height);
-                                }
-                                Handle::SubtractOpaqueRegion(x, y, width, height) => {
-                                    waywindows[index]
-                                        .0
-                                        .subtract_opaque_region(x, y, width, height);
-                                }
-                            }
-                        }
-                    }
+                    helper_fn_win_handle(&mut waywindows[index].0, window_handle_option);
                 });
 
             let _: Vec<_> = waywindows
                 .iter_mut()
                 .map(|(waywindow, event_queue)| {
-                    let is_first_config = waywindow.first_configure;
-                    if is_first_config {
-                        event_queue.roundtrip(waywindow).unwrap();
-                    } else {
-                        event_queue.flush().unwrap();
-                        event_queue.dispatch_pending(waywindow).unwrap();
-                        if let Some(read_value) = event_queue.prepare_read() {
-                            let _ = read_value.read();
-                        }
-                    }
+                    run_loop_once(waywindow, event_queue);
                 })
                 .collect();
         }
@@ -176,17 +107,59 @@ where
 pub fn cast_spell<F>(
     mut waywindow: SpellWin,
     mut event_queue: EventQueue<SpellWin>,
-    window_handle: std::sync::mpsc::Receiver<Handle>,
+    window_handle_option: Option<std::sync::mpsc::Receiver<Handle>>,
     state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
     mut set_callback: Option<F>,
 ) -> Result<(), Box<dyn Error>>
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
-    let (tx, mut rx) = mpsc::channel::<InternalHandle>(20);
-    if let Some(ref some_state) = state {
+    let mut rx = helper_fn_for_deploy(waywindow.layer_name.clone(), &state);
+    loop {
+        helper_fn_internal_handle(&state, &mut set_callback, &mut rx, &mut waywindow);
+        helper_fn_win_handle(&mut waywindow, &window_handle_option);
+        run_loop_once(&mut waywindow, &mut event_queue);
+    }
+}
+
+fn helper_fn_internal_handle<F>(
+    state: &Option<Arc<RwLock<Box<dyn ForeignController>>>>,
+    set_callback: &mut Option<F>,
+    rx: &mut mpsc::Receiver<InternalHandle>,
+    waywindow: &mut SpellWin,
+) where
+    F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
+{
+    if let Some(callback) = set_callback
+        && state.is_some()
+    {
+        if let Ok(int_handle) = rx.try_recv() {
+            match int_handle {
+                InternalHandle::StateValChange((key, data_type)) => {
+                    println!("Inside statechange");
+                    //Glad I could think of this sub scope for RwLock.
+                    {
+                        let mut state_inst = state.as_ref().unwrap().write().unwrap();
+                        state_inst.change_val(&key, data_type);
+                    }
+                    callback(state.as_ref().unwrap().clone());
+                }
+                InternalHandle::ShowWinAgain => {
+                    waywindow.show_again();
+                }
+                InternalHandle::HideWindow => waywindow.hide(),
+            }
+        }
+    };
+}
+
+fn helper_fn_for_deploy(
+    layer_name: String,
+    state: &Option<Arc<RwLock<Box<dyn ForeignController>>>>,
+) -> mpsc::Receiver<InternalHandle> {
+    let (tx, rx) = mpsc::channel::<InternalHandle>(20);
+    if let Some(some_state) = state {
         let state_clone = some_state.clone();
-        let layer_name = waywindow.layer_name.clone();
         std::thread::spawn(|| {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -198,34 +171,18 @@ where
                 Ok::<_, BusError>(())
             }) {
                 println!("Dbus Thread panicked witth the following error. \n {error}");
-                panic!("DBus thread panicked");
+                panic!("All code panicked");
             }
         });
     }
+    rx
+}
 
-    loop {
-        if let Some(ref mut callback) = set_callback
-            && state.is_some()
-        {
-            if let Ok(int_handle) = rx.try_recv() {
-                match int_handle {
-                    InternalHandle::StateValChange((key, data_type)) => {
-                        println!("Inside statechange");
-                        //Glad I could think of this sub scope for RwLock.
-                        {
-                            let mut state_inst = state.as_ref().unwrap().write().unwrap();
-                            state_inst.change_val(&key, data_type);
-                        }
-                        callback(state.as_ref().unwrap().clone());
-                    }
-                    InternalHandle::ShowWinAgain => {
-                        waywindow.show_again();
-                    }
-                    InternalHandle::HideWindow => waywindow.hide(),
-                }
-            }
-        };
-
+fn helper_fn_win_handle(
+    waywindow: &mut SpellWin,
+    window_handle_option: &Option<std::sync::mpsc::Receiver<Handle>>,
+) {
+    if let Some(window_handle) = window_handle_option {
         if let Ok(handle) = window_handle.try_recv() {
             match handle {
                 Handle::HideWindow => waywindow.hide(),
@@ -250,20 +207,22 @@ where
                 }
             }
         }
+    }
+}
 
-        let is_first_config = waywindow.first_configure;
-        if is_first_config {
-            // Primary erros are handled here in the first configration itself.
-            if let Err(err_value) = event_queue.roundtrip(&mut waywindow) {
-                report_error(err_value);
-            }
-            // event_queue.roundtrip(&mut waywindow).unwrap();
-        } else {
-            event_queue.flush().unwrap();
-            event_queue.dispatch_pending(&mut waywindow).unwrap();
-            if let Some(read_value) = event_queue.prepare_read() {
-                let _ = read_value.read();
-            }
+fn run_loop_once(waywindow: &mut SpellWin, event_queue: &mut EventQueue<SpellWin>) {
+    let is_first_config = waywindow.first_configure;
+    if is_first_config {
+        // Primary erros are handled here in the first configration itself.
+        if let Err(err_value) = event_queue.roundtrip(waywindow) {
+            report_error(err_value);
+        }
+        // event_queue.roundtrip(&mut waywindow).unwrap();
+    } else {
+        event_queue.flush().unwrap();
+        event_queue.dispatch_pending(waywindow).unwrap();
+        if let Some(read_value) = event_queue.prepare_read() {
+            let _ = read_value.read();
         }
     }
 }
@@ -303,3 +262,6 @@ fn report_error(error_value: DispatchError) {
 // A Bug effects multi widget setup where is invoke_callback is called, first draw
 // keeps on drawing on the closed window, can only be debugged after window wise logs
 // are enabled. example is saved in a bin file called bug_multi.rs
+// TODO to check what will happen to my dbus network if windows with same layer name will be
+// present. To check causes for errors as well as before implenenting muliple layers in same
+// window.

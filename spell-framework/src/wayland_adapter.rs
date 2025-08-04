@@ -86,144 +86,25 @@ pub struct SpellWin {
 }
 
 impl SpellWin {
-    pub fn conjure_spells(
-        windows: Rc<RefCell<SpellMultiWinHandler>>,
-        current_display_specs: Vec<(usize, usize, usize, usize)>,
-    ) -> Vec<(Self, EventQueue<SpellWin>)> {
-        let mut win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
-        // for handler in windows.borrow()
-        let window_length = windows.borrow().windows.len();
-        let adapter_length = windows.borrow().adapter.len();
-        let core_length = windows.borrow().core.len();
-        if window_length == adapter_length
-            && adapter_length == core_length
-            && adapter_length == current_display_specs.len()
-        {
-            let conn = Connection::connect_to_env().unwrap();
-            windows
-                .borrow()
-                .adapter
-                .iter()
-                .enumerate()
-                .for_each(|(index, val)| {
-                    if let LayerConf::Window(window_conf) = &windows.borrow().windows[index].1 {
-                        let (globals, event_queue) = registry_queue_init(&conn).unwrap();
-                        let qh: QueueHandle<SpellWin> = event_queue.handle();
-                        let compositor = CompositorState::bind(&globals, &qh)
-                            .expect("wl_compositor is not available");
-                        let layer_shell =
-                            LayerShell::bind(&globals, &qh).expect("layer shell is not available");
-                        let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
-                        let mut pool = SlotPool::new(
-                            (window_conf.width * window_conf.height * 4) as usize,
-                            &shm,
-                        )
-                        .expect("Failed to create pool");
-                        let input_region =
-                            Region::new(&compositor).expect("Couldn't create region");
-                        let opaque_region =
-                            Region::new(&compositor).expect("Couldn't create opaque region");
-                        let cursor_manager = CursorShapeManager::bind(&globals, &qh)
-                            .expect("cursor shape is not available");
-                        let stride = current_display_specs[index].2 as i32 * 4;
-                        let surface = compositor.create_surface(&qh);
-                        let mut layer = layer_shell.create_layer_surface(
-                            &qh,
-                            surface,
-                            window_conf.layer_type,
-                            Some(windows.borrow().windows[index].0.clone()),
-                            None,
-                        );
-                        set_config(
-                            window_conf,
-                            &mut layer,
-                            current_display_specs[index],
-                            true,
-                            None,
-                            None
-                            // Some(&input_region.wl_region()),
-                            // Some(&opaque_region.wl_region()),
-                        );
-                        layer.commit();
-                        let (wayland_buffer, _) = pool
-                            .create_buffer(
-                                current_display_specs[index].2 as i32,
-                                current_display_specs[index].3 as i32,
-                                stride,
-                                wl_shm::Format::Argb8888,
-                            )
-                            .expect("Creating Buffer");
-
-                        let memory_manager = MemoryManager {
-                            pool,
-                            shm,
-                            wayland_buffer,
-                        };
-
-                        let pointer_state = PointerState {
-                            pointer: None,
-                            pointer_data: None,
-                            cursor_shape: cursor_manager,
-                        };
-
-                        let keyboard_state = KeyboardState {
-                            board: None,
-                            board_data: None,
-                        };
-
-                        win_and_queue.push((
-                            SpellWin {
-                                adapter: val.clone(),
-                                core: windows.borrow().core[index].clone(),
-                                size: PhysicalSize {
-                                    width: window_conf.width,
-                                    height: window_conf.height,
-                                },
-                                memory_manager,
-                                registry_state: RegistryState::new(&globals),
-                                seat_state: SeatState::new(&globals, &qh),
-                                output_state: OutputState::new(&globals, &qh),
-                                pointer_state,
-                                keyboard_state,
-                                layer,
-                                first_configure: true,
-                                is_hidden: false,
-                                layer_name: windows.borrow().windows[index].0.clone(),
-                                config: window_conf.clone(),
-                                current_display_specs: current_display_specs[index],
-                                input_region,
-                                opaque_region,
-                            },
-                            event_queue,
-                        ));
-                    }
-                });
-        } else {
-            panic!(
-                "The length of window configs and shared cores is not equal to activated windows"
-            );
-        }
-        win_and_queue
-    }
-
-    pub fn invoke_spell(
-        name: &str,
+    fn create_window(
+        conn: &Connection,
         window_conf: WindowConf,
+        layer_name: String,
         current_display_specs: (usize, usize, usize, usize),
+        adapter: Option<Rc<SpellSkiaWinAdapter>>,
+        core: Option<Rc<RefCell<SharedCore>>>,
     ) -> (Self, EventQueue<SpellWin>) {
-        // Initialisation of wayland components.
-        let conn = Connection::connect_to_env().unwrap();
-        let (globals, event_queue) = registry_queue_init(&conn).unwrap();
+        let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
-        // let mut pool = SlotPool::new(current_display_specs.2 * current_display_specs.3 * 4, &shm)
         let mut pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
             .expect("Failed to create pool");
         let input_region = Region::new(&compositor).expect("Couldn't create region");
         let opaque_region = Region::new(&compositor).expect("Couldn't create opaque region");
+        input_region.add(0, 0, window_conf.width as i32, window_conf.height as i32);
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let stride = current_display_specs.2 as i32 * 4;
@@ -232,7 +113,7 @@ impl SpellWin {
             &qh,
             surface,
             window_conf.layer_type,
-            Some(name),
+            Some(layer_name.clone()),
             None,
         );
         set_config(
@@ -240,11 +121,10 @@ impl SpellWin {
             &mut layer,
             current_display_specs,
             true,
-            None,
+            Some(input_region.wl_region()),
             None,
         );
         layer.commit();
-
         let (wayland_buffer, _) = pool
             .create_buffer(
                 current_display_specs.2 as i32,
@@ -270,21 +150,29 @@ impl SpellWin {
             board: None,
             board_data: None,
         };
-        // Initialisation of slint Components.
-        let core = Rc::new(RefCell::new(SharedCore::new(
-            window_conf.width,
-            window_conf.height,
-        )));
-        let adapter = SpellSkiaWinAdapter::new(core.clone(), window_conf.width, window_conf.height);
 
-        let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
-            window_adapter: adapter.clone(),
-        }));
+        // These 2 unwrap or else statements are not connected programmitically
+        // though I know that either both will be none or both will have some value.
+        let core_val: Rc<RefCell<SharedCore>> = core.unwrap_or_else(|| {
+            Rc::new(RefCell::new(SharedCore::new(
+                window_conf.width,
+                window_conf.height,
+            )))
+        });
 
+        let adapter_value: Rc<SpellSkiaWinAdapter> = adapter.unwrap_or_else(|| {
+            let adapter_val =
+                SpellSkiaWinAdapter::new(core_val.clone(), window_conf.width, window_conf.height);
+
+            let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
+                window_adapter: adapter_val.clone(),
+            }));
+            adapter_val
+        });
         (
             SpellWin {
-                adapter,
-                core,
+                adapter: adapter_value,
+                core: core_val,
                 size: PhysicalSize {
                     width: window_conf.width,
                     height: window_conf.height,
@@ -298,13 +186,69 @@ impl SpellWin {
                 layer,
                 first_configure: true,
                 is_hidden: false,
-                layer_name: name.to_string(),
+                layer_name,
                 config: window_conf,
                 current_display_specs,
                 input_region,
                 opaque_region,
             },
             event_queue,
+        )
+    }
+
+    pub fn conjure_spells(
+        windows: Rc<RefCell<SpellMultiWinHandler>>,
+        current_display_specs: Vec<(usize, usize, usize, usize)>,
+    ) -> Vec<(Self, EventQueue<SpellWin>)> {
+        let mut win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
+        // for handler in windows.borrow()
+        let window_length = windows.borrow().windows.len();
+        let adapter_length = windows.borrow().adapter.len();
+        let core_length = windows.borrow().core.len();
+        if window_length == adapter_length
+            && adapter_length == core_length
+            && adapter_length == current_display_specs.len()
+        {
+            let conn = Connection::connect_to_env().unwrap();
+            windows
+                .borrow()
+                .adapter
+                .iter()
+                .enumerate()
+                .for_each(|(index, val)| {
+                    if let LayerConf::Window(window_conf) = &windows.borrow().windows[index].1 {
+                        win_and_queue.push(SpellWin::create_window(
+                            &conn,
+                            window_conf.clone(),
+                            windows.borrow().windows[index].0.clone(),
+                            current_display_specs[index],
+                            Some(val.clone()),
+                            Some(windows.borrow().core[index].clone()),
+                        ));
+                    }
+                });
+        } else {
+            panic!(
+                "The length of window configs and shared cores is not equal to activated windows"
+            );
+        }
+        win_and_queue
+    }
+
+    pub fn invoke_spell(
+        name: &str,
+        window_conf: WindowConf,
+        current_display_specs: (usize, usize, usize, usize),
+    ) -> (Self, EventQueue<SpellWin>) {
+        // Initialisation of wayland components.
+        let conn = Connection::connect_to_env().unwrap();
+        SpellWin::create_window(
+            &conn,
+            window_conf.clone(),
+            name.to_string(),
+            current_display_specs,
+            None,
+            None,
         )
     }
 
