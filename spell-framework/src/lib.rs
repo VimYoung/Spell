@@ -20,13 +20,11 @@ pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::{
         configure::WindowConf,
-        // shared_context::SharedCore,
         dbus_window_state::{DataType, ForeignController},
     };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
-    // pub use zbus::fdo::Error as BusError;
 }
 
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
