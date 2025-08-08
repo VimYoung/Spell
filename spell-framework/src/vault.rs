@@ -8,6 +8,7 @@ use std::{
     process::Command,
     str::FromStr,
 };
+
 #[derive(Debug, Clone)]
 pub struct AppSelector {
     pub app_list: Vec<AppData>,
@@ -46,15 +47,20 @@ impl Default for AppSelector {
                                 println!("Encountered a directory");
                             } else if entry_or_dir.path().extension() == Some(OsStr::new("desktop"))
                             {
-                                let new_data: Option<AppData> =
+                                let new_data: Vec<Option<AppData>> =
                                     desktop_entry_extracter(entry_or_dir.path());
-                                if let Some(data) = new_data {
-                                    // if !app_line_data.iter().any(|pushed_data| {
-                                    //     pushed_data.desktop_file_id == data.desktop_file_id
-                                    // }) {
-                                    app_line_data.push(data);
-                                    //}
-                                }
+                                let filtered_data: Vec<AppData> = new_data
+                                    .iter()
+                                    .filter_map(|val| val.to_owned())
+                                    .collect::<Vec<AppData>>();
+                                app_line_data.extend(filtered_data);
+                                // if let Some(data) = new_data {
+                                //     // if !app_line_data.iter().any(|pushed_data| {
+                                //     //     pushed_data.desktop_file_id == data.desktop_file_id
+                                //     // }) {
+                                //     app_line_data.push(data);
+                                //     //}
+                                // }
                             } else if entry_or_dir.path().is_symlink() {
                                 println!("GOt the symlink");
                             } else {
@@ -76,12 +82,13 @@ impl Default for AppSelector {
 #[derive(Debug, Clone)]
 pub struct AppData {
     pub desktop_file_id: String,
+    pub is_primary: bool,
     pub image_path: Option<String>,
     pub name: String,
     pub exec_comm: Option<String>,
 }
 
-fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
+fn desktop_entry_extracter(file_path: PathBuf) -> Vec<Option<AppData>> {
     let desktop_file_id: String = get_desktop_id(&file_path);
     let mut image_path: Option<String> = None;
     let mut name = String::new();
@@ -93,7 +100,9 @@ fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
         .map(|l| l.expect("Could not parse line"))
         .collect();
     let mut main_entry_found = false;
-    for (_line_index, line) in file_contents.iter().enumerate() {
+    let mut main_entry_pushed = false;
+    let mut return_vector: Vec<Option<AppData>> = Vec::new();
+    for line in file_contents.iter() {
         if line.starts_with('#') || line.is_empty() {
             continue;
         } else if line.starts_with("[Desktop Entry]") {
@@ -101,7 +110,24 @@ fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
         } else if !main_entry_found {
             panic!("Main Entry Not found");
         } else if line.starts_with('[') {
-            // TODO Other sections are not yet handled
+            if !main_entry_pushed {
+                main_entry_pushed = true;
+                return_vector.push(Some(AppData {
+                    desktop_file_id: desktop_file_id.clone(),
+                    is_primary: true,
+                    image_path: image_path.clone(),
+                    name: name.clone(),
+                    exec_comm: exec_comm.clone(),
+                }));
+            } else {
+                return_vector.push(Some(AppData {
+                    desktop_file_id: desktop_file_id.clone(),
+                    is_primary: false,
+                    image_path: image_path.clone(),
+                    name: format!("{} - {}", return_vector[0].clone().unwrap().name, name),
+                    exec_comm: exec_comm.clone(),
+                }));
+            }
         } else {
             // Return None if Hidden or NoDisplay
             let (key, val) = line.split_once('=').unwrap(); //unwrap_or_else(|| {
@@ -115,7 +141,7 @@ fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
                     match val {
                         "Application" => {}
                         // TODO manage the other types propely
-                        _ => return None,
+                        _ => return vec![None],
                     }
                 }
                 "Name" => name = val.to_string(),
@@ -126,15 +152,15 @@ fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
                         image_path = get_image_path(val);
                     }
                 }
-                "Exec" => exec_comm = Some(get_execute_command(val)),
+                "Exec" => exec_comm = Some(get_exec_command(val)),
                 "NoDisplay" => {
                     if val == "true" {
-                        return None;
+                        return vec![None];
                     }
                 }
                 "Hidden" => {
                     if val == "true" {
-                        return None;
+                        return vec![None];
                     }
                 }
                 // TODO This needs to be properly manged in the future.
@@ -144,16 +170,31 @@ fn desktop_entry_extracter(file_path: PathBuf) -> Option<AppData> {
             }
         }
     }
+
+    // Pushing the main entry if no sub-sections found.
+    if !main_entry_pushed {
+        return_vector.push(Some(AppData {
+            desktop_file_id: desktop_file_id.clone(),
+            is_primary: true,
+            image_path: image_path.clone(),
+            name: name.clone(),
+            exec_comm: exec_comm.clone(),
+        }));
+    } else {
+        // Pushing the last section enteries.
+        return_vector.push(Some(AppData {
+            desktop_file_id: desktop_file_id.clone(),
+            is_primary: false,
+            image_path: image_path.clone(),
+            name: format!("{} - {}", return_vector[0].clone().unwrap().name, name),
+            exec_comm: exec_comm.clone(),
+        }));
+    }
     // if name.is_empty() || image_path.is_none() {
     if name.is_empty() {
         panic!("Some necessary enteries are not provided by the entry")
     }
-    Some(AppData {
-        desktop_file_id,
-        image_path,
-        name,
-        exec_comm,
-    })
+    return_vector
 }
 
 // Image path implementation as mentioned in https://specifications.freedesktop.org/icon-theme-spec/latest/#example
@@ -186,7 +227,7 @@ fn get_image_path(val: &str) -> Option<String> {
         dir_list.push("/usr/share/pixmaps/".to_string());
     }
     let mut icon_path: Option<String> = None;
-    println!("Finding Icon of name: {val} in theme : {theme_name}");
+    // println!("Finding Icon of name: {val} in theme : {theme_name}");
     for dir in &dir_list {
         // dir is some_path/icons here, in which the file is presnet.
         icon_path = find_icon_path(dir, &theme_name, val);
@@ -196,7 +237,7 @@ fn get_image_path(val: &str) -> Option<String> {
     }
 
     if icon_path.is_none() {
-        println!("SEARCHING IN HICOLOR DEFAULT THEME");
+        // println!("SEARCHING IN HICOLOR DEFAULT THEME");
         for dir in dir_list {
             icon_path = find_icon_path(&dir, "hicolor", val);
             if icon_path.is_some() {
@@ -215,22 +256,22 @@ fn find_icon_path(dir: &str, theme_name: &str, icon_name_given: &str) -> Option<
             .flatten()
         {
             if theme_dir.path().iter().next_back() == Some(OsStr::new(theme_name)) {
-                let pathh = theme_dir.path();
-                println!("GIVEN THEME FOUND, path: {pathh:?}");
+                // let pathh = theme_dir.path();
+                // println!("GIVEN THEME FOUND, path: {pathh:?}");
                 let index_file_path_vec = &Path::new(&theme_dir.path())
                     .read_dir()
                     .expect("Error reading dir")
                     .flatten()
                     .filter(|val| {
                         if val.path().file_name() == Some(OsStr::new("index.theme")) {
-                            println!("INDEX.THEME found");
+                            // println!("INDEX.THEME found");
                             return true;
                         }
                         false
                     })
                     .collect::<Vec<_>>();
                 if !index_file_path_vec.is_empty() {
-                    println!("Vector not empty");
+                    // println!("Vector not empty");
                     let index_file_path = &index_file_path_vec[0];
                     let icon_path: Option<String> =
                         get_path_from_index(index_file_path.path(), icon_name_given);
@@ -257,7 +298,6 @@ fn remove_last(path: &Path) -> PathBuf {
 fn get_path_from_index(theme_index_path: PathBuf, icon_name: &str) -> Option<String> {
     let dir_path = remove_last(&theme_index_path);
     if dir_path.is_dir() {
-        println!("Finding icon path in {dir_path:?} for icon name: {icon_name}");
         for scale_size_dir in dir_path.read_dir().expect("Error reading dir").flatten() {
             let pathh = remove_last(&scale_size_dir.path());
             for dir in pathh
@@ -280,7 +320,6 @@ fn get_path_from_index(theme_index_path: PathBuf, icon_name: &str) -> Option<Str
                             let final_app_path_string =
                                 &(dir.path().to_str().unwrap().to_owned() + "/apps");
                             let apps_folder = Path::new(final_app_path_string);
-                            println!("ankdnvkn{apps_folder:?}");
                             for icon_path in apps_folder
                                 .read_dir()
                                 .expect("Error reading apps folder")
@@ -304,8 +343,33 @@ fn get_path_from_index(theme_index_path: PathBuf, icon_name: &str) -> Option<Str
     None
 }
 
-fn get_execute_command(val: &str) -> String {
-    "some_val".to_string()
+// TODO Backlash and quoting is not handled properly, needs to be done.
+fn get_exec_command(input: &str) -> String {
+    let mut output = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '%' => {
+                if let Some('%') = chars.peek() {
+                    // %% -> %
+                    output.push('%');
+                    chars.next();
+                } else {
+                    // %X -> remove both
+                    chars.next();
+                }
+            }
+            '"' => {
+                // Remove double quotes entirely
+            }
+            _ => {
+                output.push(c);
+            }
+        }
+    }
+
+    output.trim().to_owned()
 }
 
 fn get_desktop_id(file_path: &Path) -> String {
