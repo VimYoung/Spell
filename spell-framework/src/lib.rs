@@ -28,7 +28,7 @@ pub mod layer_properties {
 }
 
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
-use smithay_client_toolkit::reexports::client::{DispatchError, EventQueue, backend};
+use smithay_client_toolkit::reexports::client::{DispatchError, backend};
 use std::{
     error::Error,
     sync::{Arc, RwLock},
@@ -38,36 +38,33 @@ use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
 
-pub enum Handle {
-    HideWindow,
-    ShowWinAgain,
-    ToggleWindow,
-    GrabKeyboardFocus,
-    RemoveKeyboardFocus,
-    Resize(usize, usize, usize, usize),
-    AddInputRegion(i32, i32, i32, i32),
-    SubtractInputRegion(i32, i32, i32, i32),
-    AddOpaqueRegion(i32, i32, i32, i32),
-    SubtractOpaqueRegion(i32, i32, i32, i32),
-}
+// pub enum Handle {
+//     HideWindow,
+//     ShowWinAgain,
+//     ToggleWindow,
+//     GrabKeyboardFocus,
+//     RemoveKeyboardFocus,
+//     Resize(usize, usize, usize, usize),
+//     AddInputRegion(i32, i32, i32, i32),
+//     SubtractInputRegion(i32, i32, i32, i32),
+//     AddOpaqueRegion(i32, i32, i32, i32),
+//     SubtractOpaqueRegion(i32, i32, i32, i32),
+// }
 
 pub fn enchant_spells<F>(
-    mut waywindows: Vec<(SpellWin, EventQueue<SpellWin>)>,
-    window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
+    mut waywindows: Vec<SpellWin>,
+    // window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
     states: Vec<Option<Arc<RwLock<Box<dyn ForeignController>>>>>,
     mut set_callbacks: Vec<Option<F>>,
 ) -> Result<(), Box<dyn Error>>
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
-    if window_handles.len() == waywindows.len()
-        && window_handles.len() == states.len()
-        && window_handles.len() == set_callbacks.len()
-    {
+    if waywindows.len() == states.len() && waywindows.len() == set_callbacks.len() {
         let mut internal_recievers: Vec<mpsc::Receiver<InternalHandle>> = Vec::new();
         states.iter().enumerate().for_each(|(index, state)| {
             internal_recievers.push(helper_fn_for_deploy(
-                waywindows[index].0.layer_name.clone(),
+                waywindows[index].window.borrow().layer_name.clone(),
                 state,
             ));
         });
@@ -78,20 +75,20 @@ where
                     state,
                     &mut set_callbacks[index],
                     &mut internal_recievers[index],
-                    &mut waywindows[index].0,
+                    &mut waywindows[index],
                 );
             });
-            window_handles
-                .iter()
-                .enumerate()
-                .for_each(|(index, window_handle_option)| {
-                    helper_fn_win_handle(&mut waywindows[index].0, window_handle_option);
-                });
-
+            // window_handles
+            //     .iter()
+            //     .enumerate()
+            //     .for_each(|(index, window_handle_option)| {
+            //         helper_fn_win_handle(&mut waywindows[index].0, window_handle_option);
+            //     });
+            //
             let _: Vec<_> = waywindows
                 .iter_mut()
-                .map(|(waywindow, event_queue)| {
-                    run_loop_once(waywindow, event_queue);
+                .map(|waywindow| {
+                    run_loop_once(waywindow);
                 })
                 .collect();
         }
@@ -104,19 +101,19 @@ where
 
 pub fn cast_spell<F>(
     mut waywindow: SpellWin,
-    mut event_queue: EventQueue<SpellWin>,
-    window_handle_option: Option<std::sync::mpsc::Receiver<Handle>>,
+    // mut event_queue: EventQueue<SpellWinInternal>,
+    // window_handle_option: Option<std::sync::mpsc::Receiver<Handle>>,
     state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
     mut set_callback: Option<F>,
 ) -> Result<(), Box<dyn Error>>
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
-    let mut rx = helper_fn_for_deploy(waywindow.layer_name.clone(), &state);
+    let mut rx = helper_fn_for_deploy(waywindow.window.borrow().layer_name.clone(), &state);
     loop {
         helper_fn_internal_handle(&state, &mut set_callback, &mut rx, &mut waywindow);
-        helper_fn_win_handle(&mut waywindow, &window_handle_option);
-        run_loop_once(&mut waywindow, &mut event_queue);
+        // helper_fn_win_handle(&mut waywindow, &window_handle_option);
+        run_loop_once(&mut waywindow);
     }
 }
 
@@ -176,50 +173,59 @@ fn helper_fn_for_deploy(
     rx
 }
 
-fn helper_fn_win_handle(
-    waywindow: &mut SpellWin,
-    window_handle_option: &Option<std::sync::mpsc::Receiver<Handle>>,
-) {
-    if let Some(window_handle) = window_handle_option {
-        if let Ok(handle) = window_handle.try_recv() {
-            match handle {
-                Handle::HideWindow => waywindow.hide(),
-                Handle::ShowWinAgain => waywindow.show_again(),
-                Handle::ToggleWindow => waywindow.toggle(),
-                Handle::GrabKeyboardFocus => waywindow.grab_focus(),
-                Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
-                Handle::Resize(x, y, width, height) => {
-                    waywindow.resize_display(x, y, width, height)
-                }
-                Handle::AddInputRegion(x, y, width, height) => {
-                    waywindow.add_input_region(x, y, width, height);
-                }
-                Handle::SubtractInputRegion(x, y, width, height) => {
-                    waywindow.subtract_input_region(x, y, width, height);
-                }
-                Handle::AddOpaqueRegion(x, y, width, height) => {
-                    waywindow.add_opaque_region(x, y, width, height);
-                }
-                Handle::SubtractOpaqueRegion(x, y, width, height) => {
-                    waywindow.subtract_opaque_region(x, y, width, height);
-                }
-            }
-        }
-    }
-}
+// fn helper_fn_win_handle(
+//     waywindow: &mut SpellWinInternal,
+//     window_handle_option: &Option<std::sync::mpsc::Receiver<Handle>>,
+// ) {
+//     if let Some(window_handle) = window_handle_option {
+//         if let Ok(handle) = window_handle.try_recv() {
+//             match handle {
+//                 Handle::HideWindow => waywindow.hide(),
+//                 Handle::ShowWinAgain => waywindow.show_again(),
+//                 Handle::ToggleWindow => waywindow.toggle(),
+//                 Handle::GrabKeyboardFocus => waywindow.grab_focus(),
+//                 Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
+//                 Handle::Resize(x, y, width, height) => {
+//                     waywindow.resize_display(x, y, width, height)
+//                 }
+//                 Handle::AddInputRegion(x, y, width, height) => {
+//                     waywindow.add_input_region(x, y, width, height);
+//                 }
+//                 Handle::SubtractInputRegion(x, y, width, height) => {
+//                     waywindow.subtract_input_region(x, y, width, height);
+//                 }
+//                 Handle::AddOpaqueRegion(x, y, width, height) => {
+//                     waywindow.add_opaque_region(x, y, width, height);
+//                 }
+//                 Handle::SubtractOpaqueRegion(x, y, width, height) => {
+//                     waywindow.subtract_opaque_region(x, y, width, height);
+//                 }
+//             }
+//         }
+//     }
+// }
 
-fn run_loop_once(waywindow: &mut SpellWin, event_queue: &mut EventQueue<SpellWin>) {
-    let is_first_config = waywindow.first_configure;
+fn run_loop_once(waywindow: &mut SpellWin) {
+    let is_first_config = waywindow.window.borrow().first_configure;
+    let window = waywindow.window.clone();
     if is_first_config {
         // Primary erros are handled here in the first configration itself.
-        if let Err(err_value) = event_queue.roundtrip(waywindow) {
+        if let Err(err_value) = waywindow
+            .queue
+            .borrow_mut()
+            .roundtrip(&mut window.borrow_mut())
+        {
             report_error(err_value);
         }
         // event_queue.roundtrip(&mut waywindow).unwrap();
     } else {
-        event_queue.flush().unwrap();
-        event_queue.dispatch_pending(waywindow).unwrap();
-        if let Some(read_value) = event_queue.prepare_read() {
+        waywindow.queue.borrow().flush().unwrap();
+        waywindow
+            .queue
+            .borrow_mut()
+            .dispatch_pending(&mut window.borrow_mut())
+            .unwrap();
+        if let Some(read_value) = waywindow.queue.borrow().prepare_read() {
             let _ = read_value.read();
         }
     }

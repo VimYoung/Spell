@@ -1,5 +1,6 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
+use std::cell::Cell;
 
 /// Unused Internal struct representation of a pixel, it is similar to slint's
 /// representation of [pixel]() but implement few more trait. Currently, redundent
@@ -79,7 +80,7 @@ pub struct WindowConf {
     pub layer_type: Layer,
     /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`] for more
     /// details.
-    pub board_interactivity: KeyboardInteractivity,
+    pub board_interactivity: Cell<KeyboardInteractivity>,
     /// Defines if the widget is exclusive of not, if marked true, further laying of widgets in the
     /// same area is avoided. View [wayland docs](https://wayland.app/protocols/wlr-layer-shell-unstable-v1#zwlr_layer_surface_v1:request:set_exclusive_zone)
     /// for details. By default, spell takes the value of width if anchored at top or bottom and
@@ -106,7 +107,7 @@ impl WindowConf {
             anchor,
             margin,
             layer_type,
-            board_interactivity,
+            board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
         }
     }

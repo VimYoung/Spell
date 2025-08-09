@@ -1,4 +1,4 @@
-use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
+use crate::{layer_properties::WindowConf, wayland_adapter::SpellWinInternal};
 use slint::{
     SharedString,
     platform::{PointerEventButton, WindowEvent},
@@ -25,7 +25,7 @@ use smithay_client_toolkit::{
     },
 };
 
-impl KeyboardHandler for SpellWin {
+impl KeyboardHandler for SpellWinInternal {
     fn enter(
         &mut self,
         _conn: &Connection,
@@ -98,9 +98,9 @@ impl KeyboardHandler for SpellWin {
     }
 }
 
-impl SeatHandler for SpellWin {
+impl SeatHandler for SpellWinInternal {
     fn seat_state(&mut self) -> &mut SeatState {
-        &mut self.seat_state
+        &mut self.states.seat_state
     }
 
     fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
@@ -112,27 +112,29 @@ impl SeatHandler for SpellWin {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_none() {
+        if capability == Capability::Keyboard && self.states.keyboard_state.board.is_none() {
             println!("Set keyboard capability");
             let keyboard = self
+                .states
                 .seat_state
                 .get_keyboard(qh, &seat, None)
                 .expect("Failed to create keyboard");
             // let keyboard_data = KeyboardData::new(seat);
-            self.keyboard_state.board = Some(keyboard);
+            self.states.keyboard_state.board = Some(keyboard);
             // TODO keyboard Data needs to be set later.
             // self.keyboard_state.board_data = Some(keyboard_data::<Self>);
         }
 
-        if capability == Capability::Pointer && self.pointer_state.pointer.is_none() {
+        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
             println!("Set pointer capability");
             let pointer = self
+                .states
                 .seat_state
                 .get_pointer(qh, &seat)
                 .expect("Failed to create pointer");
             let pointer_data = PointerData::new(seat);
-            self.pointer_state.pointer = Some(pointer);
-            self.pointer_state.pointer_data = Some(pointer_data);
+            self.states.pointer_state.pointer = Some(pointer);
+            self.states.pointer_state.pointer_data = Some(pointer_data);
         }
     }
 
@@ -143,21 +145,21 @@ impl SeatHandler for SpellWin {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_some() {
+        if capability == Capability::Keyboard && self.states.keyboard_state.board.is_some() {
             println!("Unset keyboard capability");
-            self.keyboard_state.board.take().unwrap().release();
+            self.states.keyboard_state.board.take().unwrap().release();
         }
 
-        if capability == Capability::Pointer && self.pointer_state.pointer.is_some() {
+        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_some() {
             println!("Unset pointer capability");
-            self.pointer_state.pointer.take().unwrap().release();
+            self.states.pointer_state.pointer.take().unwrap().release();
         }
     }
 
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
-impl PointerHandler for SpellWin {
+impl PointerHandler for SpellWinInternal {
     fn pointer_frame(
         &mut self,
         _conn: &Connection,
@@ -168,7 +170,7 @@ impl PointerHandler for SpellWin {
         use PointerEventKind::*;
         for event in events {
             // Ignore events for other surfaces
-            if &event.surface != self.layer.wl_surface() {
+            if &event.surface != self.layer.borrow().wl_surface() {
                 continue;
             }
             match event.kind {
@@ -176,8 +178,9 @@ impl PointerHandler for SpellWin {
                     // println!("Pointer entered @{:?}", event.position);
 
                     // TODO this code is redundent, as it doesn't set the cursor shape.
-                    let pointer = &self.pointer_state.pointer.as_ref().unwrap();
+                    let pointer = &self.states.pointer_state.pointer.as_ref().unwrap();
                     let serial_no: Option<u32> = self
+                        .states
                         .pointer_state
                         .pointer_data
                         .as_ref()
@@ -185,7 +188,8 @@ impl PointerHandler for SpellWin {
                         .latest_enter_serial();
                     if let Some(no) = serial_no {
                         println!("Cursor Shape set");
-                        self.pointer_state
+                        self.states
+                            .pointer_state
                             .cursor_shape
                             .get_shape_device(pointer, qh)
                             .set_shape(no, Shape::Pointer);
@@ -256,20 +260,14 @@ impl PointerHandler for SpellWin {
 }
 
 // TODO FIND What is the use of registery_handlers here?
-impl ProvidesRegistryState for SpellWin {
+impl ProvidesRegistryState for SpellWinInternal {
     fn registry(&mut self) -> &mut RegistryState {
-        &mut self.registry_state
+        &mut self.states.registry_state
     }
     registry_handlers![OutputState, SeatState];
 }
 
-pub(super) fn set_anchor(
-    window_conf: &WindowConf,
-    layer: &mut LayerSurface,
-    width: i32,
-    height: i32,
-    first_configure: bool,
-) {
+pub(super) fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: bool) {
     match window_conf.anchor.0 {
         Some(mut first_anchor) => match window_conf.anchor.1 {
             Some(sec_anchor) => {
@@ -280,7 +278,9 @@ pub(super) fn set_anchor(
                 layer.set_anchor(first_anchor);
                 if window_conf.exclusive_zone && first_configure {
                     match first_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => layer.set_exclusive_zone(width),
+                        Anchor::LEFT | Anchor::RIGHT => {
+                            layer.set_exclusive_zone(window_conf.width as i32)
+                        }
                         Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.
@@ -294,7 +294,9 @@ pub(super) fn set_anchor(
                 layer.set_anchor(sec_anchor);
                 if window_conf.exclusive_zone && first_configure {
                     match sec_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => layer.set_exclusive_zone(width),
+                        Anchor::LEFT | Anchor::RIGHT => {
+                            layer.set_exclusive_zone(window_conf.width as i32)
+                        }
                         Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.

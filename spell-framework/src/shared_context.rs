@@ -1,7 +1,4 @@
-use smithay_client_toolkit::shm::{
-    Shm,
-    slot::{Buffer, SlotPool},
-};
+use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 
 #[derive(Debug)]
 pub struct SharedCore {
@@ -20,8 +17,6 @@ impl SharedCore {
 
 #[derive(Debug)]
 pub struct MemoryManager {
-    pub shm: Shm,
-    pub pool: SlotPool,
     pub wayland_buffer: Buffer,
 }
 

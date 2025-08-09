@@ -71,30 +71,28 @@ and then replace the `main.rs` with following contents:
 use std::{
     env,
     error::Error,
-    sync::mpsc,
     sync::{Arc, RwLock},
 };
 
 use slint::ComponentHandle;
-use spell::{
+use spell_framework::{
     cast_spell,
-    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf},
+    layer_properties::{BoardType, ForeignController, LayerAnchor, LayerType, WindowConf},
     wayland_adapter::SpellWin,
-    Handle,
 };
 slint::include_modules!();
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let (_tx, rx) = mpsc::channel::<Handle>();
     let window_conf = WindowConf::new(
         376,
         576,
         (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
         (5, 0, 0, 10),
         LayerType::Top,
+        BoardType::None,
         false,
     );
-    let (waywindow, event_queue) = SpellWin::invoke_spell("counter-widget", window_conf);
+    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
 
     let ui = AppWindow::new().unwrap();
     ui.on_request_increase_value({
@@ -104,19 +102,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui.set_counter(ui.get_counter() + 1);
         }
     });
-    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(
-        waywindow,
-        event_queue,
-        rx,
-        None,
-        None,
-    )
+    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(waywindow, None, None)
 }
 ```
 
 ## Batteries
 
-No batteries, but common functionalities like system tray, temp etc, will be added later for
+Not a lot of batteries included for now, future implementations of common functionalities will occur
+in `vault` module of this crate. For now it has a AppSelector, which can be used to retrieve app information
+for creating a launcher. Other common functionalities like system tray, temp etc, will be added later for
 convenience. I recommend the use of following crates for some basic usage, though you must note
 that I haven't used them extensively myself (for now).
 
