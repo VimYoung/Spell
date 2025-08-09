@@ -58,6 +58,7 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        println!("A key is pressed");
         self.adapter
             .try_dispatch_event(WindowEvent::KeyPressed {
                 text: SharedString::from(event.utf8.unwrap()),
@@ -73,11 +74,12 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        println!("A key is released");
         let value = event.keysym.key_char();
         if let Some(val) = value {
             self.adapter
                 .try_dispatch_event(WindowEvent::KeyReleased {
-                    text: SharedString::from(val),
+                    text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),
                 })
                 .unwrap();
         }

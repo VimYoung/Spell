@@ -3,7 +3,7 @@
 //! [Timer](https://docs.slint.dev/latest/docs/slint/reference/timer/). Alternatively,
 //! if you want a more rust facing interface (where timed events are not managed inside
 //! `.slint` files and rather directly created in rust code), you can use
-//! [`Forge`](crate::forge::Forge).
+//! [`Forge`]
 //!
 //! ## Use Cases
 //!

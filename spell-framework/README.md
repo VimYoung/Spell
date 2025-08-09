@@ -28,7 +28,7 @@ in rust.
 ## Installation and Usage
 
 > [!WARNING]
-> The crate is under active development and is not ready for use.
+> The crate is under active development and breaking changes are expected.
 
 I have released a version in crates.io . Hence, you can simply add spell by command, `cargo add spell-framework`.
 

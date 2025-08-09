@@ -90,10 +90,17 @@ impl SpellWin {
         conn: &Connection,
         window_conf: WindowConf,
         layer_name: String,
-        current_display_specs: (usize, usize, usize, usize),
+        // current_display_specs: (usize, usize, usize, usize),
         adapter: Option<Rc<SpellSkiaWinAdapter>>,
         core: Option<Rc<RefCell<SharedCore>>>,
     ) -> (Self, EventQueue<SpellWin>) {
+        // Makes the resixe functionality redundent.
+        let current_display_specs: (usize, usize, usize, usize) = (
+            0,
+            0,
+            window_conf.width as usize,
+            window_conf.height as usize,
+        );
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
         let compositor =
@@ -198,16 +205,15 @@ impl SpellWin {
 
     pub fn conjure_spells(
         windows: Rc<RefCell<SpellMultiWinHandler>>,
-        current_display_specs: Vec<(usize, usize, usize, usize)>,
+        // current_display_specs: Vec<(usize, usize, usize, usize)>,
     ) -> Vec<(Self, EventQueue<SpellWin>)> {
         let mut win_and_queue: Vec<(SpellWin, EventQueue<SpellWin>)> = Vec::new();
         // for handler in windows.borrow()
         let window_length = windows.borrow().windows.len();
         let adapter_length = windows.borrow().adapter.len();
         let core_length = windows.borrow().core.len();
-        if window_length == adapter_length
-            && adapter_length == core_length
-            && adapter_length == current_display_specs.len()
+        if window_length == adapter_length && adapter_length == core_length
+        // && adapter_length == current_display_specs.len()
         {
             let conn = Connection::connect_to_env().unwrap();
             windows
@@ -221,7 +227,7 @@ impl SpellWin {
                             &conn,
                             window_conf.clone(),
                             windows.borrow().windows[index].0.clone(),
-                            current_display_specs[index],
+                            // current_display_specs[index],
                             Some(val.clone()),
                             Some(windows.borrow().core[index].clone()),
                         ));
@@ -238,7 +244,7 @@ impl SpellWin {
     pub fn invoke_spell(
         name: &str,
         window_conf: WindowConf,
-        current_display_specs: (usize, usize, usize, usize),
+        // current_display_specs: (usize, usize, usize, usize),
     ) -> (Self, EventQueue<SpellWin>) {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
@@ -246,7 +252,7 @@ impl SpellWin {
             &conn,
             window_conf.clone(),
             name.to_string(),
-            current_display_specs,
+            // current_display_specs,
             None,
             None,
         )
@@ -370,7 +376,7 @@ impl SpellWin {
         if !self.is_hidden {
             let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
             let pool = &mut self.memory_manager.pool;
             let buffer = &self.memory_manager.wayland_buffer;
@@ -389,7 +395,7 @@ impl SpellWin {
                     );
                 }
             }
-            println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
+            // println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
 
             // Damage the entire window
             // if self.first_configure {
@@ -421,7 +427,7 @@ impl SpellWin {
                 .wl_surface()
                 .attach(Some(buffer.wl_buffer()), 0, 0);
         } else {
-            println!("Is_hidden is true.");
+            // println!("Is_hidden is true.");
         }
 
         self.layer.commit();
@@ -433,13 +439,15 @@ impl SpellWin {
         // of the canvas.
     }
 
-    pub fn grab_focus(&self) {
+    pub fn grab_focus(&mut self) {
+        self.config.board_interactivity = KeyboardInteractivity::Exclusive;
         self.layer
-            .set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+            .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
         self.layer.commit();
     }
 
-    pub fn remove_focus(&self) {
+    pub fn remove_focus(&mut self) {
+        self.config.board_interactivity = KeyboardInteractivity::None;
         self.layer
             .set_keyboard_interactivity(KeyboardInteractivity::None);
         self.layer.commit();
@@ -567,11 +575,11 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
-        println!("Config event is called");
+        // println!("Config event is called");
         if !self.first_configure {
             self.first_configure = true;
         } else {
-            println!("[{}]: First draw called", self.layer_name);
+            // println!("[{}]: First draw called", self.layer_name);
         }
         self.converter(qh);
     }
@@ -596,7 +604,9 @@ fn set_config(
         window_conf.margin.2,
         window_conf.margin.3,
     );
+    // if first_configure {
     layer.set_keyboard_interactivity(window_conf.board_interactivity);
+    //}
     if let Some(in_region) = input_region {
         layer.set_input_region(Some(in_region));
     }

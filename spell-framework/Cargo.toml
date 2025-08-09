@@ -6,6 +6,7 @@ description = "Make desktop widgets by the Mystic Arts of Spell"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/VimYoung/Spell"
 keywords = ["widget", "rice", "spell", "slint", "wayland"]
+exclude = ["/src/bin/*"]
 
 [dependencies]
 bytemuck = "1.23.1"
@@ -16,6 +17,7 @@ i-slint-core = "1.11.0"
 i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
+rust-fuzzy-search = "0.1.1"
 slint = { version = "1.12.0", features = [
   "raw-window-handle-06",
   "renderer-software",
