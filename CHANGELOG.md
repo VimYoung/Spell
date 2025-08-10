@@ -1,3 +1,13 @@
+0.1.3 (25-08-10)
+===============
+
+Changes:
+
+- Added app selector in docs.
+  - Now you can fetch your apps and create a app launcher form slint.
+- Optimised user-end APIs for less boilerplate.
+- Resize functionality is removed in favour of methods to specify input and opaque regions.
+
 0.1.1 and 0.1.2 (25-07-29)
 ==========================
 

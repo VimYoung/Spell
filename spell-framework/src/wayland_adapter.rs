@@ -30,9 +30,11 @@ use smithay_client_toolkit::{
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
+    sync::mpsc::{self, Receiver, Sender},
 };
 
 use crate::{
+    Handle,
     configure::{LayerConf, WindowConf},
     dbus_window_state::{KeyboardState, PointerState},
     shared_context::{MemoryManager, SharedCore},
@@ -43,93 +45,12 @@ use crate::{
 mod states_and_handles;
 
 // This trait helps in defining specifc functions that would be required to run
-// inside the SpellWinInternal. Benefit of this abstraction is that I am sure that every function
+// inside the SpellWin. Benefit of this abstraction is that I am sure that every function
 // I am defining works even if inside `Rc`, i.e. only using non interior mutability
 // functions.
 pub(crate) trait EventAdapter: std::fmt::Debug {
     fn draw_if_needed(&self) -> bool;
     fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
-}
-
-/// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
-/// implementation, thus providing various available features. ///
-/// ## Panics
-///
-/// The constructor method [conjure_spells](crate::wayland_adapter::SpellWin::conjure_spells) will
-/// panic if the number of WindowConfs provided is not equal to the amount of widgets that are
-/// initialised in the scope. The solution to avoid panic is to add more `let _ =
-/// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
-/// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
-#[derive(Debug, Clone)]
-pub struct SpellWin {
-    pub(crate) window: Rc<RefCell<SpellWinInternal>>,
-    pub(crate) queue: Rc<RefCell<EventQueue<SpellWinInternal>>>,
-}
-
-impl SpellWin {
-    pub fn conjure_spells(
-        windows: Rc<RefCell<SpellMultiWinHandler>>,
-        // current_display_specs: Vec<(usize, usize, usize, usize)>,
-    ) -> Vec<Self> {
-        SpellWinInternal::conjure_spells(windows)
-            .iter()
-            .map(|(internal, queue)| SpellWin {
-                window: internal.clone(),
-                queue: queue.clone(),
-            })
-            .collect()
-    }
-
-    pub fn invoke_spell(
-        name: &str,
-        window_conf: WindowConf,
-        // current_display_specs: (usize, usize, usize, usize),
-    ) -> Self {
-        let internal = SpellWinInternal::invoke_spell(name, window_conf);
-        SpellWin {
-            window: internal.0,
-            queue: internal.1,
-        }
-    }
-
-    pub fn toggle(&self) {
-        self.window.borrow().toggle();
-    }
-
-    pub fn hide(&self) {
-        self.window.borrow().hide();
-    }
-
-    pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.window.borrow().add_input_region(x, y, width, height);
-    }
-
-    pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.window
-            .borrow()
-            .subtract_input_region(x, y, width, height);
-    }
-
-    pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.window.borrow().add_opaque_region(x, y, width, height);
-    }
-
-    pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.window
-            .borrow()
-            .subtract_opaque_region(x, y, width, height);
-    }
-
-    pub fn show_again(&self) {
-        self.window.borrow().show_again()
-    }
-
-    pub fn grab_focus(&self) {
-        self.window.borrow().grab_focus();
-    }
-    pub fn remove_focus(&self) {
-        self.window.borrow().remove_focus();
-    }
 }
 
 #[derive(Debug)]
@@ -142,33 +63,45 @@ pub(crate) struct States {
     pub(crate) shm: Shm,
 }
 
+// TODO Remove memory manager and add Buffer directly
+
+/// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
+/// implementation, thus providing various available features. ///
+/// ## Panics
+///
+/// The constructor method [conjure_spells](crate::wayland_adapter::SpellWin::conjure_spells) will
+/// panic if the number of WindowConfs provided is not equal to the amount of widgets that are
+/// initialised in the scope. The solution to avoid panic is to add more `let _ =
+/// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
+/// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
 #[derive(Debug)]
-pub(crate) struct SpellWinInternal {
+pub struct SpellWin {
     pub(crate) adapter: Rc<dyn EventAdapter>,
     pub(crate) core: Rc<RefCell<SharedCore>>,
     pub(crate) size: PhysicalSize,
-    pub(crate) memory_manager: RefCell<MemoryManager>,
-    pub(crate) pool: RefCell<SlotPool>,
+    pub(crate) memory_manager: MemoryManager,
     pub(crate) states: States,
-    pub(crate) layer: RefCell<LayerSurface>,
+    pub(crate) layer: LayerSurface,
     pub(crate) first_configure: bool,
     pub(crate) is_hidden: Cell<bool>,
     pub(crate) layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
+    pub(crate) queue: Rc<RefCell<EventQueue<SpellWin>>>,
+    pub(crate) handler: Option<Receiver<Handle>>,
 }
 
-impl SpellWinInternal {
+impl SpellWin {
     fn create_window(
         conn: &Connection,
         window_conf: WindowConf,
         layer_name: String,
         adapter: Option<Rc<SpellSkiaWinAdapter>>,
         core: Option<Rc<RefCell<SharedCore>>>,
-    ) -> (Rc<RefCell<Self>>, Rc<RefCell<EventQueue<SpellWinInternal>>>) {
+    ) -> Self {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
-        let qh: QueueHandle<SpellWinInternal> = event_queue.handle();
+        let qh: QueueHandle<SpellWin> = event_queue.handle();
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
@@ -182,7 +115,7 @@ impl SpellWinInternal {
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let stride = window_conf.width as i32 * 4;
         let surface = compositor.create_surface(&qh);
-        let mut layer = layer_shell.create_layer_surface(
+        let layer = layer_shell.create_layer_surface(
             &qh,
             surface,
             window_conf.layer_type,
@@ -191,7 +124,7 @@ impl SpellWinInternal {
         );
         set_config(
             &window_conf,
-            &mut layer,
+            &layer,
             true,
             Some(input_region.wl_region()),
             None,
@@ -206,7 +139,10 @@ impl SpellWinInternal {
             )
             .expect("Creating Buffer");
 
-        let memory_manager = MemoryManager { wayland_buffer };
+        let memory_manager = MemoryManager {
+            wayland_buffer,
+            pool,
+        };
 
         let pointer_state = PointerState {
             pointer: None,
@@ -237,40 +173,44 @@ impl SpellWinInternal {
             }));
             adapter_val
         });
-        (
-            Rc::new(RefCell::new(SpellWinInternal {
-                adapter: adapter_value,
-                core: core_val,
-                size: PhysicalSize {
-                    width: window_conf.width,
-                    height: window_conf.height,
-                },
-                memory_manager: RefCell::new(memory_manager),
-                pool: RefCell::new(pool),
-                states: States {
-                    registry_state: RegistryState::new(&globals),
-                    seat_state: SeatState::new(&globals, &qh),
-                    output_state: OutputState::new(&globals, &qh),
-                    pointer_state,
-                    keyboard_state,
-                    shm,
-                },
-                layer: RefCell::new(layer),
-                first_configure: true,
-                is_hidden: Cell::new(false),
-                layer_name,
-                config: window_conf,
-                input_region,
-                opaque_region,
-            })),
-            Rc::new(RefCell::new(event_queue)),
-        )
+        SpellWin {
+            adapter: adapter_value,
+            core: core_val,
+            size: PhysicalSize {
+                width: window_conf.width,
+                height: window_conf.height,
+            },
+            memory_manager,
+            states: States {
+                registry_state: RegistryState::new(&globals),
+                seat_state: SeatState::new(&globals, &qh),
+                output_state: OutputState::new(&globals, &qh),
+                pointer_state,
+                keyboard_state,
+                shm,
+            },
+            layer,
+            first_configure: true,
+            is_hidden: Cell::new(false),
+            layer_name,
+            config: window_conf,
+            input_region,
+            opaque_region,
+            queue: Rc::new(RefCell::new(event_queue)),
+            handler: None,
+        }
     }
 
-    fn conjure_spells(
+    pub fn get_handler(&mut self) -> Sender<Handle> {
+        let (tx, rx) = mpsc::channel::<Handle>();
+        self.handler = Some(rx);
+        tx
+    }
+
+    pub fn conjure_spells(
         windows: Rc<RefCell<SpellMultiWinHandler>>,
         // current_display_specs: Vec<(usize, usize, usize, usize)>,
-    ) -> Vec<(Rc<RefCell<Self>>, Rc<RefCell<EventQueue<SpellWinInternal>>>)> {
+    ) -> Vec<Self> {
         let mut win_and_queue = Vec::new();
         // for handler in windows.borrow()
         let window_length = windows.borrow().windows.len();
@@ -287,7 +227,7 @@ impl SpellWinInternal {
                 .enumerate()
                 .for_each(|(index, val)| {
                     if let LayerConf::Window(window_conf) = &windows.borrow().windows[index].1 {
-                        win_and_queue.push(SpellWinInternal::create_window(
+                        win_and_queue.push(SpellWin::create_window(
                             &conn,
                             window_conf.clone(),
                             windows.borrow().windows[index].0.clone(),
@@ -306,14 +246,14 @@ impl SpellWinInternal {
         win_and_queue
     }
 
-    fn invoke_spell(
+    pub fn invoke_spell(
         name: &str,
         window_conf: WindowConf,
         // current_display_specs: (usize, usize, usize, usize),
-    ) -> (Rc<RefCell<Self>>, Rc<RefCell<EventQueue<SpellWinInternal>>>) {
+    ) -> Self {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
-        SpellWinInternal::create_window(
+        SpellWin::create_window(
             &conn,
             window_conf.clone(),
             name.to_string(),
@@ -323,12 +263,12 @@ impl SpellWinInternal {
         )
     }
 
-    fn hide(&self) {
+    pub fn hide(&self) {
         self.is_hidden.set(true);
-        self.layer.borrow().wl_surface().attach(None, 0, 0);
+        self.layer.wl_surface().attach(None, 0, 0);
     }
 
-    fn toggle(&self) {
+    pub fn toggle(&mut self) {
         if self.is_hidden.get() {
             self.show_again();
         } else {
@@ -336,28 +276,28 @@ impl SpellWinInternal {
         }
     }
 
-    fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+    pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.input_region.add(x, y, width, height);
         self.set_config_internal();
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
-    fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+    pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.input_region.subtract(x, y, width, height);
         self.set_config_internal();
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
-    fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+    pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.opaque_region.add(x, y, width, height);
         self.set_config_internal();
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
-    fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+    pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.opaque_region.subtract(x, y, width, height);
         self.set_config_internal();
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
     // fn resize_display(&mut self, x: usize, y: usize, width: usize, height: usize) {
@@ -390,10 +330,10 @@ impl SpellWinInternal {
     // TODO this doesn't seem to trace.
     // TODO have to fix buffer creation for resizeable windows.
     #[tracing::instrument]
-    fn show_again(&self) {
+    pub fn show_again(&mut self) {
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;
-        let pool = &mut self.pool.borrow_mut();
+        let pool = &mut self.memory_manager.pool;
         let (wayland_buffer, _) = pool
             .create_buffer(
                 width as i32,
@@ -418,13 +358,13 @@ impl SpellWinInternal {
         }
         self.set_config_internal();
         self.is_hidden.set(false);
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
     fn set_config_internal(&self) {
         set_config(
             &self.config,
-            &self.layer.borrow(),
+            &self.layer,
             self.first_configure,
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
@@ -443,8 +383,8 @@ impl SpellWinInternal {
             let redraw_val: bool = window_adapter.draw_if_needed();
             // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
-            let pool = &mut self.pool.borrow_mut();
-            let buffer = &self.memory_manager.borrow().wayland_buffer;
+            let pool = &mut self.memory_manager.pool;
+            let buffer = &self.memory_manager.wayland_buffer;
             let primary_canvas = buffer.canvas(pool).unwrap();
 
             // println!("{}", primary_canvas.len());
@@ -466,7 +406,6 @@ impl SpellWinInternal {
             // if self.first_configure {
             self.first_configure = false;
             self.layer
-                .borrow()
                 .wl_surface()
                 .damage_buffer(0, 0, width as i32, height as i32);
             // } else {
@@ -487,18 +426,16 @@ impl SpellWinInternal {
             // }
             // Request our next frame
             self.layer
-                .borrow()
                 .wl_surface()
-                .frame(qh, self.layer.borrow().wl_surface().clone());
+                .frame(qh, self.layer.wl_surface().clone());
             self.layer
-                .borrow()
                 .wl_surface()
                 .attach(Some(buffer.wl_buffer()), 0, 0);
         } else {
             // println!("Is_hidden is true.");
         }
 
-        self.layer.borrow().commit();
+        self.layer.commit();
         // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
         // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
 
@@ -507,43 +444,41 @@ impl SpellWinInternal {
         // of the canvas.
     }
 
-    fn grab_focus(&self) {
+    pub fn grab_focus(&self) {
         self.config
             .board_interactivity
             .set(KeyboardInteractivity::Exclusive);
         self.layer
-            .borrow()
             .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 
-    fn remove_focus(&self) {
+    pub fn remove_focus(&self) {
         self.config
             .board_interactivity
             .set(KeyboardInteractivity::None);
         self.layer
-            .borrow()
             .set_keyboard_interactivity(KeyboardInteractivity::None);
-        self.layer.borrow().commit();
+        self.layer.commit();
     }
 }
 
-delegate_compositor!(SpellWinInternal);
-delegate_registry!(SpellWinInternal);
-delegate_output!(SpellWinInternal);
-delegate_shm!(SpellWinInternal);
-delegate_seat!(SpellWinInternal);
-delegate_keyboard!(SpellWinInternal);
-delegate_pointer!(SpellWinInternal);
-delegate_layer!(SpellWinInternal);
+delegate_compositor!(SpellWin);
+delegate_registry!(SpellWin);
+delegate_output!(SpellWin);
+delegate_shm!(SpellWin);
+delegate_seat!(SpellWin);
+delegate_keyboard!(SpellWin);
+delegate_pointer!(SpellWin);
+delegate_layer!(SpellWin);
 
-impl ShmHandler for SpellWinInternal {
+impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
         &mut self.states.shm
     }
 }
 
-impl OutputHandler for SpellWinInternal {
+impl OutputHandler for SpellWin {
     fn output_state(&mut self) -> &mut OutputState {
         &mut self.states.output_state
     }
@@ -575,7 +510,7 @@ impl OutputHandler for SpellWinInternal {
     }
 }
 
-impl CompositorHandler for SpellWinInternal {
+impl CompositorHandler for SpellWin {
     fn scale_factor_changed(
         &mut self,
         _conn: &Connection,
@@ -629,7 +564,7 @@ impl CompositorHandler for SpellWinInternal {
     }
 }
 
-impl LayerShellHandler for SpellWinInternal {
+impl LayerShellHandler for SpellWin {
     fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
         println!("CLosed of layer called");
         // self.exit = true;

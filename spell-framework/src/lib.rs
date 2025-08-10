@@ -1,4 +1,6 @@
 #![doc = include_str!("../docs/entry.md")]
+#![doc(html_favicon_url = "../assets/Spell.png")]
+#![doc(html_logo_url = "../assets/Spell.png")]
 #[warn(missing_docs)]
 mod configure;
 mod dbus_window_state;
@@ -38,18 +40,18 @@ use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
 
-// pub enum Handle {
-//     HideWindow,
-//     ShowWinAgain,
-//     ToggleWindow,
-//     GrabKeyboardFocus,
-//     RemoveKeyboardFocus,
-//     Resize(usize, usize, usize, usize),
-//     AddInputRegion(i32, i32, i32, i32),
-//     SubtractInputRegion(i32, i32, i32, i32),
-//     AddOpaqueRegion(i32, i32, i32, i32),
-//     SubtractOpaqueRegion(i32, i32, i32, i32),
-// }
+#[derive(Debug)]
+pub enum Handle {
+    HideWindow,
+    ShowWinAgain,
+    ToggleWindow,
+    GrabKeyboardFocus,
+    RemoveKeyboardFocus,
+    AddInputRegion(i32, i32, i32, i32),
+    SubtractInputRegion(i32, i32, i32, i32),
+    AddOpaqueRegion(i32, i32, i32, i32),
+    SubtractOpaqueRegion(i32, i32, i32, i32),
+}
 
 pub fn enchant_spells<F>(
     mut waywindows: Vec<SpellWin>,
@@ -64,7 +66,7 @@ where
         let mut internal_recievers: Vec<mpsc::Receiver<InternalHandle>> = Vec::new();
         states.iter().enumerate().for_each(|(index, state)| {
             internal_recievers.push(helper_fn_for_deploy(
-                waywindows[index].window.borrow().layer_name.clone(),
+                waywindows[index].layer_name.clone(),
                 state,
             ));
         });
@@ -78,13 +80,10 @@ where
                     &mut waywindows[index],
                 );
             });
-            // window_handles
-            //     .iter()
-            //     .enumerate()
-            //     .for_each(|(index, window_handle_option)| {
-            //         helper_fn_win_handle(&mut waywindows[index].0, window_handle_option);
-            //     });
-            //
+            waywindows.iter_mut().for_each(|win| {
+                helper_fn_win_handle(win);
+            });
+
             let _: Vec<_> = waywindows
                 .iter_mut()
                 .map(|waywindow| {
@@ -109,10 +108,10 @@ pub fn cast_spell<F>(
 where
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
 {
-    let mut rx = helper_fn_for_deploy(waywindow.window.borrow().layer_name.clone(), &state);
+    let mut rx = helper_fn_for_deploy(waywindow.layer_name.clone(), &state);
     loop {
         helper_fn_internal_handle(&state, &mut set_callback, &mut rx, &mut waywindow);
-        // helper_fn_win_handle(&mut waywindow, &window_handle_option);
+        helper_fn_win_handle(&mut waywindow);
         run_loop_once(&mut waywindow);
     }
 }
@@ -173,58 +172,44 @@ fn helper_fn_for_deploy(
     rx
 }
 
-// fn helper_fn_win_handle(
-//     waywindow: &mut SpellWinInternal,
-//     window_handle_option: &Option<std::sync::mpsc::Receiver<Handle>>,
-// ) {
-//     if let Some(window_handle) = window_handle_option {
-//         if let Ok(handle) = window_handle.try_recv() {
-//             match handle {
-//                 Handle::HideWindow => waywindow.hide(),
-//                 Handle::ShowWinAgain => waywindow.show_again(),
-//                 Handle::ToggleWindow => waywindow.toggle(),
-//                 Handle::GrabKeyboardFocus => waywindow.grab_focus(),
-//                 Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
-//                 Handle::Resize(x, y, width, height) => {
-//                     waywindow.resize_display(x, y, width, height)
-//                 }
-//                 Handle::AddInputRegion(x, y, width, height) => {
-//                     waywindow.add_input_region(x, y, width, height);
-//                 }
-//                 Handle::SubtractInputRegion(x, y, width, height) => {
-//                     waywindow.subtract_input_region(x, y, width, height);
-//                 }
-//                 Handle::AddOpaqueRegion(x, y, width, height) => {
-//                     waywindow.add_opaque_region(x, y, width, height);
-//                 }
-//                 Handle::SubtractOpaqueRegion(x, y, width, height) => {
-//                     waywindow.subtract_opaque_region(x, y, width, height);
-//                 }
-//             }
-//         }
-//     }
-// }
+fn helper_fn_win_handle(waywindow: &mut SpellWin) {
+    if let Some(window_handle) = &waywindow.handler {
+        if let Ok(handle) = window_handle.try_recv() {
+            match handle {
+                Handle::HideWindow => waywindow.hide(),
+                Handle::ShowWinAgain => waywindow.show_again(),
+                Handle::ToggleWindow => waywindow.toggle(),
+                Handle::GrabKeyboardFocus => waywindow.grab_focus(),
+                Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
+                Handle::AddInputRegion(x, y, width, height) => {
+                    waywindow.add_input_region(x, y, width, height);
+                }
+                Handle::SubtractInputRegion(x, y, width, height) => {
+                    waywindow.subtract_input_region(x, y, width, height);
+                }
+                Handle::AddOpaqueRegion(x, y, width, height) => {
+                    waywindow.add_opaque_region(x, y, width, height);
+                }
+                Handle::SubtractOpaqueRegion(x, y, width, height) => {
+                    waywindow.subtract_opaque_region(x, y, width, height);
+                }
+            }
+        }
+    }
+}
 
 fn run_loop_once(waywindow: &mut SpellWin) {
-    let is_first_config = waywindow.window.borrow().first_configure;
-    let window = waywindow.window.clone();
+    let is_first_config = waywindow.first_configure;
+    let queue = waywindow.queue.clone();
     if is_first_config {
         // Primary erros are handled here in the first configration itself.
-        if let Err(err_value) = waywindow
-            .queue
-            .borrow_mut()
-            .roundtrip(&mut window.borrow_mut())
-        {
+        if let Err(err_value) = queue.borrow_mut().roundtrip(waywindow) {
             report_error(err_value);
         }
         // event_queue.roundtrip(&mut waywindow).unwrap();
     } else {
         waywindow.queue.borrow().flush().unwrap();
-        waywindow
-            .queue
-            .borrow_mut()
-            .dispatch_pending(&mut window.borrow_mut())
-            .unwrap();
+        queue.borrow_mut().dispatch_pending(waywindow).unwrap();
         if let Some(read_value) = waywindow.queue.borrow().prepare_read() {
             let _ = read_value.read();
         }

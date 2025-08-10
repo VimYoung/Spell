@@ -1,4 +1,4 @@
-use crate::{layer_properties::WindowConf, wayland_adapter::SpellWinInternal};
+use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
 use slint::{
     SharedString,
     platform::{PointerEventButton, WindowEvent},
@@ -25,7 +25,7 @@ use smithay_client_toolkit::{
     },
 };
 
-impl KeyboardHandler for SpellWinInternal {
+impl KeyboardHandler for SpellWin {
     fn enter(
         &mut self,
         _conn: &Connection,
@@ -98,7 +98,7 @@ impl KeyboardHandler for SpellWinInternal {
     }
 }
 
-impl SeatHandler for SpellWinInternal {
+impl SeatHandler for SpellWin {
     fn seat_state(&mut self) -> &mut SeatState {
         &mut self.states.seat_state
     }
@@ -159,7 +159,7 @@ impl SeatHandler for SpellWinInternal {
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
-impl PointerHandler for SpellWinInternal {
+impl PointerHandler for SpellWin {
     fn pointer_frame(
         &mut self,
         _conn: &Connection,
@@ -170,7 +170,7 @@ impl PointerHandler for SpellWinInternal {
         use PointerEventKind::*;
         for event in events {
             // Ignore events for other surfaces
-            if &event.surface != self.layer.borrow().wl_surface() {
+            if &event.surface != self.layer.wl_surface() {
                 continue;
             }
             match event.kind {
@@ -260,7 +260,7 @@ impl PointerHandler for SpellWinInternal {
 }
 
 // TODO FIND What is the use of registery_handlers here?
-impl ProvidesRegistryState for SpellWinInternal {
+impl ProvidesRegistryState for SpellWin {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.states.registry_state
     }

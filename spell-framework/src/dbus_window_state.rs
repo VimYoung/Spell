@@ -1,4 +1,4 @@
-use crate::{dbus_window_state::second_client::open_internal_clinet, wayland_adapter::SpellWinInternal};
+use crate::{dbus_window_state::second_client::open_internal_clinet, wayland_adapter::SpellWin};
 use smithay_client_toolkit::{
     reexports::client::protocol::{wl_keyboard, wl_pointer},
     seat::{
@@ -28,7 +28,7 @@ pub struct PointerState {
 #[derive(Debug)]
 pub struct KeyboardState {
     pub board: Option<wl_keyboard::WlKeyboard>,
-    pub board_data: Option<KeyboardData<SpellWinInternal>>,
+    pub board_data: Option<KeyboardData<SpellWin>>,
 }
 
 /// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
