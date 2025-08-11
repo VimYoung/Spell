@@ -1,8 +1,9 @@
-<p align="center"><img align="center" width="280" src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png"/></p>
-<h3 align="center">Make desktop widgets by the mystic arts of Spell  !!</h3>
-<hr>
+<img align="right" width="25%" src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png">
 
 # Spell
+
+<h3 align="left">Make desktop widgets by the mystic arts of Spell  !!</h3>
+<hr>
 
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
