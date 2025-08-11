@@ -1,3 +1,7 @@
+<p align="center"><img align="center" width="280" src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png"/></p>
+<h3 align="center">Make desktop widgets by the mystic arts of Spell  !!</h3>
+<hr>
+
 # Spell
 
 Spell is a framework that provides necessary tooling to create highly customisable,
