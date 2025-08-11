@@ -1,7 +1,7 @@
 pub mod constantvals;
 use constantvals::MAIN_HELP;
 use std::env::{self, Args};
-use zbus::{proxy, Connection, Result as BusResult};
+use zbus::{Connection, Result as BusResult, proxy};
 
 #[proxy(
     default_path = "/org/VimYoung/VarHandler",
@@ -30,8 +30,12 @@ async fn main() -> Result<(), SpellError> {
     let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.as_str() {
+            "--version" | "-v" => {
+                println!("spell-cli version 0.1.1");
+            Ok(())
+            },
             "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l `name` sub command".to_string()))),
-            "-l" => match values.next() {
+            "-l" | "--layer" => match values.next() {
                 Some(layer_value) => match values.next() {
                     Some(sub_command_after_layer) => match sub_command_after_layer.as_str() {
                         "update" => update_value(layer_value, values, proxy).await,
@@ -63,7 +67,7 @@ async fn main() -> Result<(), SpellError> {
             "toggle" => Ok(()),
             // List the running instancs of windows and subwindows.
             "list" => Ok(()),
-            "--help" => show_help(None),
+            "--help" | "-h" => show_help(None),
             _ => {
                 if sub_command.starts_with('-') || sub_command.starts_with("--") {
                     Err(SpellError::CLI(Cli::BadSubCommand(format!(
@@ -89,7 +93,9 @@ async fn main() -> Result<(), SpellError> {
                         eprintln!("[Undefined Arg]: {err}");
                     }
                     Cli::NoSubCommand(flag_val) => {
-                        eprintln!("[No Sub-command]: The flag {flag_val} should be followed by a subcommand");
+                        eprintln!(
+                            "[No Sub-command]: The flag {flag_val} should be followed by a subcommand"
+                        );
                     }
                 },
                 SpellError::Buserror(bus_error) => match bus_error {

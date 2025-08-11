@@ -1,4 +1,21 @@
-0.1.3 (25-08-10)
+0.1.6 (Due date) & 0.1.1 (CLI)
+================
+
+Changes:
+
+- Add LOGO in docs.
+- Add a notification implementation for spell framework.
+- Add keyboard implementation for non word chars like TAB, ENTER etc.
+- Add docs for functions of SpellWin.
+- Add a timer in `forge`.
+
+Changes(spell-cli):
+
+- Improve cli for adding layer_name support in other sub commands.
+- Add docs for sub commands.
+- Add logs port in CLI.
+
+0.1.3 and 0.1.4 (25-08-10)
 ===============
 
 Changes:

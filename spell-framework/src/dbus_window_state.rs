@@ -109,7 +109,13 @@ impl VarHandler {
         }
     }
 
-    async fn find_value(&self, layer_name: &str, key: &str) -> String {
+    async fn find_value(
+        &self,
+        layer_name: &str,
+        key: &str,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> String {
+        // if self.layer_name == layer_name {
         let value: DataType = self.state.read().unwrap().get_type(key);
         match value {
             DataType::Int(int_value) => int_value.to_string(),
@@ -117,6 +123,9 @@ impl VarHandler {
             // TODO this implementation needs to be improved after changing DATATYPE
             _ => "hello".to_string(),
         }
+        // } else {
+        //     emitter.layer_find_var(layer_name, key);
+        // }
     }
 
     async fn show_window_back(&self, layer_name: &str) -> Result<(), BusError> {
@@ -135,15 +144,19 @@ impl VarHandler {
         Ok(())
     }
 
-    // // A signal; the implementation is provided by the macro.
-    // This emitter will be called externally by my CLI to notify the listeners of the
-    // New changed state.
     #[zbus(signal)]
     async fn layer_var_value_changed(
         emitter: &SignalEmitter<'_>,
         layer_name: &str,
         var_name: &str,
         value: &str,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal)]
+    async fn layer_find_var(
+        emitter: &SignalEmitter<'_>,
+        layer_name: &str,
+        var_name: &str,
     ) -> zbus::Result<()>;
 }
 
@@ -188,13 +201,3 @@ pub async fn deploy_zbus_service(
 
     Ok(())
 }
-
-// #[proxy(
-//     default_path = "/org/VimYoung/VarHandler",
-//     default_service = "org.VimYoung.Spell",
-//     interface = "org.VimYoung.Spell1"
-// )]
-// trait SeconadryClient {
-//     #[zbus(signal)]
-//     fn layer_var_value_changed(layer_name: &str, var_name: &str, value: &str) -> zbus::Result<()>;
-// }
