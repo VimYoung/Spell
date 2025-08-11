@@ -1,5 +1,5 @@
-#![doc(html_logo_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/Spell.png")]
-#![doc(html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/Spell.png")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png")]
+#![doc(html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico")]
 // #![doc(html_favicon_url = "https://github.com/VimYoung/Spell/blob/bb01ae94a365d237ebb0db1df1b6eb37aea25367/spell-framework/assets/Spell.png")]
 #![doc = include_str!("../docs/entry.md")]
 #[warn(missing_docs)]
