@@ -1,4 +1,5 @@
-use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
+use crate::wayland_adapter::SpellWin;
+use owo_colors::OwoColorize;
 use slint::{
     SharedString,
     platform::{PointerEventButton, WindowEvent},
@@ -19,10 +20,7 @@ use smithay_client_toolkit::{
         keyboard::{KeyboardData, KeyboardHandler},
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
     },
-    shell::{
-        WaylandSurface,
-        wlr_layer::{Anchor, LayerSurface},
-    },
+    shell::WaylandSurface,
 };
 
 impl KeyboardHandler for SpellWin {
@@ -197,7 +195,7 @@ impl PointerHandler for SpellWin {
                     }
                 }
                 Leave { .. } => {
-                    println!("Pointer left");
+                    println!("{} left", "Pointer".red());
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap();
@@ -265,45 +263,4 @@ impl ProvidesRegistryState for SpellWin {
         &mut self.states.registry_state
     }
     registry_handlers![OutputState, SeatState];
-}
-
-pub(super) fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: bool) {
-    match window_conf.anchor.0 {
-        Some(mut first_anchor) => match window_conf.anchor.1 {
-            Some(sec_anchor) => {
-                first_anchor.set(sec_anchor, true);
-                layer.set_anchor(first_anchor);
-            }
-            None => {
-                layer.set_anchor(first_anchor);
-                if window_conf.exclusive_zone && first_configure {
-                    match first_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
-            }
-        },
-        None => {
-            if let Some(sec_anchor) = window_conf.anchor.1 {
-                layer.set_anchor(sec_anchor);
-                if window_conf.exclusive_zone && first_configure {
-                    match sec_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
 }

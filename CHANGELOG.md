@@ -3,11 +3,12 @@
 
 Changes:
 
-- Add LOGO in docs.
+- LOGO in docs and Readme.
 - Add a notification implementation for spell framework.
 - Add keyboard implementation for non word chars like TAB, ENTER etc.
 - Add docs for functions of SpellWin.
 - Add a timer in `forge`.
+- Add an implementation of lockscreen PAM APIs.
 
 Changes(spell-cli):
 

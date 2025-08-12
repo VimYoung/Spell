@@ -17,6 +17,7 @@ i-slint-core = "1.11.0"
 i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
+owo-colors = "4.2.2"
 rust-fuzzy-search = "0.1.1"
 slint = { version = "1.12.0", features = [
   "raw-window-handle-06",

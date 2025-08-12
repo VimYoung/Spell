@@ -2,22 +2,21 @@
 //! across various functionalities for your shell. The most common and only workable widget (or
 //! window as called by many) is [SpellWin] now. Future implementation of mentioned struct will
 //! take place in near future.
-use slint::{
-    PhysicalSize,
-    platform::{PlatformError, WindowEvent},
-};
+use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm,
+    delegate_registry, delegate_seat, delegate_shm, delegate_session_lock,
     output::{OutputHandler, OutputState},
     reexports::client::{
         Connection, EventQueue, QueueHandle,
         globals::registry_queue_init,
-        protocol::{wl_output, wl_region::WlRegion, wl_shm, wl_surface},
+        protocol::{wl_output, wl_shm, wl_surface},
     },
-    registry::RegistryState,
+    registry::{ProvidesRegistryState, RegistryState},
+    registry_handlers,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
+    session_lock::{SessionLock, SessionLockState, SessionLockSurface},
     shell::{
         WaylandSurface,
         wlr_layer::{
@@ -25,7 +24,10 @@ use smithay_client_toolkit::{
             LayerSurfaceConfigure,
         },
     },
-    shm::{Shm, ShmHandler, slot::SlotPool},
+    shm::{
+        Shm, ShmHandler,
+        slot::{Buffer, SlotPool},
+    },
 };
 use std::{
     cell::{Cell, RefCell},
@@ -36,22 +38,13 @@ use std::{
 use crate::{
     Handle,
     configure::{LayerConf, WindowConf},
-    dbus_window_state::{KeyboardState, PointerState},
-    shared_context::{MemoryManager, SharedCore},
+    shared_context::{EventAdapter, MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::states_and_handles::set_anchor,
+    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
 
-mod states_and_handles;
-
-// This trait helps in defining specifc functions that would be required to run
-// inside the SpellWin. Benefit of this abstraction is that I am sure that every function
-// I am defining works even if inside `Rc`, i.e. only using non interior mutability
-// functions.
-pub(crate) trait EventAdapter: std::fmt::Debug {
-    fn draw_if_needed(&self) -> bool;
-    fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
-}
+mod way_helper;
+mod win_impl;
 
 #[derive(Debug)]
 pub(crate) struct States {
@@ -63,10 +56,8 @@ pub(crate) struct States {
     pub(crate) shm: Shm,
 }
 
-// TODO Remove memory manager and add Buffer directly
-
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
-/// implementation, thus providing various available features. ///
+/// implementation, thus providing various features.
 /// ## Panics
 ///
 /// The constructor method [conjure_spells](crate::wayland_adapter::SpellWin::conjure_spells) will
@@ -201,12 +192,22 @@ impl SpellWin {
         }
     }
 
+    /// retrive the sender handle to pass [`Handle`] events to the windows.
     pub fn get_handler(&mut self) -> Sender<Handle> {
         let (tx, rx) = mpsc::channel::<Handle>();
         self.handler = Some(rx);
         tx
     }
 
+    /// This function is finally called to create instances of windows (in a multi
+    /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
+    /// event loop.
+    ///
+    /// # Panics
+    ///
+    /// It is important to call this function "after" the windows are created on the slint
+    /// side to avoid its panicking. If the number of slint initialised windows are not
+    /// same to the number of window_confs provided, then the code will panic.
     pub fn conjure_spells(
         windows: Rc<RefCell<SpellMultiWinHandler>>,
         // current_display_specs: Vec<(usize, usize, usize, usize)>,
@@ -246,6 +247,13 @@ impl SpellWin {
         win_and_queue
     }
 
+    /// This function is called to create a instance of window. This window is then
+    /// finally called by [`cast_spell`](crate::cast_spell) event loop.
+    ///
+    /// # Panics
+    ///
+    /// This function needs to be called "before" initialising the slint window to avoid
+    /// panicing of this function.
     pub fn invoke_spell(
         name: &str,
         window_conf: WindowConf,
@@ -263,72 +271,13 @@ impl SpellWin {
         )
     }
 
+    /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
         self.is_hidden.set(true);
         self.layer.wl_surface().attach(None, 0, 0);
     }
 
-    pub fn toggle(&mut self) {
-        if self.is_hidden.get() {
-            self.show_again();
-        } else {
-            self.hide();
-        }
-    }
-
-    pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.input_region.add(x, y, width, height);
-        self.set_config_internal();
-        self.layer.commit();
-    }
-
-    pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.input_region.subtract(x, y, width, height);
-        self.set_config_internal();
-        self.layer.commit();
-    }
-
-    pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.opaque_region.add(x, y, width, height);
-        self.set_config_internal();
-        self.layer.commit();
-    }
-
-    pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
-        self.opaque_region.subtract(x, y, width, height);
-        self.set_config_internal();
-        self.layer.commit();
-    }
-
-    // fn resize_display(&mut self, x: usize, y: usize, width: usize, height: usize) {
-    //     let pool = &mut self.memory_manager.pool;
-    //     let (wayland_buffer, _) = pool
-    //         .create_buffer(
-    //             width as i32,
-    //             height as i32,
-    //             width as i32 * 4,
-    //             wl_shm::Format::Argb8888,
-    //         )
-    //         .expect("Creating Buffer");
-    //     {
-    //         wayland_buffer
-    //             .canvas(pool)
-    //             .unwrap()
-    //             .iter_mut()
-    //             .enumerate()
-    //             .for_each(|(index, val)| {
-    //                 *val = self.core.borrow().primary_buffer[index];
-    //             });
-    //     }
-    //     println!("Window Resized");
-    //     // self.memory_manager.prima
-    //     self.memory_manager.wayland_buffer = wayland_buffer;
-    //     self.set_config_internal();
-    //     self.layer.commit();
-    // }
-    //
-    // TODO this doesn't seem to trace.
-    // TODO have to fix buffer creation for resizeable windows.
+    /// Brings back the layer (aka the widget) back on screen if it is hidden.
     #[tracing::instrument]
     pub fn show_again(&mut self) {
         let width: u32 = self.size.width;
@@ -358,6 +307,57 @@ impl SpellWin {
         }
         self.set_config_internal();
         self.is_hidden.set(false);
+        self.layer.commit();
+    }
+
+    /// Hides the widget if visible or shows the widget back if hidden.
+    pub fn toggle(&mut self) {
+        if self.is_hidden.get() {
+            self.show_again();
+        } else {
+            self.hide();
+        }
+    }
+
+    /// This function adds specific rectangular regions of your complete layer to receive
+    /// input events from pointer and/or touch. The coordinates are in surface local
+    /// format from top left corener. By default, The whole layer is considered for input
+    /// events. Adding existing areas again as input region has no effect. This function
+    /// combined with transparent base widgets can be used to mimic resizable widgets.
+    pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.input_region.add(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    /// This function subtracts specific rectangular regions of your complete layer from receiving
+    /// input events from pointer and/or touch. The coordinates are in surface local
+    /// format from top left corener. By default, The whole layer is considered for input
+    /// events. Substracting input areas which are already not input regions has no effect.
+    pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.input_region.subtract(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    /// This function marks specific rectangular regions of your complete layer as opaque.
+    /// This can result in specific optimisations from your wayland compositor, setting
+    /// this property is optional. The coordinates are in surface local format from top
+    /// left corener. Not adding opaque regions in it has no isuues but adding transparent
+    /// regions of layer as opaque can cause weird behaviour and glitches.
+    pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.opaque_region.add(x, y, width, height);
+        self.set_config_internal();
+        self.layer.commit();
+    }
+
+    /// This function removes specific rectangular regions of your complete layer from being opaque.
+    /// This can result in specific optimisations from your wayland compositor, setting
+    /// this property is optional. The coordinates are in surface local format from top
+    /// left corener.
+    pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.opaque_region.subtract(x, y, width, height);
+        self.set_config_internal();
         self.layer.commit();
     }
 
@@ -444,6 +444,8 @@ impl SpellWin {
         // of the canvas.
     }
 
+    /// Grabs the focus of keyboard. Can be used in combination with other functions
+    /// to make the widgets keyboard navigable.
     pub fn grab_focus(&self) {
         self.config
             .board_interactivity
@@ -453,6 +455,7 @@ impl SpellWin {
         self.layer.commit();
     }
 
+    /// Removes the focus of keyboard from window if it currently has it.
     pub fn remove_focus(&self) {
         self.config
             .board_interactivity
@@ -594,66 +597,124 @@ impl LayerShellHandler for SpellWin {
     }
 }
 
-fn set_config(
-    window_conf: &WindowConf,
-    layer: &LayerSurface,
-    first_configure: bool,
-    input_region: Option<&WlRegion>,
-    opaque_region: Option<&WlRegion>,
-) {
-    layer.set_size(window_conf.width, window_conf.height);
-    layer.set_margin(
-        window_conf.margin.0,
-        window_conf.margin.1,
-        window_conf.margin.2,
-        window_conf.margin.3,
-    );
-    layer.set_keyboard_interactivity(window_conf.board_interactivity.get());
-    if let Some(in_region) = input_region {
-        layer.set_input_region(Some(in_region));
-    }
-    if let Some(op_region) = opaque_region {
-        layer.set_opaque_region(Some(op_region));
-    }
-    set_anchor(window_conf, layer, first_configure);
+/// Furture lock screen implementation will be on this type. Currently, it is redundent.
+pub struct SpellLock {
+    pub(crate) adapter: Rc<dyn EventAdapter>,
+    pub(crate) core: Rc<RefCell<SharedCore>>,
+    pub(crate) size: PhysicalSize,
+    pub(crate) wayland_buffer: Buffer,
+    pub(crate) registry_state: RegistryState,
+    pub(crate) output_state: OutputState,
+    pub(crate) keyboard_state: KeyboardState,
+    pub(crate) shm: Shm,
+    pub(crate) session_lock_state: SessionLockState,
+    pub(crate) session_lock: Option<SessionLock>,
+    pub(crate) lock_surfaces: Vec<SessionLockSurface>,
+    pub(crate) is_locked: bool,
 }
 
-// fn render_replace(
-//     primary_canvas: &mut [u8],
-//     shared_core: &[u8],
-//     mut dimenstions: (usize, usize, usize, usize),
-//     mut shared_core_original_dimentions: (u32, u32),
-// ) {
-//     let (ref mut core_width, ref mut core_height) = shared_core_original_dimentions;
-//     let (ref mut x, y, ref mut width, ref mut height) = dimenstions;
-//     if *x + *width > *core_width as usize {
-//         *width = *core_width as usize - *x
-//     } else if y + *height > *core_height as usize {
-//         *height = *core_height as usize - y
-//     }
-//
-//     *width *= 4;
-//     *x *= 4;
-//     *core_width *= 4;
-//     let mut shared_buffer_index = (y * *core_width as usize) + *x;
-//     let mut wayland_buffer_index = 0;
-//     let jump = (*core_width as usize) - *width;
-//     for _ in 0..*height as u32 {
-//         for _ in 0..(*width as u32) / 4 {
-//             primary_canvas[wayland_buffer_index] = shared_core[shared_buffer_index];
-//             primary_canvas[wayland_buffer_index + 1] = shared_core[shared_buffer_index + 1];
-//             primary_canvas[wayland_buffer_index + 2] = shared_core[shared_buffer_index + 2];
-//             primary_canvas[wayland_buffer_index + 3] = shared_core[shared_buffer_index + 3];
-//             shared_buffer_index += 4;
-//             wayland_buffer_index += 4;
-//         }
-//         shared_buffer_index += jump;
-//     }
-// }
-//
-/// Furture lock screen implementation will be on this type. Currently, it is redundent.
-pub struct SpellLock;
+impl ProvidesRegistryState for SpellLock {
+    fn registry(&mut self) -> &mut RegistryState {
+        &mut self.registry_state
+    }
+    registry_handlers![OutputState,];
+}
+
+impl ShmHandler for SpellLock {
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.shm
+    }
+}
+
+impl OutputHandler for SpellLock {
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.output_state
+    }
+
+    fn new_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+        println!("New Output Source Added");
+    }
+
+    fn update_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+    }
+
+    fn output_destroyed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+        println!("Output is destroyed");
+    }
+}
+
+impl CompositorHandler for SpellLock {
+    fn scale_factor_changed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_factor: i32,
+    ) {
+        // Not needed for this example.
+    }
+
+    fn transform_changed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_transform: wl_output::Transform,
+    ) {
+        // Not needed for this example.
+    }
+
+    fn frame(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _time: u32,
+    ) {
+    }
+
+    fn surface_enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
+    ) {
+        println!("Surface reentered");
+        // Not needed for this example.
+    }
+
+    fn surface_leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
+    ) {
+        println!("Surface left");
+    }
+}
+
+delegate_compositor!(SpellLock);
+delegate_output!(SpellLock);
+delegate_shm!(SpellLock);
+delegate_registry!(SpellLock);
+delegate_sess
+
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;
-
-// TODO mention that panic will occur if wayland windows are initialised before slint windows.

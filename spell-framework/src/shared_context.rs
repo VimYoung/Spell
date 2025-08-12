@@ -1,3 +1,4 @@
+use slint::platform::{PlatformError, WindowEvent};
 use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 
 #[derive(Debug)]
@@ -25,6 +26,15 @@ fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
     let a: u8 = 0xFF;
     // vec![Rgba8Pixel::new(a, 0, 0, 0); width as usize * height as usize].into_boxed_slice()
     vec![a; width as usize * height as usize * 4].into_boxed_slice()
+}
+
+// This trait helps in defining specifc functions that would be required to run
+// inside the SpellWin. Benefit of this abstraction is that I am sure that every function
+// I am defining works even if inside `Rc`, i.e. only using non interior mutability
+// functions.
+pub(crate) trait EventAdapter: std::fmt::Debug {
+    fn draw_if_needed(&self) -> bool;
+    fn try_dispatch_event(&self, event: WindowEvent) -> Result<(), PlatformError>;
 }
 
 // #[derive(Debug)]
@@ -96,3 +106,36 @@ fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
 //         self.window.remove_focus();
 //     }
 // }
+// fn render_replace(
+//     primary_canvas: &mut [u8],
+//     shared_core: &[u8],
+//     mut dimenstions: (usize, usize, usize, usize),
+//     mut shared_core_original_dimentions: (u32, u32),
+// ) {
+//     let (ref mut core_width, ref mut core_height) = shared_core_original_dimentions;
+//     let (ref mut x, y, ref mut width, ref mut height) = dimenstions;
+//     if *x + *width > *core_width as usize {
+//         *width = *core_width as usize - *x
+//     } else if y + *height > *core_height as usize {
+//         *height = *core_height as usize - y
+//     }
+//
+//     *width *= 4;
+//     *x *= 4;
+//     *core_width *= 4;
+//     let mut shared_buffer_index = (y * *core_width as usize) + *x;
+//     let mut wayland_buffer_index = 0;
+//     let jump = (*core_width as usize) - *width;
+//     for _ in 0..*height as u32 {
+//         for _ in 0..(*width as u32) / 4 {
+//             primary_canvas[wayland_buffer_index] = shared_core[shared_buffer_index];
+//             primary_canvas[wayland_buffer_index + 1] = shared_core[shared_buffer_index + 1];
+//             primary_canvas[wayland_buffer_index + 2] = shared_core[shared_buffer_index + 2];
+//             primary_canvas[wayland_buffer_index + 3] = shared_core[shared_buffer_index + 3];
+//             shared_buffer_index += 4;
+//             wayland_buffer_index += 4;
+//         }
+//         shared_buffer_index += jump;
+//     }
+// }
+//

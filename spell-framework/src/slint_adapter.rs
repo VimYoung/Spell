@@ -4,8 +4,7 @@
 //! set by the user of library in intial iterations of spell_framework.
 use crate::{
     configure::{LayerConf, WindowConf},
-    shared_context::SharedCore,
-    wayland_adapter::EventAdapter,
+    shared_context::{EventAdapter, SharedCore},
 };
 use slint::{
     PhysicalSize, Window,

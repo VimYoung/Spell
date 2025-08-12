@@ -43,18 +43,6 @@ easy to learn (you can even get a sense in just few mins [here](https://docs.sli
 other good UI kits, it just has awesome integration for rust. A compatibility that
 is hard to find.
 
-## Todos
-
-A lot of things are left to be done, but following core things are not implemented yet
-which might cause problem for widget creation.
-
-1. Resize of buffers aren't possible.
-2. It is irrelevant to define `Width` and `Height` of Window, as that
-should be provided directly in your `main` function. (Though, I must say that recommended way of creating windows with curved borders is to place a `Rectangle` in a transparent window and then define its `border_radius`.)
-
-Having said that,you should try creating static widgets (like showing clock, day etc) at
-this point with `spell` and see how that turns out.
-
 ## Minimal Example
 
 I am creating my own shell from spell, which is currently private and will soon be shown

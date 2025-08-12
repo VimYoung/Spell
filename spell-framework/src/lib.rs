@@ -1,5 +1,9 @@
-#![doc(html_logo_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png")]
-#![doc(html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png"
+)]
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico"
+)]
 // #![doc(html_favicon_url = "https://github.com/VimYoung/Spell/blob/bb01ae94a365d237ebb0db1df1b6eb37aea25367/spell-framework/assets/Spell.png")]
 #![doc = include_str!("../docs/entry.md")]
 #[warn(missing_docs)]
@@ -41,23 +45,36 @@ use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
 
+/// It is a enum which is passed over to the sender for invoking wayland specific
+/// method calls.
 #[derive(Debug)]
 pub enum Handle {
+    /// Internally calls [`wayland_adapter::SpellWin::hide`]
     HideWindow,
+    /// Internally calls [`wayland_adapter::SpellWin::show_again`]
     ShowWinAgain,
+    /// Internally calls [`wayland_adapter::SpellWin::toggle`]
     ToggleWindow,
+    /// Internally calls [`wayland_adapter::SpellWin::grab_focus`]
     GrabKeyboardFocus,
+    /// Internally calls [`wayland_adapter::SpellWin::remove_focus`]
     RemoveKeyboardFocus,
+    /// Internally calls [`wayland_adapter::SpellWin::add_input_region`]
     AddInputRegion(i32, i32, i32, i32),
+    /// Internally calls [`wayland_adapter::SpellWin::subtract_input_region`]
     SubtractInputRegion(i32, i32, i32, i32),
+    /// Internally calls [`wayland_adapter::SpellWin::add_opaque_region`]
     AddOpaqueRegion(i32, i32, i32, i32),
+    /// Internally calls [`wayland_adapter::SpellWin::subtract_opaque_region`]
     SubtractOpaqueRegion(i32, i32, i32, i32),
 }
+
+type State = Arc<RwLock<Box<dyn ForeignController>>>;
 
 pub fn enchant_spells<F>(
     mut waywindows: Vec<SpellWin>,
     // window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
-    states: Vec<Option<Arc<RwLock<Box<dyn ForeignController>>>>>,
+    states: Vec<Option<State>>,
     mut set_callbacks: Vec<Option<F>>,
 ) -> Result<(), Box<dyn Error>>
 where
@@ -127,23 +144,22 @@ fn helper_fn_internal_handle<F>(
 {
     if let Some(callback) = set_callback
         && state.is_some()
+        && let Ok(int_handle) = rx.try_recv()
     {
-        if let Ok(int_handle) = rx.try_recv() {
-            match int_handle {
-                InternalHandle::StateValChange((key, data_type)) => {
-                    println!("Inside statechange");
-                    //Glad I could think of this sub scope for RwLock.
-                    {
-                        let mut state_inst = state.as_ref().unwrap().write().unwrap();
-                        state_inst.change_val(&key, data_type);
-                    }
-                    callback(state.as_ref().unwrap().clone());
+        match int_handle {
+            InternalHandle::StateValChange((key, data_type)) => {
+                println!("Inside statechange");
+                //Glad I could think of this sub scope for RwLock.
+                {
+                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
+                    state_inst.change_val(&key, data_type);
                 }
-                InternalHandle::ShowWinAgain => {
-                    waywindow.show_again();
-                }
-                InternalHandle::HideWindow => waywindow.hide(),
+                callback(state.as_ref().unwrap().clone());
             }
+            InternalHandle::ShowWinAgain => {
+                waywindow.show_again();
+            }
+            InternalHandle::HideWindow => waywindow.hide(),
         }
     };
 }
@@ -174,26 +190,26 @@ fn helper_fn_for_deploy(
 }
 
 fn helper_fn_win_handle(waywindow: &mut SpellWin) {
-    if let Some(window_handle) = &waywindow.handler {
-        if let Ok(handle) = window_handle.try_recv() {
-            match handle {
-                Handle::HideWindow => waywindow.hide(),
-                Handle::ShowWinAgain => waywindow.show_again(),
-                Handle::ToggleWindow => waywindow.toggle(),
-                Handle::GrabKeyboardFocus => waywindow.grab_focus(),
-                Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
-                Handle::AddInputRegion(x, y, width, height) => {
-                    waywindow.add_input_region(x, y, width, height);
-                }
-                Handle::SubtractInputRegion(x, y, width, height) => {
-                    waywindow.subtract_input_region(x, y, width, height);
-                }
-                Handle::AddOpaqueRegion(x, y, width, height) => {
-                    waywindow.add_opaque_region(x, y, width, height);
-                }
-                Handle::SubtractOpaqueRegion(x, y, width, height) => {
-                    waywindow.subtract_opaque_region(x, y, width, height);
-                }
+    if let Some(window_handle) = &waywindow.handler
+        && let Ok(handle) = window_handle.try_recv()
+    {
+        match handle {
+            Handle::HideWindow => waywindow.hide(),
+            Handle::ShowWinAgain => waywindow.show_again(),
+            Handle::ToggleWindow => waywindow.toggle(),
+            Handle::GrabKeyboardFocus => waywindow.grab_focus(),
+            Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
+            Handle::AddInputRegion(x, y, width, height) => {
+                waywindow.add_input_region(x, y, width, height);
+            }
+            Handle::SubtractInputRegion(x, y, width, height) => {
+                waywindow.subtract_input_region(x, y, width, height);
+            }
+            Handle::AddOpaqueRegion(x, y, width, height) => {
+                waywindow.add_opaque_region(x, y, width, height);
+            }
+            Handle::SubtractOpaqueRegion(x, y, width, height) => {
+                waywindow.subtract_opaque_region(x, y, width, height);
             }
         }
     }
@@ -255,3 +271,4 @@ fn report_error(error_value: DispatchError) {
 // TODO to check what will happen to my dbus network if windows with same layer name will be
 // present. To check causes for errors as well as before implenenting muliple layers in same
 // window.
+// TODO lock screen behaviour in a multi-monitor setup needs to be tested.

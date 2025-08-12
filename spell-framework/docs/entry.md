@@ -86,11 +86,7 @@ use spell::{
 slint::include_modules!();
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // An rx is necessary to define the remote handle from which the window will
-    // be handled from.
-    let (_tx, rx) = mpsc::channel::<Handle>();
-
-    // Necessary configurations for the widget like dimensions. layer etc.
+    // Necessary configurations for the widget like dimensions, layer etc.
     let window_conf = WindowConf::new(
         376,
         576,
@@ -117,17 +113,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Calling the event loop function for running the window
-    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(
-        waywindow,
-        event_queue,
-        rx,
-        None,
-        None,
-    )
+    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(waywindow, None, None,)
 }
 ```
 
-Running this code with cargo will display a widget in your wayland compositor. For details of arguments and use of  [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
+Running this code with cargo will display a widget in your wayland compositor. It is important to
+mention at this point that if you have defined width and height in both your window and in the rust
+code,then the renderer will manage the more or less dimensions accordingly, which may lead to certain
+undefined behaviour. For details of arguments and use of  [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
 For code examples , tips and common functionalities like timed re-running of code, callbacks etc, head over to the book on Spell which contain these guides.
 The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
