@@ -12,6 +12,7 @@ exclude = ["/src/bin/*"]
 bytemuck = "1.23.1"
 env_logger = "0.11.7"
 event-listener = "5.4.0"
+fs2 = "0.4.3"
 futures-util = "0.3.31"
 i-slint-core = "1.11.0"
 i-slint-renderer-skia = { version = "1.11.0", features = [
@@ -19,6 +20,7 @@ i-slint-renderer-skia = { version = "1.11.0", features = [
 ], optional = true }
 owo-colors = "4.2.2"
 rust-fuzzy-search = "0.1.1"
+signal-hook = "0.3.18"
 slint = { version = "1.12.0", features = [
   "raw-window-handle-06",
   "renderer-software",

@@ -119,4 +119,5 @@ impl WindowConf {
 pub enum LayerConf {
     Window(WindowConf),
     Windows(Vec<WindowConf>),
+    Lock(u32, u32),
 }

@@ -1571,6 +1571,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3980,6 +3990,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
+name = "signal-hook"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d881a16cf4426aa584979d30bd82cb33429027e42122b169753d6ef1085ed6e2"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4217,11 +4237,13 @@ dependencies = [
  "bytemuck",
  "env_logger",
  "event-listener",
+ "fs2",
  "futures-util",
  "i-slint-core",
  "i-slint-renderer-skia",
  "owo-colors",
  "rust-fuzzy-search",
+ "signal-hook",
  "slint",
  "smithay-client-toolkit",
  "tokio",

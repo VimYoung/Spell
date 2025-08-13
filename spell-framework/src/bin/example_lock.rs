@@ -3,14 +3,14 @@ use smithay_client_toolkit::{
     output::{OutputHandler, OutputState},
     reexports::{
         calloop::{
-            timer::{TimeoutAction, Timer},
             EventLoop, LoopHandle,
+            timer::{TimeoutAction, Timer},
         },
         calloop_wayland_source::WaylandSource,
         client::{
+            Connection, QueueHandle,
             globals::registry_queue_init,
             protocol::{wl_buffer, wl_output, wl_shm, wl_surface},
-            Connection, QueueHandle,
         },
     },
     registry::{ProvidesRegistryState, RegistryState},
@@ -19,7 +19,7 @@ use smithay_client_toolkit::{
         SessionLock, SessionLockHandler, SessionLockState, SessionLockSurface,
         SessionLockSurfaceConfigure,
     },
-    shm::{raw::RawPool, Shm, ShmHandler},
+    shm::{Shm, ShmHandler, raw::RawPool},
 };
 use std::time::Duration;
 

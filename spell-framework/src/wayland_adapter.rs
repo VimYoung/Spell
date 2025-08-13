@@ -6,17 +6,27 @@ use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm, delegate_session_lock,
-    output::{OutputHandler, OutputState},
-    reexports::client::{
-        Connection, EventQueue, QueueHandle,
-        globals::registry_queue_init,
-        protocol::{wl_output, wl_shm, wl_surface},
+    delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
+    output::{self, OutputHandler, OutputState},
+    reexports::{
+        calloop::{
+            EventLoop, LoopHandle,
+            timer::{TimeoutAction, Timer},
+        },
+        calloop_wayland_source::WaylandSource,
+        client::{
+            Connection, EventQueue, QueueHandle,
+            globals::registry_queue_init,
+            protocol::{wl_output, wl_shm, wl_surface},
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
-    session_lock::{SessionLock, SessionLockState, SessionLockSurface},
+    session_lock::{
+        SessionLock, SessionLockHandler, SessionLockState, SessionLockSurface,
+        SessionLockSurfaceConfigure,
+    },
     shell::{
         WaylandSurface,
         wlr_layer::{
@@ -31,15 +41,21 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
+    error::Error,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender},
+    time::Duration,
 };
+use tracing::event;
 
 use crate::{
     Handle,
-    configure::{LayerConf, WindowConf},
+    configure::{self, LayerConf, WindowConf},
     shared_context::{EventAdapter, MemoryManager, SharedCore},
-    slint_adapter::{SpellLayerShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
+    slint_adapter::{
+        SpellLayerShell, SpellLockShell, SpellMultiLayerShell, SpellMultiWinHandler,
+        SpellSkiaWinAdapter,
+    },
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
 
@@ -217,9 +233,7 @@ impl SpellWin {
         let window_length = windows.borrow().windows.len();
         let adapter_length = windows.borrow().adapter.len();
         let core_length = windows.borrow().core.len();
-        if window_length == adapter_length && adapter_length == core_length
-        // && adapter_length == current_display_specs.len()
-        {
+        if window_length == adapter_length && adapter_length == core_length {
             let conn = Connection::connect_to_env().unwrap();
             windows
                 .borrow()
@@ -599,10 +613,234 @@ impl LayerShellHandler for SpellWin {
 
 /// Furture lock screen implementation will be on this type. Currently, it is redundent.
 pub struct SpellLock {
-    pub(crate) adapter: Rc<dyn EventAdapter>,
-    pub(crate) core: Rc<RefCell<SharedCore>>,
-    pub(crate) size: PhysicalSize,
-    pub(crate) wayland_buffer: Buffer,
+    pub(crate) adapter: Vec<Rc<dyn EventAdapter>>,
+    pub(crate) builder: SpellLockBuilder,
+    pub(crate) pool: SlotPool,
+    pub(crate) size: Vec<PhysicalSize>,
+    pub(crate) wayland_buffer: Vec<Buffer>,
+    pub(crate) is_locked: bool,
+    pub(crate) develop: bool,
+}
+
+impl SpellLock {
+    pub fn invoke_lock_spell() -> (
+        SpellLockBuilder,
+        EventLoop<'static, SpellLock>,
+        EventQueue<SpellLock>,
+    ) {
+        let conn = Connection::connect_to_env().unwrap();
+
+        let (globals, event_queue) = registry_queue_init(&conn).unwrap();
+        let qh: QueueHandle<SpellLock> = event_queue.handle();
+        let registry_state = RegistryState::new(&globals);
+        let shm = Shm::bind(&globals, &qh).unwrap();
+        let loop_handle: EventLoop<SpellLock> =
+            EventLoop::try_new().expect("Failed to initialize the event loop!");
+        let output_state = OutputState::new(&globals, &qh);
+        let session_lock_state = SessionLockState::new(&globals, &qh);
+        let compositor_state =
+            CompositorState::bind(&globals, &qh).expect("Faild to create compositor state");
+        let mut win_handler_vec: Vec<(String, (u32, u32))> = Vec::new();
+        let mut lock_surfaces = Vec::new();
+
+        let session_lock = Some(
+            session_lock_state
+                .lock(&qh)
+                .expect("ext-session-lock not supported"),
+        );
+
+        let qh: QueueHandle<SpellLock> = event_queue.handle();
+        for output in output_state.outputs() {
+            let output_info: output::OutputInfo = output_state.info(&output).unwrap();
+            let output_name: String = output_info.name.unwrap_or_else(|| "SomeOutput".to_string());
+            let dimensions = (
+                output_info.logical_size.unwrap().0 as u32,
+                output_info.logical_size.unwrap().1 as u32,
+            );
+            win_handler_vec.push((output_name, dimensions));
+
+            let session_lock = session_lock.as_ref().unwrap();
+            let surface = compositor_state.create_surface(&qh);
+
+            // It's important to keep the `SessionLockSurface` returned here around, as the
+            // surface will be destroyed when the `SessionLockSurface` is dropped.
+            let lock_surface = session_lock.create_lock_surface(surface, &output, &qh);
+            lock_surfaces.push(lock_surface);
+        }
+        let keyboard_state = KeyboardState {
+            board: None,
+            board_data: None,
+        };
+
+        let multi_handler = SpellMultiWinHandler::new_lock(win_handler_vec);
+
+        let _ = slint::platform::set_platform(Box::new(SpellLockShell {
+            window_manager: multi_handler.clone(),
+        }));
+        (
+            SpellLockBuilder {
+                loop_handle: loop_handle.handle(),
+                conn: conn.clone(),
+                multi_handler,
+                compositor_state,
+                output_state,
+                keyboard_state,
+                registry_state,
+                shm,
+                session_lock_state,
+                session_lock,
+                lock_surfaces,
+            },
+            loop_handle,
+            event_queue,
+        )
+    }
+
+    pub fn build(build: SpellLockBuilder, develop: bool) -> Self {
+        let adapter_length = build.multi_handler.borrow().adapter.len();
+        let window_length = build.multi_handler.borrow().windows.len();
+        if adapter_length == window_length {
+            let sizes: Vec<PhysicalSize> = build
+                .multi_handler
+                .borrow()
+                .windows
+                .iter()
+                .map(|(_, conf)| {
+                    if let LayerConf::Lock(width, height) = conf {
+                        PhysicalSize {
+                            width: *width,
+                            height: *height,
+                        }
+                    } else {
+                        panic!("Shouldn't enter here");
+                    }
+                })
+                .collect();
+            // TODO This hould be passed with the max dimensions of the monitors.
+            let mut pool =
+                SlotPool::new((sizes[0].width * sizes[0].height * 4) as usize, &build.shm)
+                    .expect("COuldn't create pool");
+
+            let buffers: Vec<Buffer> = sizes
+                .iter()
+                .map(|physical_size| {
+                    let stride = physical_size.width as i32 * 4;
+                    let (wayland_buffer, _) = pool
+                        .create_buffer(
+                            physical_size.width as i32,
+                            physical_size.height as i32,
+                            stride,
+                            wl_shm::Format::Argb8888,
+                        )
+                        .expect("Creating Buffer");
+                    wayland_buffer
+                })
+                .collect();
+            let adapter = build.multi_handler.clone().borrow().adapter.clone();
+
+            SpellLock {
+                adapter: adapter
+                    .into_iter()
+                    .map(|vl| vl as Rc<dyn EventAdapter>)
+                    .collect(),
+                builder: build,
+                pool,
+                size: sizes,
+                wayland_buffer: buffers,
+                is_locked: false,
+                develop,
+            }
+        } else {
+            panic!("No of initialised window is not equal to no of outputs");
+        }
+    }
+
+    fn converter_lock(&mut self, qh: &QueueHandle<Self>) {
+        slint::platform::update_timers_and_animations();
+        let width: u32 = self.size[0].width;
+        let height: u32 = self.size[0].height;
+        let window_adapter = self.adapter[0].clone();
+
+        // Rendering from Skia
+        if self.is_locked {
+            // let skia_now = std::time::Instant::now();
+            let redraw_val: bool = window_adapter.draw_if_needed();
+            // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+
+            let pool = &mut self.pool;
+            let buffer = &self.wayland_buffer[0];
+            let primary_canvas = buffer.canvas(pool).unwrap();
+
+            // println!("{}", primary_canvas.len());
+            // Drawing the window
+            // let now = std::time::Instant::now();
+            if redraw_val
+            /*|| self.first_configure*/
+            {
+                {
+                    primary_canvas
+                        .iter_mut()
+                        .enumerate()
+                        .for_each(|(index, val)| {
+                            *val = self.builder.multi_handler.borrow_mut().core[0]
+                                .borrow()
+                                .primary_buffer[index];
+                        });
+                }
+            }
+            // println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
+
+            // Damage the entire window
+            // if self.first_configure {
+            // self.first_configure = false;
+            self.builder.lock_surfaces[0].wl_surface().damage_buffer(
+                0,
+                0,
+                width as i32,
+                height as i32,
+            );
+            // } else {
+            //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+            //         // println!(
+            //         //     "{}, {}, {}, {}",
+            //         //     position.x, position.y, size.width as i32, size.height as i32,
+            //         // );
+            //         // if size.width != width && size.height != height {
+            //         self.layer.wl_surface().damage_buffer(
+            //             position.x,
+            //             position.y,
+            //             size.width as i32,
+            //             size.height as i32,
+            //         );
+            //         //}
+            //     }
+            // }
+            // Request our next frame
+            self.builder.lock_surfaces[0]
+                .wl_surface()
+                .frame(qh, self.builder.lock_surfaces[0].wl_surface().clone());
+            self.builder.lock_surfaces[0]
+                .wl_surface()
+                .attach(Some(buffer.wl_buffer()), 0, 0);
+        } else {
+            // println!("Is_hidden is true.");
+        }
+
+        self.builder.lock_surfaces[0].wl_surface().commit();
+        // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
+        // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
+
+        // TODO save and reuse buffer when the window size is unchanged.  This is especially
+        // useful if you do damage tracking, since you don't need to redraw the undamaged parts
+        // of the canvas.
+    }
+}
+
+pub struct SpellLockBuilder {
+    pub(crate) loop_handle: LoopHandle<'static, SpellLock>,
+    pub(crate) multi_handler: Rc<RefCell<SpellMultiWinHandler>>,
+    pub(crate) conn: Connection,
+    pub(crate) compositor_state: CompositorState,
     pub(crate) registry_state: RegistryState,
     pub(crate) output_state: OutputState,
     pub(crate) keyboard_state: KeyboardState,
@@ -610,25 +848,26 @@ pub struct SpellLock {
     pub(crate) session_lock_state: SessionLockState,
     pub(crate) session_lock: Option<SessionLock>,
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
-    pub(crate) is_locked: bool,
 }
+
+impl SpellLockBuilder {}
 
 impl ProvidesRegistryState for SpellLock {
     fn registry(&mut self) -> &mut RegistryState {
-        &mut self.registry_state
+        &mut self.builder.registry_state
     }
     registry_handlers![OutputState,];
 }
 
 impl ShmHandler for SpellLock {
     fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
+        &mut self.builder.shm
     }
 }
 
 impl OutputHandler for SpellLock {
     fn output_state(&mut self) -> &mut OutputState {
-        &mut self.output_state
+        &mut self.builder.output_state
     }
 
     fn new_output(
@@ -686,6 +925,7 @@ impl CompositorHandler for SpellLock {
         _surface: &wl_surface::WlSurface,
         _time: u32,
     ) {
+        self.converter_lock(qh);
     }
 
     fn surface_enter(
@@ -710,11 +950,72 @@ impl CompositorHandler for SpellLock {
     }
 }
 
+impl SessionLockHandler for SpellLock {
+    fn locked(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _session_lock: SessionLock) {
+        if self.develop {
+            self.builder
+                .loop_handle
+                .insert_source(
+                    Timer::from_duration(Duration::from_secs(5)),
+                    |_, _, app_data| {
+                        // Unlock the lock
+                        app_data.builder.session_lock.take().unwrap().unlock();
+                        // Sync connection to make sure compostor receives destroy
+                        app_data.builder.conn.roundtrip().unwrap();
+                        app_data.is_locked = false;
+                        TimeoutAction::Drop
+                    },
+                )
+                .unwrap();
+        }
+    }
+    fn finished(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _session_lock: SessionLock,
+    ) {
+        println!("Session could not be locked");
+        self.is_locked = true;
+    }
+    fn configure(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _surface: SessionLockSurface,
+        _configure: SessionLockSurfaceConfigure,
+        _serial: u32,
+    ) {
+        self.converter_lock(qh);
+    }
+}
+
+pub fn run_lock(
+    mut lock: SpellLock,
+    mut event_loop: EventLoop<SpellLock>,
+    event_queue: EventQueue<SpellLock>,
+) -> Result<(), Box<dyn Error>> {
+    WaylandSource::new(lock.builder.conn.clone(), event_queue)
+        .insert(lock.builder.loop_handle.clone())
+        .unwrap();
+
+    loop {
+        event_loop
+            .dispatch(Duration::from_millis(16), &mut lock)
+            .unwrap();
+
+        if lock.is_locked {
+            break;
+        }
+    }
+    Ok(())
+}
+
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
 delegate_shm!(SpellLock);
 delegate_registry!(SpellLock);
-delegate_sess
+delegate_session_lock!(SpellLock);
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

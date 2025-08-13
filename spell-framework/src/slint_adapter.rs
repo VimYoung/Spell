@@ -162,6 +162,24 @@ impl SpellMultiWinHandler {
         }))
     }
 
+    pub(crate) fn new_lock(lock_outputs: Vec<(String, (u32, u32))>) -> Rc<RefCell<Self>> {
+        let new_locks: Vec<(String, LayerConf)> = lock_outputs
+            .iter()
+            .map(|(output_name, conf)| (output_name.clone(), LayerConf::Lock(conf.0, conf.1)))
+            .collect();
+
+        let cores: Vec<Rc<RefCell<SharedCore>>> = lock_outputs
+            .iter()
+            .map(|(_, conf)| Rc::new(RefCell::new(SharedCore::new(conf.0, conf.1))))
+            .collect();
+
+        Rc::new(RefCell::new(SpellMultiWinHandler {
+            windows: new_locks,
+            adapter: Vec::new(),
+            core: cores,
+        }))
+    }
+
     fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
         let length = self.adapter.len();
         let core = &self.core[length];
@@ -172,6 +190,30 @@ impl SpellMultiWinHandler {
         } else {
             panic!("Panicked here");
         }
+    }
+
+    fn request_new_lock(&mut self) -> Rc<dyn WindowAdapter> {
+        let length = self.adapter.len();
+        let core = &self.core[length];
+        if let LayerConf::Lock(width, height) = &self.windows[length].1 {
+            let adapter = SpellSkiaWinAdapter::new(core.clone(), *width, *height);
+            self.adapter.push(adapter.clone());
+            adapter
+        } else {
+            panic!("Panicked here");
+        }
+    }
+}
+
+pub struct SpellLockShell {
+    /// An instance of [SpellMultiWinHandler].
+    pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+}
+
+impl Platform for SpellLockShell {
+    fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+        let value = self.window_manager.borrow_mut().request_new_lock();
+        Ok(value)
     }
 }
 
