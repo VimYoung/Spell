@@ -2,7 +2,7 @@
 //! across various functionalities for your shell. The most common and only workable widget (or
 //! window as called by many) is [SpellWin] now. Future implementation of mentioned struct will
 //! take place in near future.
-use slint::PhysicalSize;
+use slint::{PhysicalSize, SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -22,7 +22,11 @@ use smithay_client_toolkit::{
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
-    seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
+    seat::{
+        SeatState,
+        keyboard::{KeyboardHandler, Keysym},
+        pointer::cursor_shape::CursorShapeManager,
+    },
     session_lock::{
         SessionLock, SessionLockHandler, SessionLockState, SessionLockSurface,
         SessionLockSurfaceConfigure,
@@ -52,7 +56,7 @@ use crate::{
     configure::{LayerConf, WindowConf},
     shared_context::{EventAdapter, MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
+    wayland_adapter::way_helper::{KeyboardState, PointerState, get_string, set_config},
 };
 
 mod way_helper;
@@ -762,6 +766,7 @@ impl SpellLock {
             let lock_surface = session_lock.create_lock_surface(surface, &output, &qh);
             spell_lock.lock_surfaces.push(lock_surface);
         }
+        // spell_lock.lock_surfaces[0].wl_surface().set_
 
         let multi_handler = SpellMultiWinHandler::new_lock(win_handler_vec);
 
@@ -1006,6 +1011,96 @@ pub fn run_lock(
     }
 }
 
+impl KeyboardHandler for SpellLock {
+    fn enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _serial: u32,
+        _raw: &[u32],
+        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
+    ) {
+        println!("Keyboard focus entered");
+    }
+
+    fn leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _serial: u32,
+    ) {
+        println!("Keyboard focus left");
+    }
+
+    fn press_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        println!("A key is pressed");
+        let string_val: SharedString = get_string(event);
+        self.slint_part.as_ref().unwrap().adapter[0]
+            .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
+            .unwrap();
+    }
+
+    fn release_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+    ) {
+        println!("A key is released");
+        let key_sym = Keysym::new(event.raw_code);
+        event.keysym = key_sym;
+        let string_val: SharedString = get_string(event);
+        self.slint_part.as_ref().unwrap().adapter[0]
+            .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
+            .unwrap();
+        // let value = event.keysym.key_char();
+        // if let Some(val) = value {
+        //     println!("Value getting out :{}", val);
+        //     self.adapter
+        //         .try_dispatch_event(WindowEvent::KeyReleased {
+        //             text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),
+        //         })
+        //         .unwrap();
+        // }
+    }
+
+    // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
+    fn update_modifiers(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _layout: u32,
+    ) {
+    }
+
+    // TODO This method needs to be implemented after the looping mecha is changed to calloop.
+    fn update_repeat_info(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
+    ) {
+    }
+}
+
+delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
 delegate_shm!(SpellLock);

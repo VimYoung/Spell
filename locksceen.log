@@ -1,0 +1,7 @@
+error: no bin target named `ex_lock` in default-run packages
+help: available bin targets:
+    ex_pid
+    example_comp
+    example_lock
+    signal_example
+    spell-cli

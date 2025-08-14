@@ -1,8 +1,9 @@
 use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
+use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::client::protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
     seat::{
-        keyboard::KeyboardData,
+        keyboard::{KeyEvent, KeyboardData, Keysym},
         pointer::{PointerData, cursor_shape::CursorShapeManager},
     },
     shell::{
@@ -73,6 +74,73 @@ fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: b
                 }
             }
         }
+    }
+}
+
+pub(super) fn get_string(event: KeyEvent) -> SharedString {
+    let mut key: Option<Key> = None;
+    match event.keysym {
+        Keysym::BackSpace => key = Some(Key::Backspace),
+        Keysym::Tab => key = Some(Key::Tab),
+        Keysym::Return => key = Some(Key::Return),
+        Keysym::Escape => key = Some(Key::Escape),
+        Keysym::BackTab => key = Some(Key::Backtab),
+        Keysym::Delete => key = Some(Key::Delete),
+        Keysym::Shift_L => key = Some(Key::Shift),
+        Keysym::Shift_R => key = Some(Key::ShiftR),
+        Keysym::Control_L => key = Some(Key::Control),
+        Keysym::Control_R => key = Some(Key::ControlR),
+        Keysym::Alt_L => key = Some(Key::Alt),
+        Keysym::Alt_R => key = Some(Key::AltGr),
+        Keysym::Caps_Lock => key = Some(Key::CapsLock),
+        Keysym::Meta_L => key = Some(Key::Meta),
+        Keysym::Meta_R => key = Some(Key::MetaR),
+        Keysym::space => key = Some(Key::Space),
+        Keysym::Up | Keysym::uparrow => key = Some(Key::UpArrow),
+        Keysym::Down | Keysym::downarrow => key = Some(Key::DownArrow),
+        Keysym::Left | Keysym::leftarrow => key = Some(Key::LeftArrow),
+        Keysym::Right | Keysym::rightarrow => key = Some(Key::RightArrow),
+        Keysym::F1 => key = Some(Key::F1),
+        Keysym::F2 => key = Some(Key::F2),
+        Keysym::F3 => key = Some(Key::F3),
+        Keysym::F4 => key = Some(Key::F4),
+        Keysym::F5 => key = Some(Key::F5),
+        Keysym::F6 => key = Some(Key::F6),
+        Keysym::F7 => key = Some(Key::F7),
+        Keysym::F8 => key = Some(Key::F8),
+        Keysym::F9 => key = Some(Key::F9),
+        Keysym::F10 => key = Some(Key::F10),
+        Keysym::F11 => key = Some(Key::F11),
+        Keysym::F12 => key = Some(Key::F12),
+        Keysym::F13 => key = Some(Key::F13),
+        Keysym::F14 => key = Some(Key::F14),
+        Keysym::F15 => key = Some(Key::F15),
+        Keysym::F16 => key = Some(Key::F16),
+        Keysym::F17 => key = Some(Key::F17),
+        Keysym::F18 => key = Some(Key::F18),
+        Keysym::F19 => key = Some(Key::F19),
+        Keysym::F20 => key = Some(Key::F20),
+        Keysym::F21 => key = Some(Key::F21),
+        Keysym::F22 => key = Some(Key::F22),
+        Keysym::F23 => key = Some(Key::F23),
+        Keysym::F24 => key = Some(Key::F24),
+        Keysym::Insert => key = Some(Key::Insert),
+        Keysym::Home => key = Some(Key::Home),
+        Keysym::End => key = Some(Key::End),
+        Keysym::Page_Up => key = Some(Key::PageUp),
+        Keysym::Page_Down => key = Some(Key::PageDown),
+        Keysym::Scroll_Lock => key = Some(Key::ScrollLock),
+        Keysym::Pause => key = Some(Key::Pause),
+        Keysym::Sys_Req => key = Some(Key::SysReq),
+        Keysym::XF86_Stop => key = Some(Key::Stop),
+        Keysym::Menu => key = Some(Key::Menu),
+        _ => {}
+    }
+
+    if let Some(key) = key {
+        key.into()
+    } else {
+        SharedString::from(event.utf8.unwrap_or_default())
     }
 }
 

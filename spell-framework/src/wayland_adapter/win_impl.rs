@@ -1,4 +1,4 @@
-use crate::wayland_adapter::SpellWin;
+use crate::wayland_adapter::{SpellWin, way_helper::get_string};
 use owo_colors::OwoColorize;
 use slint::{
     SharedString,
@@ -11,13 +11,15 @@ use smithay_client_toolkit::{
             Connection, QueueHandle,
             protocol::{wl_pointer, wl_seat},
         },
-        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+        protocols::wp::{
+            cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape, keyboard_shortcuts_inhibit,
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        keyboard::{KeyboardData, KeyboardHandler},
+        keyboard::{KeyboardData, KeyboardHandler, Keysym},
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
     },
     shell::WaylandSurface,
@@ -57,10 +59,9 @@ impl KeyboardHandler for SpellWin {
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         println!("A key is pressed");
+        let string_val: SharedString = get_string(event);
         self.adapter
-            .try_dispatch_event(WindowEvent::KeyPressed {
-                text: SharedString::from(event.utf8.unwrap()),
-            })
+            .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap();
     }
 
@@ -70,17 +71,24 @@ impl KeyboardHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
-        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+        mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         println!("A key is released");
-        let value = event.keysym.key_char();
-        if let Some(val) = value {
-            self.adapter
-                .try_dispatch_event(WindowEvent::KeyReleased {
-                    text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),
-                })
-                .unwrap();
-        }
+        let key_sym = Keysym::new(event.raw_code);
+        event.keysym = key_sym;
+        let string_val: SharedString = get_string(event);
+        self.adapter
+            .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
+            .unwrap();
+        // let value = event.keysym.key_char();
+        // if let Some(val) = value {
+        //     println!("Value getting out :{}", val);
+        //     self.adapter
+        //         .try_dispatch_event(WindowEvent::KeyReleased {
+        //             text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),
+        //         })
+        //         .unwrap();
+        // }
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
@@ -92,6 +100,16 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
         _layout: u32,
+    ) {
+    }
+
+    // TODO This method needs to be implemented after the looping mecha is changed to calloop.
+    fn update_repeat_info(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
     ) {
     }
 }
