@@ -11,9 +11,7 @@ use smithay_client_toolkit::{
             Connection, QueueHandle,
             protocol::{wl_pointer, wl_seat},
         },
-        protocols::wp::{
-            cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape, keyboard_shortcuts_inhibit,
-        },
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,

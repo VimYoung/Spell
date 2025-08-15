@@ -17,13 +17,13 @@ use smithay_client_toolkit::{
         client::{
             Connection, EventQueue, QueueHandle,
             globals::registry_queue_init,
-            protocol::{wl_output, wl_shm, wl_surface},
+            protocol::{wl_output, wl_seat, wl_shm, wl_surface},
         },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
-        SeatState,
+        Capability, SeatHandler, SeatState,
         keyboard::{KeyboardHandler, Keysym},
         pointer::cursor_shape::CursorShapeManager,
     },
@@ -681,14 +681,15 @@ impl SpellSlintLock {
 /// Furture lock screen implementation will be on this type. Currently, it is redundent.
 pub struct SpellLock {
     pub(crate) loop_handle: LoopHandle<'static, SpellLock>,
-    pub(crate) conn: Connection,
+    pub conn: Connection,
     pub(crate) compositor_state: CompositorState,
     pub(crate) registry_state: RegistryState,
     pub(crate) output_state: OutputState,
     pub(crate) keyboard_state: KeyboardState,
+    pub(crate) seat_state: SeatState,
     pub(crate) shm: Shm,
     pub(crate) session_lock_state: SessionLockState,
-    pub(crate) session_lock: Option<SessionLock>,
+    pub session_lock: Option<SessionLock>,
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) pool: Option<SlotPool>,
@@ -737,6 +738,7 @@ impl SpellLock {
             output_state,
             keyboard_state,
             registry_state,
+            seat_state: SeatState::new(&globals, &qh),
             slint_part: None,
             shm,
             pool: None,
@@ -1002,7 +1004,7 @@ pub fn run_lock(
 
     loop {
         event_loop
-            .dispatch(Duration::from_millis(16), &mut lock)
+            .dispatch(Duration::from_millis(1), &mut lock)
             .unwrap();
 
         // if lock.is_locked {
@@ -1100,12 +1102,56 @@ impl KeyboardHandler for SpellLock {
     }
 }
 
+impl SeatHandler for SpellLock {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
+
+    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+
+    fn new_capability(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard && self.keyboard_state.board.is_none() {
+            println!("Set keyboard capability");
+            let keyboard = self
+                .seat_state
+                .get_keyboard(qh, &seat, None)
+                .expect("Failed to create keyboard");
+            // let keyboard_data = KeyboardData::new(seat);
+            self.keyboard_state.board = Some(keyboard);
+            // TODO keyboard Data needs to be set later.
+            // self.keyboard_state.board_data = Some(keyboard_data::<Self>);
+        }
+    }
+
+    fn remove_capability(
+        &mut self,
+        _conn: &Connection,
+        _: &QueueHandle<Self>,
+        _: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard && self.keyboard_state.board.is_some() {
+            println!("Unset keyboard capability");
+            self.keyboard_state.board.take().unwrap().release();
+        }
+    }
+
+    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+}
+
 delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
 delegate_shm!(SpellLock);
 delegate_registry!(SpellLock);
 delegate_session_lock!(SpellLock);
+delegate_seat!(SpellLock);
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

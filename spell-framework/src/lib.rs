@@ -29,6 +29,7 @@ pub mod layer_properties {
         configure::WindowConf,
         dbus_window_state::{DataType, ForeignController},
     };
+    pub use smithay_client_toolkit::reexports::calloop::timer::{TimeoutAction, Timer};
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
