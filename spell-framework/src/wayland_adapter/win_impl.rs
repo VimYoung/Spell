@@ -58,9 +58,16 @@ impl KeyboardHandler for SpellWin {
     ) {
         println!("A key is pressed");
         let string_val: SharedString = get_string(event);
+        // println!("Value of key: {:?}", string_val.as_bytes());
+        // if *string_val.as_bytes() == [27] {
+        //     self.adapter
+        //         .try_dispatch_event(WindowEvent::KeyPressRepeated { text: string_val })
+        //         .unwrap();
+        // } else {
         self.adapter
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap();
+        //}
     }
 
     fn release_key(

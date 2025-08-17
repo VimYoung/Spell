@@ -108,24 +108,26 @@ impl AppSelector {
     /// for a given string query. `size` determines the number of enteries to
     /// yield.
     pub fn query_primary(&self, query_val: &str, size: usize) -> Vec<&AppData> {
+        let query_val = query_val.to_lowercase();
         let query_list = self
             .app_list
             .iter()
             .filter(|val| val.is_primary)
-            .map(|val| val.name.as_str())
-            .collect::<Vec<&str>>();
-        let best_match_names: Vec<&str> = fuzzy_search_best_n(query_val, &query_list, size)
+            .map(|val| val.name.to_lowercase())
+            .collect::<Vec<String>>();
+        let query_list: Vec<&str> = query_list.iter().map(|v| v.as_str()).collect();
+        let best_match_names: Vec<&str> =
+            fuzzy_search_best_n(query_val.as_str(), &query_list, size)
+                .iter()
+                .map(|val| val.0)
+                .collect();
+        best_match_names
             .iter()
-            .map(|val| val.0)
-            .collect();
-
-        self.app_list
-            .iter()
-            .filter(|app_data| {
-                if best_match_names.contains(&app_data.name.as_str()) {
-                    return true;
-                }
-                false
+            .map(|app_name| {
+                self.app_list
+                    .iter()
+                    .find(|val| val.name.to_lowercase().as_str() == *app_name)
+                    .unwrap()
             })
             .collect::<Vec<&AppData>>()
     }
@@ -134,23 +136,26 @@ impl AppSelector {
     /// for a given string query. `size` determines the number of enteries to
     /// yield.
     pub fn query_all(&self, query_val: &str, size: usize) -> Vec<&AppData> {
+        let query_val = query_val.to_lowercase();
         let query_list = self
             .app_list
             .iter()
-            .map(|val| val.name.as_str())
-            .collect::<Vec<&str>>();
-        let best_match_names: Vec<&str> = fuzzy_search_best_n(query_val, &query_list, size)
-            .iter()
-            .map(|val| val.0)
-            .collect();
+            .map(|val| val.name.to_lowercase())
+            .collect::<Vec<String>>();
+        let query_list: Vec<&str> = query_list.iter().map(|v| v.as_ref()).collect();
+        let best_match_names: Vec<&str> =
+            fuzzy_search_best_n(query_val.as_str(), &query_list, size)
+                .iter()
+                .map(|val| val.0)
+                .collect();
 
-        self.app_list
+        best_match_names
             .iter()
-            .filter(|app_data| {
-                if best_match_names.contains(&app_data.name.as_str()) {
-                    return true;
-                }
-                false
+            .map(|app_name| {
+                self.app_list
+                    .iter()
+                    .find(|val| val.name.to_lowercase().as_str() == *app_name)
+                    .unwrap()
             })
             .collect::<Vec<&AppData>>()
     }

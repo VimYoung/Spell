@@ -3,10 +3,11 @@
 
 Changes:
 
-- LOGO in docs and Readme.
+- LOGO in docs and Readme. Also update the readme to include badges for docs and rust.
 - Add a notification implementation for spell framework.
-- Add keyboard implementation for non word chars like TAB, ENTER etc.
-- Add docs for functions of SpellWin.
+- Added keyboard implementation for non word chars like TAB, ENTER etc.
+  - Next release will implement repeated key for backspace.
+- Better docs for methods of SpellWin.
 - Add a timer in `forge`.
 - Add an implementation of lockscreen PAM APIs.
 

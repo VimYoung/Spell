@@ -1048,6 +1048,7 @@ impl KeyboardHandler for SpellLock {
     ) {
         println!("A key is pressed");
         let string_val: SharedString = get_string(event);
+        println!("Value of key: {:?}", string_val);
         self.slint_part.as_ref().unwrap().adapter[0]
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap();

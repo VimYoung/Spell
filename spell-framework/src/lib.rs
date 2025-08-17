@@ -226,11 +226,14 @@ fn run_loop_once(waywindow: &mut SpellWin) {
         }
         // event_queue.roundtrip(&mut waywindow).unwrap();
     } else {
-        waywindow.queue.borrow().flush().unwrap();
-        queue.borrow_mut().dispatch_pending(waywindow).unwrap();
-        if let Some(read_value) = waywindow.queue.borrow().prepare_read() {
-            let _ = read_value.read();
+        if let Err(err_val) = queue.borrow_mut().blocking_dispatch(waywindow) {
+            panic!("{}", err_val);
         }
+        // waywindow.queue.borrow().flush().unwrap();
+        // queue.borrow_mut().dispatch_pending(waywindow).unwrap();
+        // if let Some(read_value) = waywindow.queue.borrow().prepare_read() {
+        //     let _ = read_value.read();
+        // }
     }
 }
 

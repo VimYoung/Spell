@@ -127,7 +127,7 @@ that I haven't used them extensively myself (for now).
 
 ## Docs
 
-Docs can be found [here](https://docs.rs/crate/spell-framework/).
+Docs can be found [here](https://docs.rs/spell-framework/latest/spell_framework/).
 
 ## Contributing
 
