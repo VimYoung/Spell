@@ -3,24 +3,93 @@
 //! among other things.
 //!
 //! <div class="warning">
-//! For now, this module doesn;t contain much utilities. As, more common methods
+//! For now, this module doesn't contain much utilities. As, more common methods
 //! are added, docs will expand to include examples and panic cases.
 //! </div>
+//!
+//! The whole module is divided into structs representing these utilities and
+//! their corresponding traits (if it applies). The [`Services`] is used to bind
+//! and initialise the traits. Why do most utilities have a trait counterpart?
+//!
+//! Traits are made so as to represent actions when occured from the other server/
+//! application side. For example, An [`AppSelector`] is used and initialised for
+//! usage by your shell but [`new_app_added`](AppHandler::new_app_added) was called
+//! when the coming of a new desktop entry is to be notified. Some utilities like
+//! `AppSelector` are more user intensive and less trait intensive(i.e. there are not
+//! many cases when server will ping, hence not much methods in traits). On the
+//! other hand implementations like that of notifications (via [`NotificationHandler`])
+//! are majorly trait intensive. Then, utilities like audio handling (via [`PipeWireHandler`] and
+//! [`AudioManager`]) have equal chances of being accessed from anywhere.
+//!
+//! As a general tip, the best way to implement traits is to stores weak reference to
+//! your widget windows on slint side in structs and then implement these traits on it.
 use crate::vault::application::desktop_entry_extracter;
 use rust_fuzzy_search::fuzzy_search_best_n;
 use std::{
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
+    sync::Arc,
+    thread,
 };
-
 mod application;
+
+pub trait NotificationHandler: Send + Sync {}
+pub trait AppHandler: Send + Sync {
+    fn new_app_added(&mut self, app_data: AppData);
+}
+pub trait MprisHandler: Send + Sync {}
+pub trait PipeWireHandler: Send + Sync {}
+
+#[derive(Default, Clone)]
+pub struct Services {
+    notification: Option<Arc<dyn NotificationHandler>>,
+    app: Option<Arc<dyn AppHandler>>,
+    mpris: Option<Arc<dyn MprisHandler>>,
+    pipewire: Option<Arc<dyn PipeWireHandler>>,
+}
+
+impl Services {
+    pub fn add_notification_handle(
+        &mut self,
+        noti_handler: Arc<dyn NotificationHandler>,
+    ) -> &mut Self {
+        self.notification = Some(noti_handler);
+        self
+    }
+
+    pub fn add_app_handle(&mut self, app_handler: Arc<dyn AppHandler>) -> &mut Self {
+        self.app = Some(app_handler);
+        self
+    }
+
+    pub fn add_mpris_handle(&mut self, mpris_handler: Arc<dyn MprisHandler>) -> &mut Self {
+        self.mpris = Some(mpris_handler);
+        self
+    }
+
+    pub fn add_pipewire_handle(&mut self, pipewire_handler: Arc<dyn PipeWireHandler>) -> &mut Self {
+        self.pipewire = Some(pipewire_handler);
+        self
+    }
+
+    pub fn generate_serices(&mut self) {
+        if let Some(app) = &self.app {
+            let app_clone = app.clone();
+            thread::spawn(move || {
+                check_for_new_apps(app_clone);
+            });
+        }
+    }
+}
+
+fn check_for_new_apps(app: Arc<dyn AppHandler>) {
+    todo!()
+}
+
+pub struct AudioManager;
 // TODO needs to fix the below mentioned bugs.
-/// AppSelector stores the data for each application with possible actions.
-/// It is capable of searching and storing known applications and thir data
-/// according to official specification. As a result, it doesn't support live
-/// reloading. That means the struct will need to be reinitialised after a new
-/// application is added to display it in your application launcher. Known bugs
+/// AppSelector stores the data for each application with possible actions. Known bugs
 /// include failing to open flatpak apps in certain cases and failing to find icons
 /// of apps in certain cases both of which will be fixed in coming releases.
 #[derive(Debug, Clone)]
@@ -168,14 +237,16 @@ pub struct AppData {
     /// Unique ID of an application desktop file according to
     /// [spec](https://specifications.freedesktop.org/desktop-entry-spec/latest/file-naming.html#desktop-file-id).
     pub desktop_file_id: String,
-    // Determines if the entry is primary or an action of an application.
+    /// Determines if the entry is primary or an action of an application.
     pub is_primary: bool,
-    // Image path of the application if could be fetched.
+    /// Image path of the application if could be fetched.
     pub image_path: Option<String>,
-    // Name of application
+    /// Name of application
     pub name: String,
-    // Execute command which runs in an spaned thread when an application is asked to run.
+    /// Execute command which runs in an spaned thread when an application is asked to run.
     pub exec_comm: Option<String>,
 }
 
 // TODO have to replace fuzzy search with a custom implementation to avoid dependency.
+// There needs to be performance improvements in AppSelector's default implementation
+// TODO add an example section in this module with pseudocode for trait implementations.

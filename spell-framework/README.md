@@ -1,5 +1,21 @@
 # Spell
 
+<img align="right" width="25%" src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png">
+
+<h3 align="left">Make desktop widgets by the mystic arts of Spell  !!</h3>
+<hr>
+
+<p align="left">
+  <br />
+  <a href="https://github.com/VimYoung/Spell/issues">Report Bug</a>
+  ·
+  <a href="https://github.com/VimYoung/Spell/discussions">Request Feature</a>
+  ·
+  <a href="https://docs.rs/crate/spell-framework/">Wiki</a>
+  <br />
+  <br />
+</p>
+
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
 
@@ -9,10 +25,12 @@ as backend, so as though there are not many batteries (for now) included
 in the framework itself, everything can be brought to life from the dark arts of
 rust.
 
+> [!IMPORTANT]
+> Please provide your inputs to improve Spell.
+
 ## When can we expect a stable release?
 
-No promises but I think I can push it to a stable release (i.e. 1.0.0) in 2-3 months.
-You can find change logs for both spell-framework and CLI in [CHANGELOG](https://github.com/VimYoung/Spell/blob/main/CHANGELOG.md).
+No promises but I think I can push it to a release in 3-4 months.
 
 ## Inspiration
 
@@ -39,18 +57,6 @@ easy to learn (you can even get a sense in just few mins [here](https://docs.sli
 other good UI kits, it just has awesome integration for rust. A compatibility that
 is hard to find.
 
-## Todos
-
-A lot of things are left to be done, but following core things are not implemented yet
-which might cause problem for widget creation.
-
-1. Resize of buffers aren't possible.
-2. It is irrelevant to define `Width` and `Height` of Window, as that
-should be provided directly in your `main` function. (Though, I must say that recommended way of creating windows with curved borders is to place a `Rectangle` in a transparent window and then define its `border_radius`.)
-
-Having said that,you should try creating static widgets (like showing clock, day etc) at
-this point with `spell` and see how that turns out.
-
 ## Minimal Example
 
 I am creating my own shell from spell, which is currently private and will soon be shown
@@ -64,6 +70,7 @@ slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }
 i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
+pam-sys = {git = "https://github.com/VimYoung/pam-sys"}
 ```
 
 and then replace the `main.rs` with following contents:
@@ -72,30 +79,28 @@ and then replace the `main.rs` with following contents:
 use std::{
     env,
     error::Error,
-    sync::mpsc,
     sync::{Arc, RwLock},
 };
 
 use slint::ComponentHandle;
-use spell::{
+use spell_framework::{
     cast_spell,
-    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf},
+    layer_properties::{BoardType, ForeignController, LayerAnchor, LayerType, WindowConf},
     wayland_adapter::SpellWin,
-    Handle,
 };
 slint::include_modules!();
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let (_tx, rx) = mpsc::channel::<Handle>();
     let window_conf = WindowConf::new(
         376,
         576,
         (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
         (5, 0, 0, 10),
         LayerType::Top,
+        BoardType::None,
         false,
     );
-    let (waywindow, event_queue) = SpellWin::invoke_spell("counter-widget", window_conf);
+    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
 
     let ui = AppWindow::new().unwrap();
     ui.on_request_increase_value({
@@ -105,19 +110,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui.set_counter(ui.get_counter() + 1);
         }
     });
-    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(
-        waywindow,
-        event_queue,
-        rx,
-        None,
-        None,
-    )
+    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(waywindow, None, None)
 }
 ```
 
 ## Batteries
 
-No batteries, but common functionalities like system tray, temp etc, will be added later for
+Not a lot of batteries included for now, future implementations of common functionalities will occur
+in `vault` module of this crate. For now it has a AppSelector, which can be used to retrieve app information
+for creating a launcher. Other common functionalities like system tray, temp etc, will be added later for
 convenience. I recommend the use of following crates for some basic usage, though you must note
 that I haven't used them extensively myself (for now).
 
@@ -127,10 +128,8 @@ that I haven't used them extensively myself (for now).
 
 ## Docs
 
-Docs can be found [here](https://docs.rs/spell-framework/latest/spell_framework/).
+Docs can be found [here](https://docs.rs/crate/spell-framework/).
 
 ## Contributing
 
-I should say that at this point, the crate is not ready for contributions but people can open
-issues for suggestions. Bugs and feature-requests will be ignored for now. As soon as a stable
-release happens, I will restructure my workflow for issues and PR.
+The library is still in an early stage. Yet I will encourage you try it out, feel free to open issues and even better PRs for issues. Feature requests can be posted in the issues section itself, but since a lot of things are planned already, they will take a lower priority.

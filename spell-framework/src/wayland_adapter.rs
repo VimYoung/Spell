@@ -1,36 +1,25 @@
 //! It provides various widget types for implementing properties
-//! across various functionalities for your shell. The most common and only workable widget (or
-//! window as called by many) is [SpellWin] now. Future implementation of mentioned struct will
-//! take place in near future.
-use slint::{PhysicalSize, SharedString, platform::WindowEvent};
+//! across various functionalities for your shell. The most common widget (or
+//! window as called by many) is [SpellWin]. You can also implement a lock screen
+//! with [`SpellLock`].
+use pam_client::{Context, Flag, conv_mock::Conversation};
+use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
     output::{self, OutputHandler, OutputState},
     reexports::{
-        calloop::{
-            EventLoop, LoopHandle,
-            timer::{TimeoutAction, Timer},
-        },
-        calloop_wayland_source::WaylandSource,
+        calloop::{EventLoop, LoopHandle},
         client::{
             Connection, EventQueue, QueueHandle,
             globals::registry_queue_init,
-            protocol::{wl_output, wl_seat, wl_shm, wl_surface},
+            protocol::{wl_output, wl_shm, wl_surface},
         },
     },
-    registry::{ProvidesRegistryState, RegistryState},
-    registry_handlers,
-    seat::{
-        Capability, SeatHandler, SeatState,
-        keyboard::{KeyboardHandler, Keysym},
-        pointer::cursor_shape::CursorShapeManager,
-    },
-    session_lock::{
-        SessionLock, SessionLockHandler, SessionLockState, SessionLockSurface,
-        SessionLockSurfaceConfigure,
-    },
+    registry::RegistryState,
+    seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
+    session_lock::{SessionLock, SessionLockState, SessionLockSurface},
     shell::{
         WaylandSurface,
         wlr_layer::{
@@ -38,17 +27,13 @@ use smithay_client_toolkit::{
             LayerSurfaceConfigure,
         },
     },
-    shm::{
-        Shm, ShmHandler,
-        slot::{Buffer, SlotPool},
-    },
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use std::{
     cell::{Cell, RefCell},
-    error::Error,
+    process::Command,
     rc::Rc,
     sync::mpsc::{self, Receiver, Sender},
-    time::Duration,
 };
 
 use crate::{
@@ -56,9 +41,11 @@ use crate::{
     configure::{LayerConf, WindowConf},
     shared_context::{EventAdapter, MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::way_helper::{KeyboardState, PointerState, get_string, set_config},
+    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
-
+pub use lock_impl::{SpellSlintLock, run_lock};
+pub use pam_client::Error as PamError;
+mod lock_impl;
 mod way_helper;
 mod win_impl;
 
@@ -611,77 +598,61 @@ impl LayerShellHandler for SpellWin {
     }
 }
 
-pub struct SpellSlintLock {
-    pub(crate) adapter: Vec<Rc<dyn EventAdapter>>,
-    pub(crate) cores: Vec<Rc<RefCell<SharedCore>>>,
-    pub(crate) size: Vec<PhysicalSize>,
-    pub(crate) wayland_buffer: Vec<Buffer>,
-}
-
-impl SpellSlintLock {
-    pub fn build(spell_lock: &mut SpellLock, multi_handler: Rc<RefCell<SpellMultiWinHandler>>) {
-        let adapter_length = multi_handler.borrow().adapter.len();
-        let window_length = multi_handler.borrow().windows.len();
-        if adapter_length == window_length {
-            let sizes: Vec<PhysicalSize> = multi_handler
-                .borrow()
-                .windows
-                .iter()
-                .map(|(_, conf)| {
-                    if let LayerConf::Lock(width, height) = conf {
-                        PhysicalSize {
-                            width: *width,
-                            height: *height,
-                        }
-                    } else {
-                        panic!("Shouldn't enter here");
-                    }
-                })
-                .collect();
-            // TODO This hould be passed with the max dimensions of the monitors.
-            let mut pool = SlotPool::new(
-                (sizes[0].width * sizes[0].height * 4) as usize,
-                &spell_lock.shm,
-            )
-            .expect("COuldn't create pool");
-
-            let buffers: Vec<Buffer> = sizes
-                .iter()
-                .map(|physical_size| {
-                    let stride = physical_size.width as i32 * 4;
-                    let (wayland_buffer, _) = pool
-                        .create_buffer(
-                            physical_size.width as i32,
-                            physical_size.height as i32,
-                            stride,
-                            wl_shm::Format::Argb8888,
-                        )
-                        .expect("Creating Buffer");
-                    wayland_buffer
-                })
-                .collect();
-
-            spell_lock.pool = Some(pool);
-            let adapter = multi_handler.borrow().adapter.clone();
-            spell_lock.slint_part = Some(SpellSlintLock {
-                adapter: adapter
-                    .into_iter()
-                    .map(|vl| vl as Rc<dyn EventAdapter>)
-                    .collect(),
-                cores: multi_handler.borrow().core.clone(),
-                size: sizes,
-                wayland_buffer: buffers,
-            })
-        } else {
-            panic!("No of initialised window is not equal to no of outputs");
-        }
-    }
-}
-
-/// Furture lock screen implementation will be on this type. Currently, it is redundent.
+/// SpellLock is a struct which represents a window lock. It can be run and initialised
+/// on a custom lockscreen implementation with slint.
+/// <div class="warning">
+/// Remember, with great power comes great responsibility. The struct doen't implement
+/// pointer events so you would need to make sure that your lock screen has a text input field
+/// and it is in focus on startup. Also spell doesn't add any
+/// restrictions on what you can have in your lockscreen so that is a bonus
+/// </div>
+/// Know limitations include the abscence to verify from fingerprints and unideal issues on
+/// multi-monitor setup. You can add the path of binary of your lock in your compositor config and idle
+/// manager config to use the program. It will be linked to spell-cli directly in coming releases.
+///
+/// ## Example
+/// Here is a minimal example.
+///
+/// ```rust
+/// use std::{env, error::Error, time::Duration};
+///
+/// use slint::ComponentHandle;
+/// use spell_framework::{
+///     layer_properties::{TimeoutAction, Timer},
+///     wayland_adapter::{run_lock, SpellLock, SpellSlintLock},
+/// };
+/// slint::include_modules!();
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let (mut lock, event_loop, event_queue, handle) = SpellLock::invoke_lock_spell();
+///     let lock_ui = LockScreen::new().unwrap();
+///     let looop_handle = event_loop.handle().clone();
+///     SpellSlintLock::build(&mut lock, handle);
+///     lock_ui.on_check_pass({
+///         let lock_handle = lock_ui.as_weak();
+///         move |string_val| {
+///             // let lock_handle_a = lock_handle.clone();
+///             let lock_handle_a = lock_handle.clone().unwrap();
+///             looop_handle
+///                 .insert_source(
+///                     Timer::from_duration(Duration::from_secs(5)),
+///                     move |_, _, app_data| {
+///                         if app_data.unlock(None, string_val.as_str()).is_err() {
+///                             lock_handle_a.set_lock_error(true);
+///                         }
+///                         TimeoutAction::Drop
+///                     },
+///                 )
+///                 .unwrap();
+///         }
+///     });
+///
+///     run_lock(lock, event_loop, event_queue)
+/// }
+/// ```
 pub struct SpellLock {
     pub(crate) loop_handle: LoopHandle<'static, SpellLock>,
-    pub conn: Connection,
+    pub(crate) conn: Connection,
     pub(crate) compositor_state: CompositorState,
     pub(crate) registry_state: RegistryState,
     pub(crate) output_state: OutputState,
@@ -689,18 +660,15 @@ pub struct SpellLock {
     pub(crate) seat_state: SeatState,
     pub(crate) shm: Shm,
     pub(crate) session_lock_state: SessionLockState,
-    pub session_lock: Option<SessionLock>,
+    pub(crate) session_lock: Option<SessionLock>,
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) pool: Option<SlotPool>,
     pub(crate) is_locked: bool,
-    pub(crate) develop: bool,
 }
 
 impl SpellLock {
-    pub fn invoke_lock_spell(
-        develop: bool,
-    ) -> (
+    pub fn invoke_lock_spell() -> (
         Self,
         EventLoop<'static, SpellLock>,
         EventQueue<SpellLock>,
@@ -746,7 +714,6 @@ impl SpellLock {
             session_lock,
             lock_surfaces,
             is_locked: false,
-            develop,
         };
 
         let _ = event_queue.roundtrip(&mut spell_lock);
@@ -854,296 +821,38 @@ impl SpellLock {
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
         // of the canvas.
     }
-}
 
-impl ProvidesRegistryState for SpellLock {
-    fn registry(&mut self) -> &mut RegistryState {
-        &mut self.registry_state
-    }
-    registry_handlers![OutputState,];
-}
+    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> Result<(), PamError> {
+        let mut user_name = String::new();
+        if let Some(username) = username {
+            user_name = username.to_string();
+        } else {
+            let output = Command::new("sh")
+                .arg("-c")
+                .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+                .output()
+                .expect("Couldn't retrive username");
 
-impl ShmHandler for SpellLock {
-    fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
-    }
-}
-
-impl OutputHandler for SpellLock {
-    fn output_state(&mut self) -> &mut OutputState {
-        &mut self.output_state
-    }
-
-    fn new_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-        println!("New Output Source Added");
-    }
-
-    fn update_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-
-    fn output_destroyed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-        println!("Output is destroyed");
-    }
-}
-
-impl CompositorHandler for SpellLock {
-    fn scale_factor_changed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_factor: i32,
-    ) {
-        // Not needed for this example.
-    }
-
-    fn transform_changed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_transform: wl_output::Transform,
-    ) {
-        // Not needed for this example.
-    }
-
-    fn frame(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _time: u32,
-    ) {
-        self.converter_lock(qh);
-    }
-
-    fn surface_enter(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        println!("Surface reentered");
-        // Not needed for this example.
-    }
-
-    fn surface_leave(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        println!("Surface left");
-    }
-}
-
-impl SessionLockHandler for SpellLock {
-    fn locked(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _session_lock: SessionLock) {
-        if self.develop {
-            self.loop_handle
-                .insert_source(
-                    Timer::from_duration(Duration::from_secs(5)),
-                    |_, _, app_data| {
-                        // Unlock the lock
-                        app_data.session_lock.take().unwrap().unlock();
-                        // Sync connection to make sure compostor receives destroy
-                        app_data.conn.roundtrip().unwrap();
-                        app_data.is_locked = false;
-                        TimeoutAction::Drop
-                    },
-                )
-                .unwrap();
+            let val = String::from_utf8_lossy(&output.stdout);
+            let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+            user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
         }
-    }
-    fn finished(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _session_lock: SessionLock,
-    ) {
-        println!("Session could not be locked");
-        self.is_locked = true;
-    }
-    fn configure(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _surface: SessionLockSurface,
-        _configure: SessionLockSurfaceConfigure,
-        _serial: u32,
-    ) {
-        self.converter_lock(qh);
-    }
-}
 
-pub fn run_lock(
-    mut lock: SpellLock,
-    mut event_loop: EventLoop<SpellLock>,
-    event_queue: EventQueue<SpellLock>,
-) -> Result<(), Box<dyn Error>> {
-    WaylandSource::new(lock.conn.clone(), event_queue)
-        .insert(lock.loop_handle.clone())
-        .unwrap();
+        let mut context = Context::new(
+            "login", // Service name
+            None,
+            Conversation::with_credentials(&user_name, password),
+        )?;
+        context.authenticate(Flag::NONE)?;
+        context.acct_mgmt(Flag::NONE)?;
 
-    loop {
-        event_loop
-            .dispatch(Duration::from_millis(1), &mut lock)
-            .unwrap();
-
-        // if lock.is_locked {
-        //     break;
-        // }
-    }
-}
-
-impl KeyboardHandler for SpellLock {
-    fn enter(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-        _serial: u32,
-        _raw: &[u32],
-        _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
-    ) {
-        println!("Keyboard focus entered");
-    }
-
-    fn leave(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-        _serial: u32,
-    ) {
-        println!("Keyboard focus left");
-    }
-
-    fn press_key(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _serial: u32,
-        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
-    ) {
-        println!("A key is pressed");
-        let string_val: SharedString = get_string(event);
-        println!("Value of key: {:?}", string_val);
-        self.slint_part.as_ref().unwrap().adapter[0]
-            .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap();
-    }
-
-    fn release_key(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _serial: u32,
-        mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
-    ) {
-        println!("A key is released");
-        let key_sym = Keysym::new(event.raw_code);
-        event.keysym = key_sym;
-        let string_val: SharedString = get_string(event);
-        self.slint_part.as_ref().unwrap().adapter[0]
-            .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
-            .unwrap();
-        // let value = event.keysym.key_char();
-        // if let Some(val) = value {
-        //     println!("Value getting out :{}", val);
-        //     self.adapter
-        //         .try_dispatch_event(WindowEvent::KeyReleased {
-        //             text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),
-        //         })
-        //         .unwrap();
-        // }
-    }
-
-    // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
-    fn update_modifiers(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _serial: u32,
-        _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
-        _layout: u32,
-    ) {
-    }
-
-    // TODO This method needs to be implemented after the looping mecha is changed to calloop.
-    fn update_repeat_info(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
-    ) {
-    }
-}
-
-impl SeatHandler for SpellLock {
-    fn seat_state(&mut self) -> &mut SeatState {
-        &mut self.seat_state
-    }
-
-    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-
-    fn new_capability(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_none() {
-            println!("Set keyboard capability");
-            let keyboard = self
-                .seat_state
-                .get_keyboard(qh, &seat, None)
-                .expect("Failed to create keyboard");
-            // let keyboard_data = KeyboardData::new(seat);
-            self.keyboard_state.board = Some(keyboard);
-            // TODO keyboard Data needs to be set later.
-            // self.keyboard_state.board_data = Some(keyboard_data::<Self>);
+        if let Some(locked_val) = self.session_lock.take() {
+            locked_val.unlock();
         }
-    }
+        self.conn.roundtrip().unwrap();
 
-    fn remove_capability(
-        &mut self,
-        _conn: &Connection,
-        _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_some() {
-            println!("Unset keyboard capability");
-            self.keyboard_state.board.take().unwrap().release();
-        }
+        Ok(())
     }
-
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
 delegate_keyboard!(SpellLock);

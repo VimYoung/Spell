@@ -1,4 +1,4 @@
-use crate::{dbus_window_state::second_client::open_internal_clinet, wayland_adapter::SpellWin};
+use crate::dbus_window_state::second_client::open_internal_clinet;
 use std::{
     any::Any,
     future::pending,

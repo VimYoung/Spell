@@ -300,12 +300,12 @@ fn get_desktop_id(file_path: &Path) -> String {
         if part == Component::Normal(OsStr::new("applications")) {
             app_index = index as i32;
         }
-        if index > app_index as usize {
-            if let Component::Normal(string_val) = part {
-                return_string_val.push_str(string_val.to_str().unwrap());
-                if !part.as_os_str().to_str().unwrap().ends_with(".desktop") {
-                    return_string_val.push('-');
-                }
+        if index > app_index as usize
+            && let Component::Normal(string_val) = part
+        {
+            return_string_val.push_str(string_val.to_str().unwrap());
+            if !part.as_os_str().to_str().unwrap().ends_with(".desktop") {
+                return_string_val.push('-');
             }
         }
     }
@@ -314,4 +314,7 @@ fn get_desktop_id(file_path: &Path) -> String {
 
 // TODO have to add break statements in for loops of above functions whene the desired
 // folder is found.
+// TODO Have to add binding for other side of application for following 2 tasks
+//  1. updating the list if new apps gets added (via traits).
+//  2. Providing a way to add category to which the apps belong, like games, config, tools etc.
 // TODO fix image path function so that it can find icons if app not present in /apps/

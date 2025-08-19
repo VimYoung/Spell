@@ -29,22 +29,23 @@ async fn main() -> Result<(), SpellError> {
     let conn = Connection::session().await?;
     let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
-        let return_value = match sub_command.as_str() {
+        let return_value = match sub_command.trim() {
             "--version" | "-v" => {
-                println!("spell-cli version 0.1.1");
+                println!("spell-cli version 0.1.2");
             Ok(())
             },
-            "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l `name` sub command".to_string()))),
+            "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l|--layer `name` sub command".to_string()))),
             "-l" | "--layer" => match values.next() {
                 Some(layer_value) => match values.next() {
-                    Some(sub_command_after_layer) => match sub_command_after_layer.as_str() {
+                    Some(sub_command_after_layer) => match sub_command_after_layer.trim() {
                         "update" => update_value(layer_value, values, proxy).await,
                         "look" => look_value(layer_value, values, proxy).await,
                         "show" => proxy.show_window_back(&layer_value).await,
                         "hide" => proxy.hide_window(&layer_value).await,
+                        "log" => get_logs(Some(layer_value), values).await,
                         _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
                     },
-                    None => Err(SpellError::CLI(Cli::NoSubCommand(
+                    None => Err(SpellError::CLI(Cli::UndefinedArg(
                         "provide a subcommand like 'update', 'look' etc".to_string(),
                     ))),
                 },
@@ -55,7 +56,18 @@ async fn main() -> Result<(), SpellError> {
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
             // TODO tracing subscriber logs here plus debug logs of slint here in sub commands.
-            "logs" => Ok(()),
+            "log" => match values.next() {
+                Some(log_type) =>  match log_type.trim() {
+                "-l" | "--layer" => match values.next() {
+                        Some(layer_name) => get_logs(Some(layer_name), values).await,
+                        None => Err(SpellError::CLI(Cli::UndefinedArg(
+                            "Provide the value of layer name".to_string(),
+                        ))),
+                    },
+                _ => get_logs(None, values).await,
+                },
+                None => Err(SpellError::CLI(Cli::UndefinedArg("define a layer name to display user logs".to_string())))
+            } ,
             // A later on added trait which can be configured and then running this command
             // Will display all the existing features of your shell as configured by the user.
             // So, when showcasing, he would only need to run this command once.
@@ -92,10 +104,8 @@ async fn main() -> Result<(), SpellError> {
                     Cli::UndefinedArg(err) => {
                         eprintln!("[Undefined Arg]: {err}");
                     }
-                    Cli::NoSubCommand(flag_val) => {
-                        eprintln!(
-                            "[No Sub-command]: The flag {flag_val} should be followed by a subcommand"
-                        );
+                    Cli::UnknownVal(err) => {
+                        eprintln!("[Unknown Value] {err}");
                     }
                 },
                 SpellError::Buserror(bus_error) => match bus_error {
@@ -126,6 +136,37 @@ async fn main() -> Result<(), SpellError> {
         }
     } else {
         let _ = show_help(None);
+    }
+    Ok(())
+}
+
+async fn get_logs(layer_name: Option<String>, mut values: Args) -> Result<(), SpellError> {
+    if let Some(layer_name) = layer_name {
+        match values.next() {
+            Some(debug_type) => match debug_type.trim() {
+                "slint_debug" => get_tracing_debug(LogType::Slint, layer_name),
+                "debug" => get_tracing_debug(LogType::Debug, layer_name),
+                "dump" => get_tracing_debug(LogType::Dump, layer_name),
+                "dev" => get_tracing_debug(LogType::Dev, layer_name),
+                x => Err(SpellError::CLI(Cli::UnknownVal(format!(
+                    "{x} is not a debug type.",
+                )))),
+            },
+            None => get_tracing_debug(LogType::Debug, layer_name),
+        }
+    } else {
+        Err(SpellError::CLI(Cli::UndefinedArg(
+            "define a layer name to display user logs".to_string(),
+        )))
+    }
+}
+
+fn get_tracing_debug(log_type: LogType, layer_name: String) -> Result<(), SpellError> {
+    match log_type {
+        LogType::Slint => {}
+        LogType::Debug => {}
+        LogType::Dump => {}
+        LogType::Dev => {}
     }
     Ok(())
 }
@@ -177,6 +218,13 @@ async fn update_value(
     }
 }
 
+enum LogType {
+    Slint,
+    Debug,
+    Dump,
+    Dev,
+}
+
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
 // Currently Buserror is not being used. THis requires type implementations
@@ -192,7 +240,7 @@ pub enum SpellError {
 pub enum Cli {
     BadSubCommand(String),
     UndefinedArg(String),
-    NoSubCommand(String),
+    UnknownVal(String),
 }
 
 impl From<zbus::Error> for SpellError {

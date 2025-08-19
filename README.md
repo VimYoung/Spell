@@ -5,6 +5,17 @@
 <h3 align="left">Make desktop widgets by the mystic arts of Spell  !!</h3>
 <hr>
 
+<p align="left">
+  <br />
+  <a href="https://github.com/VimYoung/Spell/issues">Report Bug</a>
+  ·
+  <a href="https://github.com/VimYoung/Spell/discussions">Request Feature</a>
+  ·
+  <a href="https://docs.rs/crate/spell-framework/">Wiki</a>
+  <br />
+  <br />
+</p>
+
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
 
@@ -13,6 +24,9 @@ a very easy but comprehensive way to make aesthetic interfaces. It, supports rus
 as backend, so as though there are not many batteries (for now) included
 in the framework itself, everything can be brought to life from the dark arts of
 rust.
+
+> [!IMPORTANT]
+> Please provide your inputs to improve Spell.
 
 ## When can we expect a stable release?
 
@@ -32,7 +46,7 @@ in rust.
 ## Installation and Usage
 
 > [!WARNING]
-> The crate is under active development and is not ready for use.
+> The crate is under active development and breaking changes are expected.
 
 I have released a version in crates.io . Hence, you can simply add spell by command, `cargo add spell-framework`.
 
@@ -56,6 +70,7 @@ slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }
 i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
+pam-sys = {git = "https://github.com/VimYoung/pam-sys"}
 ```
 
 and then replace the `main.rs` with following contents:

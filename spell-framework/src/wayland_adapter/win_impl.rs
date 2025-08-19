@@ -97,6 +97,7 @@ impl KeyboardHandler for SpellWin {
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
+
     fn update_modifiers(
         &mut self,
         _conn: &Connection,
@@ -104,10 +105,10 @@ impl KeyboardHandler for SpellWin {
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
         _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
         _layout: u32,
     ) {
     }
-
     // TODO This method needs to be implemented after the looping mecha is changed to calloop.
     fn update_repeat_info(
         &mut self,
@@ -115,6 +116,16 @@ impl KeyboardHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
+    ) {
+    }
+
+    fn repeat_key(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _serial: u32,
+        _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
     }
 }

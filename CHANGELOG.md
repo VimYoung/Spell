@@ -1,21 +1,22 @@
-0.1.6 (Due date) & 0.1.1 (CLI)
+0.1.5  & 0.1.1 CLI (25-08-19)
 ================
 
 Changes:
 
 - LOGO in docs and Readme. Also update the readme to include badges for docs and rust.
-- Add a notification implementation for spell framework.
+- Added skeletal structure for future implementations of services.
 - Added keyboard implementation for non word chars like TAB, ENTER etc.
   - Next release will implement repeated key for backspace.
 - Better docs for methods of SpellWin.
-- Add a timer in `forge`.
-- Add an implementation of lockscreen PAM APIs.
+- Added a lockscreen implementation with PAM backend APIs authenticate lockscreens.
+  - PAM bindings to rust have a known issue with newer versions of clang .I have opened
+  a PR for it, patch the package with git path from my profile till the PR is merged. Look
+  patches in README (in example) to copy the contents for necessary slint and pam-sys patches.
 
 Changes(spell-cli):
 
-- Improve cli for adding layer_name support in other sub commands.
-- Add docs for sub commands.
-- Add logs port in CLI.
+- Added version info in CLI.
+- Help statement for main CLI added.
 
 0.1.3 and 0.1.4 (25-08-10)
 ===============
