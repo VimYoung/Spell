@@ -168,7 +168,7 @@ pub fn run_lock(
         .insert(lock.loop_handle.clone())
         .unwrap();
 
-    loop {
+    while lock.is_locked {
         event_loop
             .dispatch(Duration::from_millis(1), &mut lock)
             .unwrap();
@@ -177,6 +177,7 @@ pub fn run_lock(
         //     break;
         // }
     }
+    Ok(())
 }
 
 impl KeyboardHandler for SpellLock {

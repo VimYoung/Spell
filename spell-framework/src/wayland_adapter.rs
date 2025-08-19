@@ -713,7 +713,7 @@ impl SpellLock {
             session_lock_state,
             session_lock,
             lock_surfaces,
-            is_locked: false,
+            is_locked: true,
         };
 
         let _ = event_queue.roundtrip(&mut spell_lock);
@@ -849,6 +849,7 @@ impl SpellLock {
         if let Some(locked_val) = self.session_lock.take() {
             locked_val.unlock();
         }
+        self.is_locked = false;
         self.conn.roundtrip().unwrap();
 
         Ok(())

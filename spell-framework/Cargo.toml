@@ -37,6 +37,9 @@ zbus = "5.7.1"
 no-default-features = true
 features = ["docs-only"]
 
+[patch.crates-io]
+pam-sys = { git = "https://github.com/VimYoung/pam-sys" }
+
 [features]
 default = ["i-slint-renderer-skia"]
 docs-only = []
