@@ -1,8 +1,11 @@
 use crate::shared_context::SharedCore;
+#[cfg(not(docsrs))]
+use crate::wayland_adapter::SpellLock;
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
 use std::{
     cell::Cell,
     cell::RefCell,
+    process::Command,
     rc::{Rc, Weak},
 };
 
@@ -11,6 +14,11 @@ use i_slint_renderer_skia::{
     skia_safe::{self, ColorType},
     software_surface::RenderBuffer,
 };
+
+#[cfg(feature = "pam")]
+pub use pam_client::Error as PamError;
+#[cfg(feature = "pam")]
+use pam_client::{Context, Flag, conv_mock::Conversation};
 
 #[cfg(feature = "i-slint-renderer-skia")]
 #[cfg(not(docsrs))]
@@ -159,6 +167,43 @@ impl SpellSkiaWinAdapterReal {
     // }
 }
 
+#[cfg(feature = "pam")]
+pub fn unlock(
+    mut lock: &mut SpellLock,
+    username: Option<&str>,
+    password: &str,
+) -> Result<(), PamError> {
+    let mut user_name = String::new();
+    if let Some(username) = username {
+        user_name = username.to_string();
+    } else {
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+            .output()
+            .expect("Couldn't retrive username");
+
+        let val = String::from_utf8_lossy(&output.stdout);
+        let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+        user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
+    }
+
+    let mut context = Context::new(
+        "login", // Service name
+        None,
+        Conversation::with_credentials(&user_name, password),
+    )?;
+    context.authenticate(Flag::NONE)?;
+    context.acct_mgmt(Flag::NONE)?;
+
+    if let Some(locked_val) = lock.session_lock.take() {
+        locked_val.unlock();
+    }
+    lock.is_locked = false;
+    lock.conn.roundtrip().unwrap();
+
+    Ok(())
+}
 // #[cfg(docsrs)]
 // use crate::dummy_skia_docs;
 //

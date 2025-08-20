@@ -19,7 +19,10 @@ i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
 owo-colors = "4.2.2"
-pam-client = { version = "0.5.0", features = ["rpassword", "cli"] }
+pam-client = { version = "0.5.0", features = [
+  "rpassword",
+  "cli",
+], optional = true }
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.3.18"
 slint = { version = "1.12.0", features = [
@@ -37,9 +40,11 @@ zbus = "5.7.1"
 no-default-features = true
 features = ["docs-only"]
 
-[patch.crates-io]
-pam-sys = { git = "https://github.com/VimYoung/pam-sys" }
+# [patch.crates-io]
+# pam-sys = { git = "https://github.com/VimYoung/pam-sys" }
 
 [features]
-default = ["i-slint-renderer-skia"]
+default = ["i-slint-renderer-skia", "slint", "pam"]
 docs-only = []
+pam = ["pam-client"]
+slint = ["i-slint-renderer-skia"]

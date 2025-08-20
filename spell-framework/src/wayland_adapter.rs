@@ -2,7 +2,6 @@
 //! across various functionalities for your shell. The most common widget (or
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
-use pam_client::{Context, Flag, conv_mock::Conversation};
 use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
@@ -33,7 +32,10 @@ use std::{
     cell::{Cell, RefCell},
     process::Command,
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        Arc, RwLock,
+        mpsc::{self, Receiver, Sender},
+    },
 };
 
 use crate::{
@@ -44,7 +46,11 @@ use crate::{
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
 pub use lock_impl::{SpellSlintLock, run_lock};
-pub use pam_client::Error as PamError;
+
+#[cfg(not(docsrs))]
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::skia_non_docs::{PamError, unlock};
+
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -135,7 +141,7 @@ impl SpellWin {
 
         let memory_manager = MemoryManager {
             wayland_buffer,
-            pool,
+            pool: Arc::new(RwLock::new(pool)),
         };
 
         let pointer_state = PointerState {
@@ -285,6 +291,8 @@ impl SpellWin {
         let height: u32 = self.size.height;
         let pool = &mut self.memory_manager.pool;
         let (wayland_buffer, _) = pool
+            .write()
+            .unwrap()
             .create_buffer(
                 width as i32,
                 height as i32,
@@ -822,37 +830,16 @@ impl SpellLock {
         // of the canvas.
     }
 
+    /// call this method to unlock Spelllock
+    #[cfg(docsrs)]
     pub fn unlock(&mut self, username: Option<&str>, password: &str) -> Result<(), PamError> {
-        let mut user_name = String::new();
-        if let Some(username) = username {
-            user_name = username.to_string();
-        } else {
-            let output = Command::new("sh")
-                .arg("-c")
-                .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
-                .output()
-                .expect("Couldn't retrive username");
-
-            let val = String::from_utf8_lossy(&output.stdout);
-            let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
-            user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
-        }
-
-        let mut context = Context::new(
-            "login", // Service name
-            None,
-            Conversation::with_credentials(&user_name, password),
-        )?;
-        context.authenticate(Flag::NONE)?;
-        context.acct_mgmt(Flag::NONE)?;
-
-        if let Some(locked_val) = self.session_lock.take() {
-            locked_val.unlock();
-        }
-        self.is_locked = false;
-        self.conn.roundtrip().unwrap();
-
         Ok(())
+    }
+
+    /// call this method to unlock Spelllock
+    #[cfg(not(docsrs))]
+    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> Result<(), PamError> {
+        unlock(self, username, password)
     }
 }
 

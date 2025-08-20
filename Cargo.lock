@@ -3441,7 +3441,8 @@ dependencies = [
 [[package]]
 name = "pam-sys"
 version = "1.0.0-alpha5"
-source = "git+https://github.com/VimYoung/pam-sys#cddb66f2e7d647d8842d8fd8326a2d05be4cc1aa"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce9484729b3e52c0bacdc5191cb6a6a5f31ef4c09c5e4ab1209d3340ad9e997b"
 dependencies = [
  "bindgen 0.69.5",
  "libc",

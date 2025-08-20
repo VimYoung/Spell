@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use slint::platform::{PlatformError, WindowEvent};
 use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 
@@ -19,7 +21,7 @@ impl SharedCore {
 #[derive(Debug)]
 pub struct MemoryManager {
     pub wayland_buffer: Buffer,
-    pub pool: SlotPool,
+    pub pool: Arc<RwLock<SlotPool>>,
 }
 
 fn get_spell_ingredients(width: u32, height: u32) -> Box<[u8]> {
