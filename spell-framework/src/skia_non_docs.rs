@@ -1,7 +1,13 @@
-use crate::shared_context::SharedCore;
 #[cfg(not(docsrs))]
 use crate::wayland_adapter::SpellLock;
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
+use smithay_client_toolkit::shm::slot::Buffer;
+#[cfg(not(docsrs))]
+#[cfg(feature = "i-slint-renderer-skia")]
+use smithay_client_toolkit::{
+    reexports::client::protocol::wl_shm,
+    shm::slot::{Slot, SlotPool},
+};
 use std::{
     cell::Cell,
     cell::RefCell,
@@ -23,8 +29,29 @@ use pam_client::{Context, Flag, conv_mock::Conversation};
 #[cfg(feature = "i-slint-renderer-skia")]
 #[cfg(not(docsrs))]
 pub struct SkiaSoftwareBufferReal {
-    pub core: Rc<RefCell<SharedCore>>,
+    pub primary_slot: Slot,
+    pub secondary_slot: RefCell<Slot>,
+    pub pool: Rc<RefCell<SlotPool>>,
     pub last_dirty_region: RefCell<Option<i_slint_core::item_rendering::DirtyRegion>>,
+}
+
+impl SkiaSoftwareBufferReal {
+    pub(crate) fn refresh_buffer(&self, width: u32, height: u32) -> Buffer {
+        let (wayland_buffer, _) = self
+            .pool
+            .borrow_mut()
+            .create_buffer(
+                width as i32,
+                height as i32,
+                (width * 4) as i32,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+        // TODO this was previously set, if rendering causes issues, uncomment this.
+        // self.set_config_internal();
+        *self.secondary_slot.borrow_mut() = wayland_buffer.slot();
+        wayland_buffer
+    }
 }
 
 #[allow(unused_variables)]
@@ -67,14 +94,37 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
         //     age = 0;
         //     SharedPixelBuffer::new(width.get(), height.get())
         // });
-        let native_buffer = &mut self.core.borrow_mut().primary_buffer;
+        let pool = &mut self.pool.borrow_mut();
+        // let mut native_buffer = {
+        //     let x = self.secondary_slot.borrow().canvas(pool).unwrap();
+        //     // creates a copy
+        //     x.to_vec()
+        // };
 
-        let bytes = bytemuck::cast_slice_mut(native_buffer);
-        *self.last_dirty_region.borrow_mut() =
-            render_callback(width, height, skia_safe::ColorType::BGRA8888, 1, bytes).unwrap();
+        // let bytes = bytemuck::cast_slice_mut(&mut native_buffer);
+        *self.last_dirty_region.borrow_mut() = render_callback(
+            width,
+            height,
+            skia_safe::ColorType::BGRA8888,
+            1,
+            self.secondary_slot.borrow_mut().canvas(pool).unwrap(),
+        )
+        .unwrap();
 
-        // *self.pixels.borrow_mut() = shared_pixel_buffer;
+        let native_buffer = {
+            let x = self.secondary_slot.borrow().canvas(pool).unwrap();
+            // creates a copy
+            x.to_vec()
+        };
+        // *self.secondary_slot.borrow_mut().canvas(pool).unwrap() = *native_buffer.as_slice();
 
+        // let mut sec_buffer = self.primary_slot.canvas(pool).unwrap();
+        let nv = native_buffer[649728..649738].to_vec();
+        // let mv = sec_buffer[649728..649738].to_vec();
+        println!("On iterations: {:?}", nv);
+        // println!("On iterations sec: {:?}", mv);
+        // core::mem::swap::<&mut [u8]>(&mut native_buffer.as_mut_slice(), &mut sec_buffer);
+        // println!("On iterations sec after: {:?}", mv);
         Ok(())
     }
 }
@@ -90,6 +140,7 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) window: Window,
     pub(crate) size: PhysicalSize,
     pub(crate) renderer: SkiaRenderer,
+    pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
 }
 
@@ -127,9 +178,17 @@ impl std::fmt::Debug for SpellSkiaWinAdapterReal {
 }
 
 impl SpellSkiaWinAdapterReal {
-    pub fn new(shared_core: Rc<RefCell<SharedCore>>, width: u32, height: u32) -> Rc<Self> {
+    pub fn new(
+        pool: Rc<RefCell<SlotPool>>,
+        primary_slot: Slot,
+        secondary_slot: RefCell<Slot>,
+        width: u32,
+        height: u32,
+    ) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBufferReal {
-            core: shared_core,
+            primary_slot,
+            secondary_slot,
+            pool,
             last_dirty_region: Default::default(),
         });
         let renderer = SkiaRenderer::new_with_surface(
@@ -140,6 +199,7 @@ impl SpellSkiaWinAdapterReal {
             window: slint::Window::new(w.clone()),
             size: PhysicalSize { width, height },
             renderer,
+            buffer_slint: buffer,
             needs_redraw: Cell::new(true),
         })
     }
@@ -204,15 +264,3 @@ pub fn unlock(
 
     Ok(())
 }
-// #[cfg(docsrs)]
-// use crate::dummy_skia_docs;
-//
-// #[cfg(feature = "i-slint-renderer-skia")]
-// #[cfg(not(docsrs))]
-// use crate::skia_non_docs::SkiaSoftwareBufferReal;
-//
-// #[cfg(not(docsrs))]
-// pub type SkiaSoftwareBuffer = SkiaSoftwareBufferReal;
-//
-// #[cfg(docsrs)]
-// pub type SkiaSoftwareBuffer = SkiaSoftwareBufferDummy;

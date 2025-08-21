@@ -16,6 +16,7 @@ use slint::{
         },
     },
 };
+use smithay_client_toolkit::shm::slot::Buffer;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -181,27 +182,29 @@ impl SpellMultiWinHandler {
     }
 
     fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
-        let length = self.adapter.len();
-        let core = &self.core[length];
-        if let LayerConf::Window(conf) = &self.windows[length].1 {
-            let adapter = SpellSkiaWinAdapter::new(core.clone(), conf.width, conf.height);
-            self.adapter.push(adapter.clone());
-            adapter
-        } else {
-            panic!("Panicked here");
-        }
+        // let length = self.adapter.len();
+        // let core = &self.core[length];
+        // if let LayerConf::Window(conf) = &self.windows[length].1 {
+        //     let adapter = SpellSkiaWinAdapter::new(core.clone(), conf.width, conf.height);
+        //     self.adapter.push(adapter.clone());
+        //     adapter
+        // } else {
+        //     panic!("Panicked here");
+        // }
+        todo!()
     }
 
-    fn request_new_lock(&mut self) -> Rc<dyn WindowAdapter> {
-        let length = self.adapter.len();
-        let core = &self.core[length];
-        if let LayerConf::Lock(width, height) = &self.windows[length].1 {
-            let adapter = SpellSkiaWinAdapter::new(core.clone(), *width, *height);
-            self.adapter.push(adapter.clone());
-            adapter
-        } else {
-            panic!("Panicked here");
-        }
+    fn request_new_lock(&self) -> Rc<dyn WindowAdapter> {
+        // let length = self.adapter.len();
+        // let core = &self.core[length];
+        // if let LayerConf::Lock(width, height) = &self.windows[length].1 {
+        //     let adapter = SpellSkiaWinAdapter::new(core.clone(), *width, *height);
+        //     self.adapter.push(adapter.clone());
+        //     adapter
+        // } else {
+        //     panic!("Panicked here");
+        // }
+        todo!()
     }
 }
 
@@ -227,5 +230,11 @@ impl EventAdapter for SpellSkiaWinAdapter {
         event: slint::platform::WindowEvent,
     ) -> Result<(), slint::PlatformError> {
         self.window.try_dispatch_event(event)
+    }
+
+    fn refersh_buffer(&self) -> Buffer {
+        let width: u32 = self.size.width;
+        let height: u32 = self.size.height;
+        self.buffer_slint.refresh_buffer(width, height)
     }
 }

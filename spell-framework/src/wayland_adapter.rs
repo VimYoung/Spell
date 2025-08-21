@@ -30,12 +30,8 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
-    process::Command,
     rc::Rc,
-    sync::{
-        Arc, RwLock,
-        mpsc::{self, Receiver, Sender},
-    },
+    sync::mpsc::{self, Receiver, Sender},
 };
 
 use crate::{
@@ -77,7 +73,6 @@ pub(crate) struct States {
 #[derive(Debug)]
 pub struct SpellWin {
     pub(crate) adapter: Rc<dyn EventAdapter>,
-    pub(crate) core: Rc<RefCell<SharedCore>>,
     pub(crate) size: PhysicalSize,
     pub(crate) memory_manager: MemoryManager,
     pub(crate) states: States,
@@ -130,7 +125,7 @@ impl SpellWin {
             None,
         );
         layer.commit();
-        let (wayland_buffer, _) = pool
+        let (way_pri_buffer, _) = pool
             .create_buffer(
                 window_conf.width as i32,
                 window_conf.height as i32,
@@ -139,9 +134,23 @@ impl SpellWin {
             )
             .expect("Creating Buffer");
 
+        let (way_sec_buffer, sec_can) = pool
+            .create_buffer(
+                window_conf.width as i32,
+                window_conf.height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+        let nv = sec_can[649728..649738].to_vec();
+        println!("On startup {:?}", nv);
+        let primary_slot = way_pri_buffer.slot();
+        let secondary_slot = way_sec_buffer.slot();
+        // let _ = way_pri_buffer.activate();
+        // let _ = way_sec_buffer.activate();
         let memory_manager = MemoryManager {
-            wayland_buffer,
-            pool: Arc::new(RwLock::new(pool)),
+            way_pri_buffer,
+            way_sec_buffer,
         };
 
         let pointer_state = PointerState {
@@ -165,8 +174,13 @@ impl SpellWin {
         });
 
         let adapter_value: Rc<SpellSkiaWinAdapter> = adapter.unwrap_or_else(|| {
-            let adapter_val =
-                SpellSkiaWinAdapter::new(core_val.clone(), window_conf.width, window_conf.height);
+            let adapter_val = SpellSkiaWinAdapter::new(
+                Rc::new(RefCell::new(pool)),
+                primary_slot,
+                RefCell::new(secondary_slot),
+                window_conf.width,
+                window_conf.height,
+            );
 
             let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
                 window_adapter: adapter_val.clone(),
@@ -175,7 +189,6 @@ impl SpellWin {
         });
         SpellWin {
             adapter: adapter_value,
-            core: core_val,
             size: PhysicalSize {
                 width: window_conf.width,
                 height: window_conf.height,
@@ -287,33 +300,8 @@ impl SpellWin {
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
     #[tracing::instrument]
     pub fn show_again(&mut self) {
-        let width: u32 = self.size.width;
-        let height: u32 = self.size.height;
-        let pool = &mut self.memory_manager.pool;
-        let (wayland_buffer, _) = pool
-            .write()
-            .unwrap()
-            .create_buffer(
-                width as i32,
-                height as i32,
-                (width * 4) as i32,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("Creating Buffer");
-        // TODO this was previously set, if rendering causes issues, uncomment this.
-        // self.set_config_internal();
-
-        // tracing::info!("tracing output: {}", buffer.canvas(pool).unwrap().len());
-        {
-            wayland_buffer
-                .canvas(pool)
-                .unwrap()
-                .iter_mut()
-                .enumerate()
-                .for_each(|(index, val)| {
-                    *val = self.core.borrow().primary_buffer[index];
-                });
-        }
+        let primary_buf = self.adapter.refersh_buffer();
+        self.memory_manager.way_pri_buffer = primary_buf;
         self.set_config_internal();
         self.is_hidden.set(false);
         self.layer.commit();
@@ -388,69 +376,58 @@ impl SpellWin {
 
         // Rendering from Skia
         if !self.is_hidden.get() {
-            // let skia_now = std::time::Instant::now();
+            // println!("Inside hidden");
+            let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
-            let pool = &mut self.memory_manager.pool;
-            let buffer = &self.memory_manager.wayland_buffer;
-            let primary_canvas = buffer.canvas(pool).unwrap();
-
-            // println!("{}", primary_canvas.len());
-            // Drawing the window
-            // let now = std::time::Instant::now();
-            if redraw_val || self.first_configure {
-                {
-                    primary_canvas
-                        .iter_mut()
-                        .enumerate()
-                        .for_each(|(index, val)| {
-                            *val = self.core.borrow().primary_buffer[index];
-                        });
-                }
-            }
-            // println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
-
-            // Damage the entire window
-            // if self.first_configure {
-            self.first_configure = false;
-            self.layer
-                .wl_surface()
-                .damage_buffer(0, 0, width as i32, height as i32);
-            // } else {
-            //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
-            //         // println!(
-            //         //     "{}, {}, {}, {}",
-            //         //     position.x, position.y, size.width as i32, size.height as i32,
-            //         // );
-            //         // if size.width != width && size.height != height {
-            //         self.layer.wl_surface().damage_buffer(
-            //             position.x,
-            //             position.y,
-            //             size.width as i32,
-            //             size.height as i32,
-            //         );
-            //         //}
-            //     }
+            // if redraw_val || self.first_configure {
+            // {
+            //     primary_canvas
+            //         .iter_mut()
+            //         .enumerate()
+            //         .for_each(|(index, val)| {
+            //             *val = self.core.borrow().primary_buffer[index];
+            //         });
             // }
-            // Request our next frame
-            self.layer
-                .wl_surface()
-                .frame(qh, self.layer.wl_surface().clone());
-            self.layer
-                .wl_surface()
-                .attach(Some(buffer.wl_buffer()), 0, 0);
+            //}
         } else {
-            // println!("Is_hidden is true.");
+            println!("Is_hidden is true.");
         }
 
-        self.layer.commit();
-        // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
-        // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
+        let buffer = &self.memory_manager.way_sec_buffer;
+        // println!("{:?}", buffer);
+        // println!("{:?}", &self.memory_manager.way_pri_buffer);
 
-        // TODO save and reuse buffer when the window size is unchanged.  This is especially
-        // useful if you do damage tracking, since you don't need to redraw the undamaged parts
-        // of the canvas.
+        // if self.first_configure {
+        self.first_configure = false;
+        self.layer
+            .wl_surface()
+            .damage_buffer(0, 0, width as i32, height as i32);
+        // } else {
+        //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+        //         // println!(
+        //         //     "{}, {}, {}, {}",
+        //         //     position.x, position.y, size.width as i32, size.height as i32,
+        //         // );
+        //         // if size.width != width && size.height != height {
+        //         self.layer.wl_surface().damage_buffer(
+        //             position.x,
+        //             position.y,
+        //             size.width as i32,
+        //             size.height as i32,
+        //         );
+        //         //}
+        //     }
+        // }
+        // Request our next frame
+        self.layer
+            .wl_surface()
+            .frame(qh, self.layer.wl_surface().clone());
+        self.layer
+            .wl_surface()
+            .attach(Some(buffer.wl_buffer()), 0, 0);
+        self.layer.commit();
     }
 
     /// Grabs the focus of keyboard. Can be used in combination with other functions
@@ -596,7 +573,7 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
-        // println!("Config event is called");
+        println!("Config event is called");
         if !self.first_configure {
             self.first_configure = true;
         } else {
