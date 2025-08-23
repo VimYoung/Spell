@@ -2,7 +2,7 @@
 //! across various functionalities for your shell. The most common widget (or
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
-use slint::PhysicalSize;
+use slint::{ComponentHandle, PhysicalSize, Window};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -26,7 +26,10 @@ use smithay_client_toolkit::{
             LayerSurfaceConfigure,
         },
     },
-    shm::{Shm, ShmHandler, slot::SlotPool},
+    shm::{
+        Shm, ShmHandler, multi,
+        slot::{Buffer, Slot, SlotPool},
+    },
 };
 use std::{
     cell::{Cell, RefCell},
@@ -37,7 +40,6 @@ use std::{
 use crate::{
     Handle,
     configure::{LayerConf, WindowConf},
-    shared_context::{EventAdapter, MemoryManager, SharedCore},
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
@@ -72,9 +74,9 @@ pub(crate) struct States {
 /// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
 #[derive(Debug)]
 pub struct SpellWin {
-    pub(crate) adapter: Rc<dyn EventAdapter>,
+    pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     pub(crate) size: PhysicalSize,
-    pub(crate) memory_manager: MemoryManager,
+    pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: LayerSurface,
     pub(crate) first_configure: bool,
@@ -88,12 +90,11 @@ pub struct SpellWin {
 }
 
 impl SpellWin {
-    fn create_window(
+    pub(crate) fn create_window(
         conn: &Connection,
         window_conf: WindowConf,
         layer_name: String,
-        adapter: Option<Rc<SpellSkiaWinAdapter>>,
-        core: Option<Rc<RefCell<SharedCore>>>,
+        if_single: bool,
     ) -> Self {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
@@ -134,24 +135,7 @@ impl SpellWin {
             )
             .expect("Creating Buffer");
 
-        let (way_sec_buffer, sec_can) = pool
-            .create_buffer(
-                window_conf.width as i32,
-                window_conf.height as i32,
-                stride,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("Creating Buffer");
-        let nv = sec_can[649728..649738].to_vec();
-        println!("On startup {:?}", nv);
         let primary_slot = way_pri_buffer.slot();
-        let secondary_slot = way_sec_buffer.slot();
-        // let _ = way_pri_buffer.activate();
-        // let _ = way_sec_buffer.activate();
-        let memory_manager = MemoryManager {
-            way_pri_buffer,
-            way_sec_buffer,
-        };
 
         let pointer_state = PointerState {
             pointer: None,
@@ -164,36 +148,26 @@ impl SpellWin {
             board_data: None,
         };
 
-        // These 2 unwrap or else statements are not connected programmitically
-        // though I know that either both will be none or both will have some value.
-        let core_val: Rc<RefCell<SharedCore>> = core.unwrap_or_else(|| {
-            Rc::new(RefCell::new(SharedCore::new(
-                window_conf.width,
-                window_conf.height,
-            )))
-        });
+        let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
+            Rc::new(RefCell::new(pool)),
+            RefCell::new(primary_slot),
+            window_conf.width,
+            window_conf.height,
+        );
 
-        let adapter_value: Rc<SpellSkiaWinAdapter> = adapter.unwrap_or_else(|| {
-            let adapter_val = SpellSkiaWinAdapter::new(
-                Rc::new(RefCell::new(pool)),
-                primary_slot,
-                RefCell::new(secondary_slot),
-                window_conf.width,
-                window_conf.height,
-            );
-
+        if if_single {
             let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
-                window_adapter: adapter_val.clone(),
+                window_adapter: adapter_value.clone(),
             }));
-            adapter_val
-        });
+        }
+
         SpellWin {
             adapter: adapter_value,
             size: PhysicalSize {
                 width: window_conf.width,
                 height: window_conf.height,
             },
-            memory_manager,
+            buffer: way_pri_buffer,
             states: States {
                 registry_state: RegistryState::new(&globals),
                 seat_state: SeatState::new(&globals, &qh),
@@ -221,52 +195,6 @@ impl SpellWin {
         tx
     }
 
-    /// This function is finally called to create instances of windows (in a multi
-    /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
-    /// event loop.
-    ///
-    /// # Panics
-    ///
-    /// It is important to call this function "after" the windows are created on the slint
-    /// side to avoid its panicking. If the number of slint initialised windows are not
-    /// same to the number of window_confs provided, then the code will panic.
-    pub fn conjure_spells(
-        windows: Rc<RefCell<SpellMultiWinHandler>>,
-        // current_display_specs: Vec<(usize, usize, usize, usize)>,
-    ) -> Vec<Self> {
-        let mut win_and_queue = Vec::new();
-        // for handler in windows.borrow()
-        let window_length = windows.borrow().windows.len();
-        let adapter_length = windows.borrow().adapter.len();
-        let core_length = windows.borrow().core.len();
-        if window_length == adapter_length && adapter_length == core_length {
-            let conn = Connection::connect_to_env().unwrap();
-            windows
-                .borrow()
-                .adapter
-                .iter()
-                .enumerate()
-                .for_each(|(index, val)| {
-                    if let LayerConf::Window(window_conf) = &windows.borrow().windows[index].1 {
-                        win_and_queue.push(SpellWin::create_window(
-                            &conn,
-                            window_conf.clone(),
-                            windows.borrow().windows[index].0.clone(),
-                            // current_display_specs[index],
-                            Some(val.clone()),
-                            Some(windows.borrow().core[index].clone()),
-                        ));
-                    }
-                });
-        } else {
-            panic!(
-                "The length of window configs and shared cores is not equal to activated windows, {} {} {}",
-                window_length, core_length, adapter_length
-            );
-        }
-        win_and_queue
-    }
-
     /// This function is called to create a instance of window. This window is then
     /// finally called by [`cast_spell`](crate::cast_spell) event loop.
     ///
@@ -281,14 +209,7 @@ impl SpellWin {
     ) -> Self {
         // Initialisation of wayland components.
         let conn = Connection::connect_to_env().unwrap();
-        SpellWin::create_window(
-            &conn,
-            window_conf.clone(),
-            name.to_string(),
-            // current_display_specs,
-            None,
-            None,
-        )
+        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true)
     }
 
     /// Hides the layer (aka the widget) if it is visible in screen.
@@ -301,7 +222,7 @@ impl SpellWin {
     #[tracing::instrument]
     pub fn show_again(&mut self) {
         let primary_buf = self.adapter.refersh_buffer();
-        self.memory_manager.way_pri_buffer = primary_buf;
+        self.buffer = primary_buf;
         self.set_config_internal();
         self.is_hidden.set(false);
         self.layer.commit();
@@ -376,57 +297,45 @@ impl SpellWin {
 
         // Rendering from Skia
         if !self.is_hidden.get() {
-            // println!("Inside hidden");
-            let skia_now = std::time::Instant::now();
+            // let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
-            // if redraw_val || self.first_configure {
-            // {
-            //     primary_canvas
-            //         .iter_mut()
-            //         .enumerate()
-            //         .for_each(|(index, val)| {
-            //             *val = self.core.borrow().primary_buffer[index];
-            //         });
-            // }
-            //}
+            let buffer = &self.buffer;
+            if self.first_configure || redraw_val {
+                // if self.first_configure {
+                self.first_configure = false;
+                self.layer
+                    .wl_surface()
+                    .damage_buffer(0, 0, width as i32, height as i32);
+                // } else {
+                //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+                //         // println!(
+                //         //     "{}, {}, {}, {}",
+                //         //     position.x, position.y, size.width as i32, size.height as i32,
+                //         // );
+                //         // if size.width != width && size.height != height {
+                //         self.layer.wl_surface().damage_buffer(
+                //             position.x,
+                //             position.y,
+                //             size.width as i32,
+                //             size.height as i32,
+                //         );
+                //         //}
+                //     }
+                // }
+                // Request our next frame
+                self.layer
+                    .wl_surface()
+                    .attach(Some(buffer.wl_buffer()), 0, 0);
+            }
         } else {
-            println!("Is_hidden is true.");
+            // println!("Is_hidden is true.");
         }
 
-        let buffer = &self.memory_manager.way_sec_buffer;
-        // println!("{:?}", buffer);
-        // println!("{:?}", &self.memory_manager.way_pri_buffer);
-
-        // if self.first_configure {
-        self.first_configure = false;
-        self.layer
-            .wl_surface()
-            .damage_buffer(0, 0, width as i32, height as i32);
-        // } else {
-        //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
-        //         // println!(
-        //         //     "{}, {}, {}, {}",
-        //         //     position.x, position.y, size.width as i32, size.height as i32,
-        //         // );
-        //         // if size.width != width && size.height != height {
-        //         self.layer.wl_surface().damage_buffer(
-        //             position.x,
-        //             position.y,
-        //             size.width as i32,
-        //             size.height as i32,
-        //         );
-        //         //}
-        //     }
-        // }
-        // Request our next frame
         self.layer
             .wl_surface()
             .frame(qh, self.layer.wl_surface().clone());
-        self.layer
-            .wl_surface()
-            .attach(Some(buffer.wl_buffer()), 0, 0);
         self.layer.commit();
     }
 
@@ -573,7 +482,7 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
-        println!("Config event is called");
+        // println!("Config event is called");
         if !self.first_configure {
             self.first_configure = true;
         } else {
@@ -648,17 +557,11 @@ pub struct SpellLock {
     pub(crate) session_lock: Option<SessionLock>,
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
-    pub(crate) pool: Option<SlotPool>,
     pub(crate) is_locked: bool,
 }
 
 impl SpellLock {
-    pub fn invoke_lock_spell() -> (
-        Self,
-        EventLoop<'static, SpellLock>,
-        EventQueue<SpellLock>,
-        Rc<RefCell<SpellMultiWinHandler>>,
-    ) {
+    pub fn invoke_lock_spell() -> (Self, EventLoop<'static, SpellLock>, EventQueue<SpellLock>) {
         let conn = Connection::connect_to_env().unwrap();
 
         let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
@@ -694,7 +597,6 @@ impl SpellLock {
             seat_state: SeatState::new(&globals, &qh),
             slint_part: None,
             shm,
-            pool: None,
             session_lock_state,
             session_lock,
             lock_surfaces,
@@ -720,21 +622,80 @@ impl SpellLock {
             let lock_surface = session_lock.create_lock_surface(surface, &output, &qh);
             spell_lock.lock_surfaces.push(lock_surface);
         }
-        // spell_lock.lock_surfaces[0].wl_surface().set_
-
         let multi_handler = SpellMultiWinHandler::new_lock(win_handler_vec);
+        let sizes: Vec<PhysicalSize> = multi_handler
+            .borrow()
+            .windows
+            .iter()
+            .map(|(_, conf)| {
+                if let LayerConf::Lock(width, height) = conf {
+                    PhysicalSize {
+                        width: *width,
+                        height: *height,
+                    }
+                } else {
+                    panic!("Shouldn't enter here");
+                }
+            })
+            .collect();
+
+        let mut pool = SlotPool::new(
+            (sizes[0].width * sizes[0].height * 4) as usize,
+            &spell_lock.shm,
+        )
+        .expect("Couldn't create pool");
+        let mut buffer_slots: Vec<RefCell<Slot>> = Vec::new();
+        let buffers: Vec<Buffer> = sizes
+            .iter()
+            .map(|physical_size| {
+                let stride = physical_size.width as i32 * 4;
+                let (wayland_buffer, _) = pool
+                    .create_buffer(
+                        physical_size.width as i32,
+                        physical_size.height as i32,
+                        stride,
+                        wl_shm::Format::Argb8888,
+                    )
+                    .expect("Creating Buffer");
+                buffer_slots.push(RefCell::new(wayland_buffer.slot()));
+                wayland_buffer
+            })
+            .collect();
+
+        let pool: Rc<RefCell<SlotPool>> = Rc::new(RefCell::new(pool));
+        let mut adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
+        buffer_slots
+            .into_iter()
+            .enumerate()
+            .for_each(|(index, slot)| {
+                let adapter = SpellSkiaWinAdapter::new(
+                    pool.clone(),
+                    slot,
+                    sizes[index].width,
+                    sizes[index].height,
+                );
+                adapters.push(adapter);
+            });
+
+        multi_handler.borrow_mut().adapter = adapters.clone();
+        spell_lock.slint_part = Some(SpellSlintLock {
+            adapters,
+            size: sizes,
+            wayland_buffer: buffers,
+        });
 
         let _ = slint::platform::set_platform(Box::new(SpellLockShell {
-            window_manager: multi_handler.clone(),
+            window_manager: multi_handler,
         }));
-        (spell_lock, loop_handle, event_queue, multi_handler)
+
+        (spell_lock, loop_handle, event_queue)
     }
 
     fn converter_lock(&mut self, qh: &QueueHandle<Self>) {
         slint::platform::update_timers_and_animations();
         let width: u32 = self.slint_part.as_ref().unwrap().size[0].width;
         let height: u32 = self.slint_part.as_ref().unwrap().size[0].height;
-        let window_adapter = self.slint_part.as_ref().unwrap().adapter[0].clone();
+        let window_adapter = self.slint_part.as_ref().unwrap().adapters[0].clone();
 
         // Rendering from Skia
         // if self.is_locked {
@@ -742,29 +703,7 @@ impl SpellLock {
         let redraw_val: bool = window_adapter.draw_if_needed();
         // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
-        let pool = &mut self.pool.as_mut().unwrap();
         let buffer = &self.slint_part.as_ref().unwrap().wayland_buffer[0];
-        let primary_canvas = buffer.canvas(pool).unwrap();
-
-        // println!("{}", primary_canvas.len());
-        // Drawing the window
-        // let now = std::time::Instant::now();
-        if redraw_val
-        /*|| self.first_configure*/
-        {
-            {
-                primary_canvas
-                    .iter_mut()
-                    .enumerate()
-                    .for_each(|(index, val)| {
-                        *val = self.slint_part.as_ref().unwrap().cores[0]
-                            .borrow()
-                            .primary_buffer[index];
-                    });
-            }
-        }
-        // println!("Normal Elapsed Time: {}", now.elapsed().as_millis());
-
         // Damage the entire window
         // if self.first_configure {
         // self.first_configure = false;
@@ -827,6 +766,7 @@ delegate_shm!(SpellLock);
 delegate_registry!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
+// TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

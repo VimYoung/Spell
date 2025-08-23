@@ -3,10 +3,7 @@ use smithay_client_toolkit::{
     compositor::CompositorHandler,
     output::{OutputHandler, OutputState},
     reexports::{
-        calloop::{
-            EventLoop,
-            timer::{TimeoutAction, Timer},
-        },
+        calloop::EventLoop,
         calloop_wayland_source::WaylandSource,
         client::{
             Connection, EventQueue, QueueHandle,
@@ -20,8 +17,7 @@ use smithay_client_toolkit::{
         keyboard::{KeyboardHandler, Keysym},
     },
     session_lock::{
-        SessionLock, SessionLockHandler, SessionLockState, SessionLockSurface,
-        SessionLockSurfaceConfigure,
+        SessionLock, SessionLockHandler, SessionLockSurface, SessionLockSurfaceConfigure,
     },
     shm::{
         Shm, ShmHandler,
@@ -32,8 +28,7 @@ use std::{cell::RefCell, error::Error, rc::Rc, time::Duration};
 
 use crate::{
     configure::LayerConf,
-    shared_context::{EventAdapter, SharedCore},
-    slint_adapter::SpellMultiWinHandler,
+    slint_adapter::{SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::{SpellLock, way_helper::get_string},
 };
 
@@ -216,7 +211,7 @@ impl KeyboardHandler for SpellLock {
         println!("A key is pressed");
         let string_val: SharedString = get_string(event);
         println!("Value of key: {:?}", string_val);
-        self.slint_part.as_ref().unwrap().adapter[0]
+        self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap();
     }
@@ -233,7 +228,7 @@ impl KeyboardHandler for SpellLock {
         let key_sym = Keysym::new(event.raw_code);
         event.keysym = key_sym;
         let string_val: SharedString = get_string(event);
-        self.slint_part.as_ref().unwrap().adapter[0]
+        self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
             .unwrap();
         // let value = event.keysym.key_char();
@@ -326,71 +321,70 @@ impl SeatHandler for SpellLock {
 /// It is an internal struct used by [`SpellLock`] internally. After the window is initialised,
 /// this struct's [build](`SpellSlintLock::build`) is used to complete the lock making process.
 pub struct SpellSlintLock {
-    pub(crate) adapter: Vec<Rc<dyn EventAdapter>>,
-    pub(crate) cores: Vec<Rc<RefCell<SharedCore>>>,
+    pub(crate) adapters: Vec<Rc<SpellSkiaWinAdapter>>,
     pub(crate) size: Vec<PhysicalSize>,
     pub(crate) wayland_buffer: Vec<Buffer>,
 }
 
-impl SpellSlintLock {
-    /// Used to complete the lock making process after the initialisation of your slint windows.
-    /// This method takes SpellLock's mutable reference along with the window handler to complete
-    /// the lock creation process by setting appropriate slint properties.
-    pub fn build(spell_lock: &mut SpellLock, multi_handler: Rc<RefCell<SpellMultiWinHandler>>) {
-        let adapter_length = multi_handler.borrow().adapter.len();
-        let window_length = multi_handler.borrow().windows.len();
-        if adapter_length == window_length {
-            let sizes: Vec<PhysicalSize> = multi_handler
-                .borrow()
-                .windows
-                .iter()
-                .map(|(_, conf)| {
-                    if let LayerConf::Lock(width, height) = conf {
-                        PhysicalSize {
-                            width: *width,
-                            height: *height,
-                        }
-                    } else {
-                        panic!("Shouldn't enter here");
-                    }
-                })
-                .collect();
-            // TODO This hould be passed with the max dimensions of the monitors.
-            let mut pool = SlotPool::new(
-                (sizes[0].width * sizes[0].height * 4) as usize,
-                &spell_lock.shm,
-            )
-            .expect("COuldn't create pool");
-
-            let buffers: Vec<Buffer> = sizes
-                .iter()
-                .map(|physical_size| {
-                    let stride = physical_size.width as i32 * 4;
-                    let (wayland_buffer, _) = pool
-                        .create_buffer(
-                            physical_size.width as i32,
-                            physical_size.height as i32,
-                            stride,
-                            wl_shm::Format::Argb8888,
-                        )
-                        .expect("Creating Buffer");
-                    wayland_buffer
-                })
-                .collect();
-
-            spell_lock.pool = Some(pool);
-            let adapter = multi_handler.borrow().adapter.clone();
-            spell_lock.slint_part = Some(SpellSlintLock {
-                adapter: adapter
-                    .into_iter()
-                    .map(|vl| vl as Rc<dyn EventAdapter>)
-                    .collect(),
-                cores: multi_handler.borrow().core.clone(),
-                size: sizes,
-                wayland_buffer: buffers,
-            })
-        } else {
-            panic!("No of initialised window is not equal to no of outputs");
-        }
-    }
-}
+// impl SpellSlintLock {
+//     /// Used to complete the lock making process after the initialisation of your slint windows.
+//     /// This method takes SpellLock's mutable reference along with the window handler to complete
+//     /// the lock creation process by setting appropriate slint properties.
+//     pub fn build(spell_lock: &mut SpellLock, multi_handler: Rc<RefCell<SpellMultiWinHandler>>) {
+//         let adapter_length = multi_handler.borrow().adapter.len();
+//         let window_length = multi_handler.borrow().windows.len();
+//         if adapter_length == window_length {
+//             let sizes: Vec<PhysicalSize> = multi_handler
+//                 .borrow()
+//                 .windows
+//                 .iter()
+//                 .map(|(_, conf)| {
+//                     if let LayerConf::Lock(width, height) = conf {
+//                         PhysicalSize {
+//                             width: *width,
+//                             height: *height,
+//                         }
+//                     } else {
+//                         panic!("Shouldn't enter here");
+//                     }
+//                 })
+//                 .collect();
+//             // TODO This hould be passed with the max dimensions of the monitors.
+//             let mut pool = SlotPool::new(
+//                 (sizes[0].width * sizes[0].height * 4) as usize,
+//                 &spell_lock.shm,
+//             )
+//             .expect("COuldn't create pool");
+//
+//             let buffers: Vec<Buffer> = sizes
+//                 .iter()
+//                 .map(|physical_size| {
+//                     let stride = physical_size.width as i32 * 4;
+//                     let (wayland_buffer, _) = pool
+//                         .create_buffer(
+//                             physical_size.width as i32,
+//                             physical_size.height as i32,
+//                             stride,
+//                             wl_shm::Format::Argb8888,
+//                         )
+//                         .expect("Creating Buffer");
+//                     wayland_buffer
+//                 })
+//                 .collect();
+//
+//             let adapter = multi_handler.borrow().adapter.clone();
+//             // spell_lock.slint_part = Some(SpellSlintLock {
+//             //     adapter: adapter
+//             //         .into_iter()
+//             //         .map(|vl| vl as Rc<dyn EventAdapter>)
+//             //         .collect(),
+//             //     cores: multi_handler.borrow().core.clone(),
+//             //     size: sizes,
+//             //     wayland_buffer: buffers,
+//             // })
+//             todo!();
+//         } else {
+//             panic!("No of initialised window is not equal to no of outputs");
+//         }
+//     }
+// }

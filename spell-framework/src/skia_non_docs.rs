@@ -21,16 +21,15 @@ use i_slint_renderer_skia::{
     software_surface::RenderBuffer,
 };
 
-#[cfg(feature = "pam")]
-pub use pam_client::Error as PamError;
-#[cfg(feature = "pam")]
-use pam_client::{Context, Flag, conv_mock::Conversation};
+// #[cfg(feature = "pam-client2")]
+use pam_client2_fork::{Context, Flag, conv_mock::Conversation};
+// #[cfg(feature = "pam-client2")]
+pub use pam_client2_fork::Error as PamError;
 
 #[cfg(feature = "i-slint-renderer-skia")]
 #[cfg(not(docsrs))]
 pub struct SkiaSoftwareBufferReal {
-    pub primary_slot: Slot,
-    pub secondary_slot: RefCell<Slot>,
+    pub primary_slot: RefCell<Slot>,
     pub pool: Rc<RefCell<SlotPool>>,
     pub last_dirty_region: RefCell<Option<i_slint_core::item_rendering::DirtyRegion>>,
 }
@@ -49,7 +48,7 @@ impl SkiaSoftwareBufferReal {
             .expect("Creating Buffer");
         // TODO this was previously set, if rendering causes issues, uncomment this.
         // self.set_config_internal();
-        *self.secondary_slot.borrow_mut() = wayland_buffer.slot();
+        *self.primary_slot.borrow_mut() = wayland_buffer.slot();
         wayland_buffer
     }
 }
@@ -107,12 +106,12 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
             height,
             skia_safe::ColorType::BGRA8888,
             1,
-            self.secondary_slot.borrow_mut().canvas(pool).unwrap(),
+            self.primary_slot.borrow_mut().canvas(pool).unwrap(),
         )
         .unwrap();
 
         let native_buffer = {
-            let x = self.secondary_slot.borrow().canvas(pool).unwrap();
+            let x = self.primary_slot.borrow().canvas(pool).unwrap();
             // creates a copy
             x.to_vec()
         };
@@ -180,14 +179,12 @@ impl std::fmt::Debug for SpellSkiaWinAdapterReal {
 impl SpellSkiaWinAdapterReal {
     pub fn new(
         pool: Rc<RefCell<SlotPool>>,
-        primary_slot: Slot,
-        secondary_slot: RefCell<Slot>,
+        primary_slot: RefCell<Slot>,
         width: u32,
         height: u32,
     ) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBufferReal {
             primary_slot,
-            secondary_slot,
             pool,
             last_dirty_region: Default::default(),
         });
@@ -204,13 +201,30 @@ impl SpellSkiaWinAdapterReal {
         })
     }
 
-    pub fn draw(&self) -> bool {
+    fn draw(&self) -> bool {
         if self.needs_redraw.replace(false) {
             self.renderer.render().unwrap();
             true
         } else {
             false
         }
+    }
+
+    pub(crate) fn draw_if_needed(&self) -> bool {
+        self.draw()
+    }
+
+    pub(crate) fn try_dispatch_event(
+        &self,
+        event: slint::platform::WindowEvent,
+    ) -> Result<(), slint::PlatformError> {
+        self.window.try_dispatch_event(event)
+    }
+
+    pub(crate) fn refersh_buffer(&self) -> Buffer {
+        let width: u32 = self.size.width;
+        let height: u32 = self.size.height;
+        self.buffer_slint.refresh_buffer(width, height)
     }
 
     // fn last_dirty_region_bounding_box_size(&self) -> Option<slint::LogicalSize> {
@@ -227,7 +241,7 @@ impl SpellSkiaWinAdapterReal {
     // }
 }
 
-#[cfg(feature = "pam")]
+// #[cfg(feature = "pam-client2")]
 pub fn unlock(
     mut lock: &mut SpellLock,
     username: Option<&str>,

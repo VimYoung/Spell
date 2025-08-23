@@ -11,6 +11,6 @@ slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }
 i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
-pam-sys = { path = "../pam-sys/" }
+# pam-sys = { path = "../pam-sys/" }
 # pam-sys = { package = "pam-sys-fork", version = "1.0.0-alpha5" }
 # pam-sys = { git = "https://github.com/VimYoung/pam-sys-fork", branch = "master" }

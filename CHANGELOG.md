@@ -4,6 +4,7 @@
 Changes:
 
 - LOGO in docs and Readme. Also update the readme to include badges for docs and rust.
+- Massive performance improvements in rendering per frame for lock, multi-window setup single window setup.
 - Added skeletal structure for future implementations of services.
 - Added keyboard implementation for non word chars like TAB, ENTER etc.
   - Next release will implement repeated key for backspace.

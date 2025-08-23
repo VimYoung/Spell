@@ -1,6 +1,6 @@
 fn main() {
-    use pam_client::conv_mock::Conversation;
-    use pam_client::{Context, Flag}; // Non-interactive implementation
+    use pam_client2_fork::conv_mock::Conversation;
+    use pam_client2_fork::{Context, Flag}; // Non-interactive implementation
 
     let mut context = Context::new(
         "login", // Service name

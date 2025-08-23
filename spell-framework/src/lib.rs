@@ -12,10 +12,10 @@ mod dbus_window_state;
 #[cfg(docsrs)]
 mod dummy_skia_docs;
 pub mod forge;
-mod shared_context;
 #[cfg(feature = "i-slint-renderer-skia")]
-#[doc(hidden)]
+// #[cfg(feature = "pam-client2")]
 #[cfg(not(docsrs))]
+#[doc(hidden)]
 mod skia_non_docs;
 pub mod slint_adapter;
 pub mod vault;
@@ -256,8 +256,6 @@ fn report_error(error_value: DispatchError) {
 }
 // TODO it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
-// TODO make the state and callback optional, so that if someone don't want to
-// implement state, they wouldn't.
 // TODO see if the above loop can be replaced by callloop for better idomicity and
 // performance in any sense.
 // TODO The project should have a live preview feature. It can be made by leveraging
@@ -268,7 +266,6 @@ fn report_error(error_value: DispatchError) {
 // TODO needs to have multi monitor support.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
-// TODO scroll action is not implemented in Pointer touch event.
 // A Bug effects multi widget setup where is invoke_callback is called, first draw
 // keeps on drawing on the closed window, can only be debugged after window wise logs
 // are enabled. example is saved in a bin file called bug_multi.rs
@@ -276,3 +273,4 @@ fn report_error(error_value: DispatchError) {
 // present. To check causes for errors as well as before implenenting muliple layers in same
 // window.
 // TODO lock screen behaviour in a multi-monitor setup needs to be tested.
+// TODO merge cast_Spell with run_lock after implementing calloop in normal windows.

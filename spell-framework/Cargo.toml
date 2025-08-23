@@ -9,7 +9,6 @@ keywords = ["widget", "rice", "spell", "slint", "wayland"]
 exclude = ["/src/bin/*"]
 
 [dependencies]
-bytemuck = "1.23.1"
 env_logger = "0.11.7"
 event-listener = "5.4.0"
 fs2 = "0.4.3"
@@ -19,7 +18,7 @@ i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
 owo-colors = "4.2.2"
-pam-client = { version = "0.5.0", features = [
+pam-client2-fork = { version = "0.5.2", features = [
   "rpassword",
   "cli",
 ], optional = true }
@@ -40,11 +39,8 @@ zbus = "5.7.1"
 no-default-features = true
 features = ["docs-only"]
 
-# [patch.crates-io]
-# pam-sys = { git = "https://github.com/VimYoung/pam-sys" }
-
 [features]
-default = ["i-slint-renderer-skia", "slint", "pam"]
+default = ["i-slint-renderer-skia", "pam"]
 docs-only = []
-pam = ["pam-client"]
+pam = ["pam-client2-fork"]
 slint = ["i-slint-renderer-skia"]

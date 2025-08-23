@@ -4,7 +4,7 @@
 //! set by the user of library in intial iterations of spell_framework.
 use crate::{
     configure::{LayerConf, WindowConf},
-    shared_context::{EventAdapter, SharedCore},
+    wayland_adapter::SpellWin,
 };
 use slint::{
     PhysicalSize, Window,
@@ -16,7 +16,7 @@ use slint::{
         },
     },
 };
-use smithay_client_toolkit::shm::slot::Buffer;
+use smithay_client_toolkit::reexports::client::Connection;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -114,15 +114,9 @@ impl Platform for SpellLayerShell {
 }
 
 /// This struct needs to be set when multiple windows are to be started together. It is
-/// used in combination with [`conjure_spells`](crate::wayland_adapter::SpellWin::conjure_spells)
+/// used in combination with [`conjure_spells`](crate::slint_adapter::SpellMultiWinHandler::conjure_spells)
 /// and is required to be set before any other initialisation with an instance of [SpellMultiWinHandler].
-/// It implements slint's [Platform](https://docs.rs/slint/latest/slint/platform/trait.Platform.html) trait.
-/// Example of setting it is as follows:
-/// ```rust
-/// slint::platform::set_platform(Box::new(SpellMultiLayerShell {
-///     window_manager: windows_handler.clone(),
-/// })).unwrap();
-/// ```
+/// It implements slint's [Platform](https://docs.rs/slint/latest/slint/platform/trait.Platform.html) trait and is set internally.
 pub struct SpellMultiLayerShell {
     /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
@@ -141,26 +135,39 @@ impl Platform for SpellMultiLayerShell {
 pub struct SpellMultiWinHandler {
     pub(crate) windows: Vec<(String, LayerConf)>,
     pub(crate) adapter: Vec<Rc<SpellSkiaWinAdapter>>,
-    pub(crate) core: Vec<Rc<RefCell<SharedCore>>>,
+    pub(crate) value_given: u32,
 }
 
 impl SpellMultiWinHandler {
-    pub fn new(windows: Vec<(&str, WindowConf)>) -> Rc<RefCell<Self>> {
+    /// This function is finally called to create instances of windows (in a multi
+    /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
+    /// event loop.
+    pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
+        let conn = Connection::connect_to_env().unwrap();
         let new_windows: Vec<(String, LayerConf)> = windows
             .iter()
             .map(|(layer_name, conf)| (layer_name.to_string(), LayerConf::Window(conf.clone())))
             .collect();
 
-        let cores: Vec<Rc<RefCell<SharedCore>>> = windows
-            .iter()
-            .map(|(_, conf)| Rc::new(RefCell::new(SharedCore::new(conf.width, conf.height))))
-            .collect();
-
-        Rc::new(RefCell::new(SpellMultiWinHandler {
+        let mut new_adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
+        let mut windows_spell: Vec<SpellWin> = Vec::new();
+        windows.iter().for_each(|(layer_name, conf)| {
+            let window =
+                SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
+            let adapter = window.adapter.clone();
+            windows_spell.push(window);
+            new_adapters.push(adapter);
+        });
+        let windows_handler = Rc::new(RefCell::new(SpellMultiWinHandler {
             windows: new_windows,
-            adapter: Vec::new(),
-            core: cores,
-        }))
+            adapter: new_adapters,
+            value_given: 0,
+        }));
+
+        let _ = slint::platform::set_platform(Box::new(SpellMultiLayerShell {
+            window_manager: windows_handler,
+        }));
+        windows_spell
     }
 
     pub(crate) fn new_lock(lock_outputs: Vec<(String, (u32, u32))>) -> Rc<RefCell<Self>> {
@@ -169,42 +176,23 @@ impl SpellMultiWinHandler {
             .map(|(output_name, conf)| (output_name.clone(), LayerConf::Lock(conf.0, conf.1)))
             .collect();
 
-        let cores: Vec<Rc<RefCell<SharedCore>>> = lock_outputs
-            .iter()
-            .map(|(_, conf)| Rc::new(RefCell::new(SharedCore::new(conf.0, conf.1))))
-            .collect();
-
         Rc::new(RefCell::new(SpellMultiWinHandler {
             windows: new_locks,
             adapter: Vec::new(),
-            core: cores,
+            value_given: 0,
         }))
     }
 
     fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
-        // let length = self.adapter.len();
-        // let core = &self.core[length];
-        // if let LayerConf::Window(conf) = &self.windows[length].1 {
-        //     let adapter = SpellSkiaWinAdapter::new(core.clone(), conf.width, conf.height);
-        //     self.adapter.push(adapter.clone());
-        //     adapter
-        // } else {
-        //     panic!("Panicked here");
-        // }
-        todo!()
+        self.value_given += 1;
+        let index = self.value_given - 1;
+        self.adapter[index as usize].clone()
     }
 
-    fn request_new_lock(&self) -> Rc<dyn WindowAdapter> {
-        // let length = self.adapter.len();
-        // let core = &self.core[length];
-        // if let LayerConf::Lock(width, height) = &self.windows[length].1 {
-        //     let adapter = SpellSkiaWinAdapter::new(core.clone(), *width, *height);
-        //     self.adapter.push(adapter.clone());
-        //     adapter
-        // } else {
-        //     panic!("Panicked here");
-        // }
-        todo!()
+    fn request_new_lock(&mut self) -> Rc<dyn WindowAdapter> {
+        self.value_given += 1;
+        let index = self.value_given - 1;
+        self.adapter[index as usize].clone()
     }
 }
 
@@ -217,24 +205,5 @@ impl Platform for SpellLockShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let value = self.window_manager.borrow_mut().request_new_lock();
         Ok(value)
-    }
-}
-
-impl EventAdapter for SpellSkiaWinAdapter {
-    fn draw_if_needed(&self) -> bool {
-        self.draw()
-    }
-
-    fn try_dispatch_event(
-        &self,
-        event: slint::platform::WindowEvent,
-    ) -> Result<(), slint::PlatformError> {
-        self.window.try_dispatch_event(event)
-    }
-
-    fn refersh_buffer(&self) -> Buffer {
-        let width: u32 = self.size.width;
-        let height: u32 = self.size.height;
-        self.buffer_slint.refresh_buffer(width, height)
     }
 }
