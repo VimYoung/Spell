@@ -21,9 +21,11 @@ use i_slint_renderer_skia::{
     software_surface::RenderBuffer,
 };
 
-// #[cfg(feature = "pam-client2")]
+// #[cfg(feature = "pam")]
+#[cfg(not(docsrs))]
 use pam_client2_fork::{Context, Flag, conv_mock::Conversation};
 // #[cfg(feature = "pam-client2")]
+#[cfg(not(docsrs))]
 pub use pam_client2_fork::Error as PamError;
 
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -70,7 +72,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
             slint::PlatformError,
         >,
     ) -> std::result::Result<(), slint::PlatformError> {
-        println!("This trait implementation of RenderBuffer is Run");
+        // println!("This trait implementation of RenderBuffer is Run");
         let Some((width, height)): Option<(std::num::NonZeroU32, std::num::NonZeroU32)> =
             size.width.try_into().ok().zip(size.height.try_into().ok())
         else {
@@ -120,7 +122,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
         // let mut sec_buffer = self.primary_slot.canvas(pool).unwrap();
         let nv = native_buffer[649728..649738].to_vec();
         // let mv = sec_buffer[649728..649738].to_vec();
-        println!("On iterations: {:?}", nv);
+        // println!("On iterations: {:?}", nv);
         // println!("On iterations sec: {:?}", mv);
         // core::mem::swap::<&mut [u8]>(&mut native_buffer.as_mut_slice(), &mut sec_buffer);
         // println!("On iterations sec after: {:?}", mv);
@@ -241,7 +243,8 @@ impl SpellSkiaWinAdapterReal {
     // }
 }
 
-// #[cfg(feature = "pam-client2")]
+#[cfg(feature = "pam")]
+#[cfg(not(docsrs))]
 pub fn unlock(
     mut lock: &mut SpellLock,
     username: Option<&str>,

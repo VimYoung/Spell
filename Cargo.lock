@@ -3389,9 +3389,9 @@ checksum = "48dd4f4a2c8405440fd0462561f0e5806bd0f77e86f51c761481bdd4018b545e"
 
 [[package]]
 name = "pam-client2-fork"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "962e8fe9e7788ab06c3af92192fa2d414beccecc9d3d109a5a2354076044dba6"
+checksum = "454bd75eed8ab0f8e077be32471f63127179daabb9a5ca02e3456af6830938a3"
 dependencies = [
  "bitflags 2.9.1",
  "libc",
@@ -3402,9 +3402,9 @@ dependencies = [
 
 [[package]]
 name = "pam-sys-fork"
-version = "1.0.0-alpha5"
+version = "1.0.2-alpha5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea27360f5e1e1b1ce845fce129d10e2a0acd62fd25ce19dca22015dd99cde2e"
+checksum = "e39d3ba1b3b980f53a54b51cff69c4a93ef97963843b38cd81c59cc61103f467"
 dependencies = [
  "bindgen",
  "libc",
@@ -6169,3 +6169,7 @@ dependencies = [
  "syn",
  "winnow",
 ]
+
+[[patch.unused]]
+name = "pam-sys"
+version = "1.0.2-alpha5"
