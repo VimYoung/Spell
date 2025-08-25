@@ -18,7 +18,7 @@ i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
 owo-colors = "4.2.2"
-pam-client2-fork = { version = "0.5.3", features = [
+pam-client2-fork = { version = "0.5.4", features = [
   "rpassword",
   "cli",
 ], optional = true }
