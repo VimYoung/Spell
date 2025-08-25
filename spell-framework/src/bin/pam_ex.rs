@@ -1,60 +1,54 @@
-fn main() {
-    use pam_client2_fork::conv_mock::Conversation;
-    use pam_client2_fork::{Context, Flag}; // Non-interactive implementation
+use nonstick::{
+    AuthnFlags, Conversation, ConversationAdapter, Result as PamResult, Transaction,
+    TransactionBuilder,
+};
+use std::ffi::{OsStr, OsString};
 
-    let mut context = Context::new(
-        "login", // Service name
-        None,
-        Conversation::with_credentials("ramayen", "Bhau@07"),
-    )
-    .expect("Failed to initialize PAM context");
+/// A basic Conversation that assumes that any "regular" prompt is for
+/// the username, and that any "masked" prompt is for the password.
+///
+/// A typical Conversation will provide the user with an interface
+/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
+struct UsernamePassConvo {
+    username: String,
+    password: String,
+}
 
-    // Authenticate the user
-    context
-        .authenticate(Flag::NONE)
-        .expect("Authentication failed");
+// ConversationAdapter is a convenience wrapper for the common case
+// of only handling one request at a time.
+impl ConversationAdapter for UsernamePassConvo {
+    fn prompt(&self, request: impl AsRef<OsStr>) -> PamResult<OsString> {
+        Ok(OsString::from(&self.username))
+    }
 
-    // Validate the account
-    context
-        .acct_mgmt(Flag::NONE)
-        .expect("Account validation failed");
-    // let mut context = Context::new(
-    //     "login",             // Service name, decides which policy is used (see `/etc/pam.d`)
-    //     None,                // Optional preset user name
-    //     Conversation::new(), // Handler for user interaction
-    // )
-    // .expect("Failed to initialize PAM context");
-    //
-    // // Optionally set some settings
-    // context.set_user_prompt(Some("Who art thou? "));
-    //
-    // // Authenticate the user (ask for password, 2nd-factor token, fingerprint, etc.)
-    // context
-    //     .authenticate(Flag::NONE)
-    //     .expect("Authentication failed");
-    //
-    // // Validate the account (is not locked, expired, etc.)
-    // context
-    //     .acct_mgmt(Flag::NONE)
-    //     .expect("Account validation failed");
-    //
-    // // Get resulting user name and map to a user id
-    // let username = context.user();
-    // println!("{}", username.unwrap());
-    // let uid = 65535; // Left as an exercise to the reader
-    //
-    // // Open session and initialize credentials
-    // let mut session = context
-    //     .open_session(Flag::NONE)
-    //     .expect("Session opening failed");
-    //
-    // // Run a process in the PAM environment
-    // let result = Command::new("/usr/bin/some_program")
-    //     .env_clear()
-    //     .envs(session.envlist().iter_tuples())
-    //     .uid(uid)
-    //     // .gid(...)
-    //     .status();
-    //
-    // The session is automatically closed when it goes out of scope.
+    fn masked_prompt(&self, request: impl AsRef<OsStr>) -> PamResult<OsString> {
+        Ok(OsString::from(&self.password))
+    }
+
+    fn error_msg(&self, message: impl AsRef<OsStr>) {
+        // Normally you would want to display this to the user somehow.
+        // In this case, we're just ignoring it.
+    }
+
+    fn info_msg(&self, message: impl AsRef<OsStr>) {
+        // ibid.
+    }
+}
+
+fn main() -> PamResult<()> {
+    let username: &str = "rgmayen";
+    let password: &str = "djfvfkdv7";
+    let user_pass = UsernamePassConvo {
+        username: username.into(),
+        password: password.into(),
+    };
+
+    let mut txn = TransactionBuilder::new_with_service("login")
+        .username(username)
+        .build(user_pass.into_conversation())?;
+    // If authentication fails, this will return an error.
+    // We immediately give up rather than re-prompting the user.
+    txn.authenticate(AuthnFlags::empty())?;
+    txn.account_management(AuthnFlags::empty())?;
+    Ok(())
 }

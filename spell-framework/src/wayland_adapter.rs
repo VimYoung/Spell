@@ -2,7 +2,7 @@
 //! across various functionalities for your shell. The most common widget (or
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
-use slint::{ComponentHandle, PhysicalSize, Window};
+use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -27,14 +27,9 @@ use smithay_client_toolkit::{
         },
     },
     shm::{
-        Shm, ShmHandler, multi,
+        Shm, ShmHandler,
         slot::{Buffer, Slot, SlotPool},
     },
-};
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
 };
 
 use crate::{
@@ -44,11 +39,17 @@ use crate::{
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
 pub use lock_impl::{SpellSlintLock, run_lock};
-
-#[cfg(not(docsrs))]
-#[cfg(feature = "i-slint-renderer-skia")]
-use crate::skia_non_docs::{PamError, unlock};
-
+use nonstick::{
+    AuthnFlags, Conversation, ConversationAdapter, Result as PamResult, Transaction,
+    TransactionBuilder,
+};
+use std::{
+    cell::{Cell, RefCell},
+    ffi::{OsStr, OsString},
+    process::Command,
+    rc::Rc,
+    sync::mpsc::{self, Receiver, Sender},
+};
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -745,17 +746,42 @@ impl SpellLock {
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
         // of the canvas.
     }
-
     /// call this method to unlock Spelllock
-    #[cfg(docsrs)]
-    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> Result<(), PamError> {
+    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> PamResult<()> {
+        let user_name;
+        if let Some(username) = username {
+            user_name = username.to_string();
+        } else {
+            let output = Command::new("sh")
+                .arg("-c")
+                .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+                .output()
+                .expect("Couldn't retrive username");
+
+            let val = String::from_utf8_lossy(&output.stdout);
+            let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+            user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
+        }
+
+        let user_pass = UsernamePassConvo {
+            username: user_name.clone(),
+            password: password.into(),
+        };
+
+        let mut txn = TransactionBuilder::new_with_service("login")
+            .username(user_name)
+            .build(user_pass.into_conversation())?;
+        // If authentication fails, this will return an error.
+        // We immediately give up rather than re-prompting the user.
+        txn.authenticate(AuthnFlags::empty())?;
+        txn.account_management(AuthnFlags::empty())?;
+
+        if let Some(locked_val) = self.session_lock.take() {
+            locked_val.unlock();
+        }
+        self.is_locked = false;
+        self.conn.roundtrip().unwrap();
         Ok(())
-    }
-
-    /// call this method to unlock Spelllock
-    #[cfg(not(docsrs))]
-    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> Result<(), PamError> {
-        unlock(self, username, password)
     }
 }
 
@@ -767,6 +793,37 @@ delegate_registry!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
 // TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
+
+/// A basic Conversation that assumes that any "regular" prompt is for
+/// the username, and that any "masked" prompt is for the password.
+///
+/// A typical Conversation will provide the user with an interface
+/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
+struct UsernamePassConvo {
+    username: String,
+    password: String,
+}
+
+// ConversationAdapter is a convenience wrapper for the common case
+// of only handling one request at a time.
+impl ConversationAdapter for UsernamePassConvo {
+    fn prompt(&self, _request: impl AsRef<OsStr>) -> PamResult<OsString> {
+        Ok(OsString::from(&self.username))
+    }
+
+    fn masked_prompt(&self, _request: impl AsRef<OsStr>) -> PamResult<OsString> {
+        Ok(OsString::from(&self.password))
+    }
+
+    fn error_msg(&self, _message: impl AsRef<OsStr>) {
+        // Normally you would want to display this to the user somehow.
+        // In this case, we're just ignoring it.
+    }
+
+    fn info_msg(&self, _message: impl AsRef<OsStr>) {
+        // ibid.
+    }
+}
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

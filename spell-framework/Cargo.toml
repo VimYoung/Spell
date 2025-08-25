@@ -18,10 +18,6 @@ i-slint-renderer-skia = { version = "1.11.0", features = [
   "wayland",
 ], optional = true }
 owo-colors = "4.2.2"
-pam-client2-fork = { version = "0.5.4", features = [
-  "rpassword",
-  "cli",
-], optional = true }
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.3.18"
 slint = { version = "1.12.0", features = [
@@ -34,13 +30,13 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["std"] }
 tracing-rfc-5424 = "0.1.4"
 zbus = "5.7.1"
+nonstick = "0.1.1"
 
 [package.metadata.docs.rs]
 no-default-features = true
 features = ["docs-only"]
 
 [features]
-default = ["i-slint-renderer-skia", "pam"]
+default = ["i-slint-renderer-skia", "slint"]
 docs-only = []
-pam = ["pam-client2-fork"]
 slint = ["i-slint-renderer-skia"]
