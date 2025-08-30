@@ -26,14 +26,14 @@ impl WindowAdapter for SpellSkiaWinAdapterDummy {
 
     fn request_redraw(&self) {}
 }
-
-impl std::fmt::Debug for SpellSkiaWinAdapterDummy {
-    // TODO this needs to be implemented properly
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
+//
+// impl std::fmt::Debug for SpellSkiaWinAdapterDummy {
+//     // TODO this needs to be implemented properly
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         Ok(())
+//     }
+// }
+//
 impl SpellSkiaWinAdapterDummy {
     pub fn new(shared_core: bool, width: u32, height: u32) -> Rc<Self> {}
 

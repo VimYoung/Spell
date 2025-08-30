@@ -83,7 +83,7 @@ impl Services {
     }
 }
 
-fn check_for_new_apps(app: Arc<dyn AppHandler>) {
+fn check_for_new_apps(_app: Arc<dyn AppHandler>) {
     todo!()
 }
 

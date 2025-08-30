@@ -1,9 +1,9 @@
-use crate::{layer_properties::WindowConf, wayland_adapter::SpellWin};
+use crate::layer_properties::WindowConf;
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::client::protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
     seat::{
-        keyboard::{KeyEvent, KeyboardData, Keysym},
+        keyboard::{KeyEvent, Keysym},
         pointer::{PointerData, cursor_shape::CursorShapeManager},
     },
     shell::{
@@ -154,5 +154,4 @@ pub(crate) struct PointerState {
 #[derive(Debug)]
 pub(crate) struct KeyboardState {
     pub board: Option<wl_keyboard::WlKeyboard>,
-    pub board_data: Option<KeyboardData<SpellWin>>,
 }

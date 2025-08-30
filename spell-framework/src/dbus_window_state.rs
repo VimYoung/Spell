@@ -95,17 +95,21 @@ impl VarHandler {
         key: &str,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) -> String {
-        // if self.layer_name == layer_name {
-        let value: DataType = self.state.read().unwrap().get_type(key);
-        match value {
-            DataType::Int(int_value) => int_value.to_string(),
-            DataType::Boolean(bool_val) => bool_val.to_string().clone(),
-            // TODO this implementation needs to be improved after changing DATATYPE
-            _ => "hello".to_string(),
+        if self.layer_name == layer_name {
+            let value: DataType = self.state.read().unwrap().get_type(key);
+            match value {
+                DataType::Int(int_value) => int_value.to_string(),
+                DataType::Boolean(bool_val) => bool_val.to_string().clone(),
+                // TODO this implementation needs to be improved after changing DATATYPE
+                _ => "".to_string(),
+            }
+        } else if let Err(err_val) = emitter.layer_find_var(layer_name, key).await
+            && let zbus::Error::Address(val) = err_val
+        {
+            val
+        } else {
+            "".to_string()
         }
-        // } else {
-        //     emitter.layer_find_var(layer_name, key);
-        // }
     }
 
     async fn show_window_back(&self, layer_name: &str) -> Result<(), BusError> {

@@ -1,5 +1,4 @@
 #[cfg(not(docsrs))]
-use crate::wayland_adapter::SpellLock;
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
 use smithay_client_toolkit::shm::slot::Buffer;
 #[cfg(not(docsrs))]
@@ -11,7 +10,6 @@ use smithay_client_toolkit::{
 use std::{
     cell::Cell,
     cell::RefCell,
-    process::Command,
     rc::{Rc, Weak},
 };
 
@@ -163,13 +161,13 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
         self.needs_redraw.set(true);
     }
 }
-
-impl std::fmt::Debug for SpellSkiaWinAdapterReal {
-    // TODO this needs to be implemented properly
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
+//
+// impl std::fmt::Debug for SpellSkiaWinAdapterReal {
+//     // TODO this needs to be implemented properly
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         Ok(())
+//     }
+// }
 
 impl SpellSkiaWinAdapterReal {
     pub fn new(

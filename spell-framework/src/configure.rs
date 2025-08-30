@@ -4,6 +4,7 @@ use std::cell::Cell;
 
 /// Unused Internal struct representation of a pixel, it is similar to slint's
 /// representation of [pixel]() but implement few more trait. Currently, redundent
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct Rgba8Pixel {
     pub a: u8,

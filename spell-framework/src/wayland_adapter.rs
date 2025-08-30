@@ -40,8 +40,7 @@ use crate::{
 };
 pub use lock_impl::{SpellSlintLock, run_lock};
 use nonstick::{
-    AuthnFlags, Conversation, ConversationAdapter, Result as PamResult, Transaction,
-    TransactionBuilder,
+    AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -68,12 +67,11 @@ pub(crate) struct States {
 /// implementation, thus providing various features.
 /// ## Panics
 ///
-/// The constructor method [conjure_spells](crate::wayland_adapter::SpellWin::conjure_spells) will
+/// The constructor method [conjure_spells](crate::wayland_adapter::SpellMultiWinHandler::conjure_spells) will
 /// panic if the number of WindowConfs provided is not equal to the amount of widgets that are
 /// initialised in the scope. The solution to avoid panic is to add more `let _ =
 /// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
 /// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
-#[derive(Debug)]
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     pub(crate) size: PhysicalSize,
@@ -146,7 +144,7 @@ impl SpellWin {
 
         let keyboard_state = KeyboardState {
             board: None,
-            board_data: None,
+            // board_data: None,
         };
 
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
@@ -220,7 +218,6 @@ impl SpellWin {
     }
 
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
-    #[tracing::instrument]
     pub fn show_again(&mut self) {
         let primary_buf = self.adapter.refersh_buffer();
         self.buffer = primary_buf;
@@ -526,19 +523,15 @@ impl LayerShellHandler for SpellWin {
 ///     lock_ui.on_check_pass({
 ///         let lock_handle = lock_ui.as_weak();
 ///         move |string_val| {
-///             // let lock_handle_a = lock_handle.clone();
 ///             let lock_handle_a = lock_handle.clone().unwrap();
 ///             looop_handle
-///                 .insert_source(
-///                     Timer::from_duration(Duration::from_secs(5)),
-///                     move |_, _, app_data| {
+///                 .insert_idle(
+///                     move |app_data| {
 ///                         if app_data.unlock(None, string_val.as_str()).is_err() {
 ///                             lock_handle_a.set_lock_error(true);
 ///                         }
-///                         TimeoutAction::Drop
 ///                     },
-///                 )
-///                 .unwrap();
+///                 );
 ///         }
 ///     });
 ///
@@ -554,7 +547,6 @@ pub struct SpellLock {
     pub(crate) keyboard_state: KeyboardState,
     pub(crate) seat_state: SeatState,
     pub(crate) shm: Shm,
-    pub(crate) session_lock_state: SessionLockState,
     pub(crate) session_lock: Option<SessionLock>,
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
@@ -586,7 +578,7 @@ impl SpellLock {
 
         let keyboard_state = KeyboardState {
             board: None,
-            board_data: None,
+            // board_data: None,
         };
         let mut spell_lock = SpellLock {
             loop_handle: loop_handle.handle(),
@@ -598,7 +590,6 @@ impl SpellLock {
             seat_state: SeatState::new(&globals, &qh),
             slint_part: None,
             shm,
-            session_lock_state,
             session_lock,
             lock_surfaces,
             is_locked: true,
@@ -701,7 +692,7 @@ impl SpellLock {
         // Rendering from Skia
         // if self.is_locked {
         // let skia_now = std::time::Instant::now();
-        let redraw_val: bool = window_adapter.draw_if_needed();
+        let _redraw_val: bool = window_adapter.draw_if_needed();
         // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
 
         let buffer = &self.slint_part.as_ref().unwrap().wayland_buffer[0];

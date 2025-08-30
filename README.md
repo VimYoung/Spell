@@ -11,7 +11,7 @@
   ·
   <a href="https://github.com/VimYoung/Spell/discussions">Request Feature</a>
   ·
-  <a href="https://docs.rs/crate/spell-framework/">Wiki</a>
+  <a href="https://docs.rs/spell-framework/latest/spell_framework/">Wiki</a>
   <br />
   <br />
 </p>
@@ -70,7 +70,6 @@ slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }
 i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
-pam-sys = {git = "https://github.com/VimYoung/pam-sys"}
 ```
 
 and then replace the `main.rs` with following contents:
@@ -125,10 +124,6 @@ that I haven't used them extensively myself (for now).
 1. [sysinfo](https://crates.io/crates/sysinfo): For System info like uptime, cpu, memory usage etc.
 2. [rusty-network-manger](https://crates.io/crates/rusty_network_manager): For network management.
 3. [bluer](https://docs.rs/bluer/latest/bluer/): For bluetooth management.
-
-## Docs
-
-Docs can be found [here](https://docs.rs/crate/spell-framework/).
 
 ## Contributing
 
