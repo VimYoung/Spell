@@ -2,6 +2,17 @@
 //! across various functionalities for your shell. The most common widget (or
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
+use crate::{
+    SpellAssociated,
+    configure::{LayerConf, WindowConf},
+    helper_fn_for_deploy, helper_fn_internal_handle,
+    slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
+    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
+};
+pub use lock_impl::{SpellSlintLock, run_lock};
+use nonstick::{
+    AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
+};
 use slint::PhysicalSize;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
@@ -10,8 +21,9 @@ use smithay_client_toolkit::{
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{EventLoop, LoopHandle},
+        calloop_wayland_source::WaylandSource,
         client::{
-            Connection, EventQueue, QueueHandle,
+            Connection, QueueHandle,
             globals::registry_queue_init,
             protocol::{wl_output, wl_shm, wl_surface},
         },
@@ -31,23 +43,12 @@ use smithay_client_toolkit::{
         slot::{Buffer, Slot, SlotPool},
     },
 };
-
-use crate::{
-    Handle,
-    configure::{LayerConf, WindowConf},
-    slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
-};
-pub use lock_impl::{SpellSlintLock, run_lock};
-use nonstick::{
-    AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
-};
 use std::{
     cell::{Cell, RefCell},
     ffi::{OsStr, OsString},
     process::Command,
     rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
+    time::Duration,
 };
 mod lock_impl;
 mod way_helper;
@@ -74,6 +75,7 @@ pub(crate) struct States {
 /// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
+    pub(crate) loop_handle: LoopHandle<'static, SpellWin>,
     pub(crate) size: PhysicalSize,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
@@ -84,8 +86,7 @@ pub struct SpellWin {
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
-    pub(crate) queue: Rc<RefCell<EventQueue<SpellWin>>>,
-    pub(crate) handler: Option<Receiver<Handle>>,
+    pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
 }
 
 impl SpellWin {
@@ -99,6 +100,8 @@ impl SpellWin {
         let qh: QueueHandle<SpellWin> = event_queue.handle();
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
+        let event_loop: EventLoop<'static, SpellWin> =
+            EventLoop::try_new().expect("Failed to initialize the event loop!");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
         let mut pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
@@ -159,9 +162,9 @@ impl SpellWin {
                 window_adapter: adapter_value.clone(),
             }));
         }
-
-        SpellWin {
+        let win = SpellWin {
             adapter: adapter_value,
+            loop_handle: event_loop.handle(),
             size: PhysicalSize {
                 width: window_conf.width,
                 height: window_conf.height,
@@ -182,16 +185,18 @@ impl SpellWin {
             config: window_conf,
             input_region,
             opaque_region,
-            queue: Rc::new(RefCell::new(event_queue)),
-            handler: None,
-        }
+            event_loop: Rc::new(RefCell::new(event_loop)),
+        };
+
+        WaylandSource::new(conn.clone(), event_queue)
+            .insert(win.loop_handle.clone())
+            .unwrap();
+        win
     }
 
     /// retrive the sender handle to pass [`Handle`] events to the windows.
-    pub fn get_handler(&mut self) -> Sender<Handle> {
-        let (tx, rx) = mpsc::channel::<Handle>();
-        self.handler = Some(rx);
-        tx
+    pub fn get_handler(&mut self) -> WinHandle {
+        WinHandle(self.loop_handle.clone())
     }
 
     /// This function is called to create a instance of window. This window is then
@@ -359,6 +364,37 @@ impl SpellWin {
     }
 }
 
+impl SpellAssociated for SpellWin {
+    fn on_call<'a>(
+        &mut self,
+        state: Option<
+            std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
+        >,
+        mut set_callback: Option<
+            Box<
+                dyn FnMut(
+                        std::sync::Arc<
+                            std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
+                        >,
+                    ) + 'a,
+            >,
+        >,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut rx = helper_fn_for_deploy(self.layer_name.clone(), &state);
+
+        let event_loop = self.event_loop.clone();
+        loop {
+            helper_fn_internal_handle(&state, &mut set_callback, &mut rx, self);
+            // helper_fn_win_handle(self);
+            // run_loop_once(self);
+            event_loop
+                .borrow_mut()
+                .dispatch(Duration::from_millis(1), self)
+                .unwrap();
+        }
+    }
+}
+
 delegate_compositor!(SpellWin);
 delegate_registry!(SpellWin);
 delegate_output!(SpellWin);
@@ -490,6 +526,63 @@ impl LayerShellHandler for SpellWin {
     }
 }
 
+/// This is a wrapper around calloop's [loop_handle](https://docs.rs/calloop/latest/calloop/struct.LoopHandle.html)
+/// for calling wayland specific features of `SpellWin`. It can be accessed from
+/// [`crate::wayland_adapter::SpellWin::get_handler`].
+#[derive(Clone, Debug)]
+pub struct WinHandle(LoopHandle<'static, SpellWin>);
+
+impl WinHandle {
+    /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
+    pub fn hide(&self) {
+        self.0.insert_idle(|win| win.hide());
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::show_again`]
+    pub fn show_again(&self) {
+        self.0.insert_idle(|win| win.show_again());
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::toggle`]
+    pub fn toggle(&self) {
+        self.0.insert_idle(|win| win.toggle());
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::grab_focus`]
+    pub fn grab_focus(&self) {
+        self.0.insert_idle(|win| win.grab_focus());
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::remove_focus`]
+    pub fn remove_focus(&self) {
+        self.0.insert_idle(|win| win.remove_focus());
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::add_input_region`]
+    pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.0
+            .insert_idle(move |win| win.add_input_region(x, y, width, height));
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_input_region`]
+    pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.0
+            .insert_idle(move |win| win.subtract_input_region(x, y, width, height));
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::add_opaque_region`]
+    pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.0
+            .insert_idle(move |win| win.add_opaque_region(x, y, width, height));
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_opaque_region`]
+    pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        self.0
+            .insert_idle(move |win| win.subtract_opaque_region(x, y, width, height));
+    }
+}
+
 /// SpellLock is a struct which represents a window lock. It can be run and initialised
 /// on a custom lockscreen implementation with slint.
 /// <div class="warning">
@@ -506,36 +599,34 @@ impl LayerShellHandler for SpellWin {
 /// Here is a minimal example.
 ///
 /// ```rust
-/// use std::{env, error::Error, time::Duration};
+/// use spell_framework::cast_spell;
+/// use std::{env, error::Error};
 ///
 /// use slint::ComponentHandle;
-/// use spell_framework::{
-///     layer_properties::{TimeoutAction, Timer},
-///     wayland_adapter::{run_lock, SpellLock, SpellSlintLock},
-/// };
+/// use spell_framework::wayland_adapter::SpellLock;
 /// slint::include_modules!();
 ///
 /// fn main() -> Result<(), Box<dyn Error>> {
-///     let (mut lock, event_loop, event_queue, handle) = SpellLock::invoke_lock_spell();
+///     env::set_var("SLINT_STYLE", "cosmic-dark");
+///     let mut lock = SpellLock::invoke_lock_spell();
 ///     let lock_ui = LockScreen::new().unwrap();
-///     let looop_handle = event_loop.handle().clone();
-///     SpellSlintLock::build(&mut lock, handle);
+///     let looop_handle = lock.get_handler();
 ///     lock_ui.on_check_pass({
 ///         let lock_handle = lock_ui.as_weak();
 ///         move |string_val| {
+///             // let lock_handle_a = lock_handle.clone();
 ///             let lock_handle_a = lock_handle.clone().unwrap();
-///             looop_handle
-///                 .insert_idle(
-///                     move |app_data| {
-///                         if app_data.unlock(None, string_val.as_str()).is_err() {
-///                             lock_handle_a.set_lock_error(true);
-///                         }
-///                     },
-///                 );
+///             looop_handle.unlock(
+///                 None,
+///                 string_val.to_string(),
+///                 Box::new(move || {
+///                     lock_handle_a.set_lock_error(true);
+///                 }),
+///             );
 ///         }
 ///     });
-///
-///     run_lock(lock, event_loop, event_queue)
+///     eprintln!("Ran till here");
+///     cast_spell(Box::new(lock), None, None)
 /// }
 /// ```
 pub struct SpellLock {
@@ -551,17 +642,18 @@ pub struct SpellLock {
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
+    pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
 }
 
 impl SpellLock {
-    pub fn invoke_lock_spell() -> (Self, EventLoop<'static, SpellLock>, EventQueue<SpellLock>) {
+    pub fn invoke_lock_spell() -> Self {
         let conn = Connection::connect_to_env().unwrap();
 
         let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
         let qh: QueueHandle<SpellLock> = event_queue.handle();
         let registry_state = RegistryState::new(&globals);
         let shm = Shm::bind(&globals, &qh).unwrap();
-        let loop_handle: EventLoop<'static, SpellLock> =
+        let event_loop: EventLoop<'static, SpellLock> =
             EventLoop::try_new().expect("Failed to initialize the event loop!");
         let output_state = OutputState::new(&globals, &qh);
         let session_lock_state = SessionLockState::new(&globals, &qh);
@@ -581,7 +673,7 @@ impl SpellLock {
             // board_data: None,
         };
         let mut spell_lock = SpellLock {
-            loop_handle: loop_handle.handle(),
+            loop_handle: event_loop.handle().clone(),
             conn: conn.clone(),
             compositor_state,
             output_state,
@@ -593,6 +685,7 @@ impl SpellLock {
             session_lock,
             lock_surfaces,
             is_locked: true,
+            event_loop: Rc::new(RefCell::new(event_loop)),
         };
 
         let _ = event_queue.roundtrip(&mut spell_lock);
@@ -680,7 +773,10 @@ impl SpellLock {
             window_manager: multi_handler,
         }));
 
-        (spell_lock, loop_handle, event_queue)
+        WaylandSource::new(spell_lock.conn.clone(), event_queue)
+            .insert(spell_lock.loop_handle.clone())
+            .unwrap();
+        spell_lock
     }
 
     fn converter_lock(&mut self, qh: &QueueHandle<Self>) {
@@ -737,8 +833,8 @@ impl SpellLock {
         // useful if you do damage tracking, since you don't need to redraw the undamaged parts
         // of the canvas.
     }
-    /// call this method to unlock Spelllock
-    pub fn unlock(&mut self, username: Option<&str>, password: &str) -> PamResult<()> {
+
+    fn unlock(&mut self, username: Option<&str>, password: &str) -> PamResult<()> {
         let user_name;
         if let Some(username) = username {
             user_name = username.to_string();
@@ -773,6 +869,55 @@ impl SpellLock {
         self.is_locked = false;
         self.conn.roundtrip().unwrap();
         Ok(())
+    }
+
+    pub fn get_handler(&self) -> LockHandle {
+        LockHandle(self.loop_handle.clone())
+    }
+}
+
+impl SpellAssociated for SpellLock {
+    fn on_call<'a>(
+        &mut self,
+        _: Option<
+            std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
+        >,
+        _: Option<
+            Box<
+                dyn FnMut(
+                        std::sync::Arc<
+                            std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
+                        >,
+                    ) + 'a,
+            >,
+        >,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let event_loop = self.event_loop.clone();
+        while self.is_locked {
+            event_loop
+                .borrow_mut()
+                .dispatch(Duration::from_millis(1), self)
+                .unwrap();
+        }
+        Ok(())
+    }
+}
+
+pub struct LockHandle(LoopHandle<'static, SpellLock>);
+
+impl LockHandle {
+    /// call this method to unlock Spelllock
+    pub fn unlock(
+        &self,
+        username: Option<String>,
+        password: String,
+        on_err_callback: Box<dyn FnOnce()>,
+    ) {
+        self.0.insert_idle(move |app_data| {
+            if app_data.unlock(username.as_deref(), &password).is_err() {
+                on_err_callback();
+            }
+        });
     }
 }
 

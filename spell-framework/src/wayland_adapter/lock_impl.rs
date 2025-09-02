@@ -2,13 +2,9 @@ use slint::{PhysicalSize, SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     output::{OutputHandler, OutputState},
-    reexports::{
-        calloop::EventLoop,
-        calloop_wayland_source::WaylandSource,
-        client::{
-            Connection, EventQueue, QueueHandle,
-            protocol::{wl_output, wl_seat, wl_surface},
-        },
+    reexports::client::{
+        Connection, QueueHandle,
+        protocol::{wl_output, wl_seat, wl_surface},
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -150,23 +146,13 @@ impl SessionLockHandler for SpellLock {
     }
 }
 
-pub fn run_lock(
-    mut lock: SpellLock,
-    mut event_loop: EventLoop<SpellLock>,
-    event_queue: EventQueue<SpellLock>,
-) -> Result<(), Box<dyn Error>> {
-    WaylandSource::new(lock.conn.clone(), event_queue)
-        .insert(lock.loop_handle.clone())
-        .unwrap();
-
+pub fn run_lock(mut lock: SpellLock) -> Result<(), Box<dyn Error>> {
+    let event_loop = lock.event_loop.clone();
     while lock.is_locked {
         event_loop
+            .borrow_mut()
             .dispatch(Duration::from_millis(1), &mut lock)
             .unwrap();
-
-        // if lock.is_locked {
-        //     break;
-        // }
     }
     Ok(())
 }

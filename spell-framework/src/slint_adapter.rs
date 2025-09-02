@@ -152,8 +152,8 @@ impl SpellMultiWinHandler {
         let mut new_adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
         let mut windows_spell: Vec<SpellWin> = Vec::new();
         windows.iter().for_each(|(layer_name, conf)| {
-            let window =
-                SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
+            let window: SpellWin;
+            window = SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
             let adapter = window.adapter.clone();
             windows_spell.push(window);
             new_adapters.push(adapter);

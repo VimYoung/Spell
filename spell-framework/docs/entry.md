@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Getting the window and its event_queue given the properties and a window name.
-    let (waywindow, event_queue) = SpellWin::invoke_spell("counter-widget", window_conf);
+    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
 
     // Slint specific code. Like initialising the window.
     let ui = AppWindow::new().unwrap();
@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Calling the event loop function for running the window
-    cast_spell::<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>)>>(waywindow, None, None,)
+    cast_spell(Box::new(waywindow), None, None)
 }
 ```
 

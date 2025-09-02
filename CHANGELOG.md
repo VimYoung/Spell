@@ -1,3 +1,14 @@
+W.I.P. 0.1.6 & 0.1.2 CLI (Due Date)
+===========================
+
+Changes:
+
+- `Handle` is removed in favor of `WinHandle` and `LockHandle` for `SpellWin` and `SpellLock` respectively.This
+significantly reduces necessary call from objects for use and streamlines the process.
+- `cast_spell` is made universal for both `SpellWin` and `SpellLock` (`run_lock` is removed).
+- Rather than directly handling the events, event_queue is converted to a calloop based event loop. This
+eliminates the need for using mpsc channels in the same thread (which was previously the case).
+
 0.1.5  & 0.1.1 CLI (25-08-19)
 ================
 

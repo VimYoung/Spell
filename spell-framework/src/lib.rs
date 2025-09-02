@@ -29,46 +29,21 @@ pub mod layer_properties {
         configure::WindowConf,
         dbus_window_state::{DataType, ForeignController},
     };
-    pub use smithay_client_toolkit::reexports::calloop::timer::{TimeoutAction, Timer};
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
-
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
 use smithay_client_toolkit::reexports::client::{DispatchError, backend};
 use std::{
     error::Error,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 use tokio::sync::mpsc;
 use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
-
-/// It is a enum which is passed over to the sender for invoking wayland specific
-/// method calls.
-#[derive(Debug)]
-pub enum Handle {
-    /// Internally calls [`wayland_adapter::SpellWin::hide`]
-    HideWindow,
-    /// Internally calls [`wayland_adapter::SpellWin::show_again`]
-    ShowWinAgain,
-    /// Internally calls [`wayland_adapter::SpellWin::toggle`]
-    ToggleWindow,
-    /// Internally calls [`wayland_adapter::SpellWin::grab_focus`]
-    GrabKeyboardFocus,
-    /// Internally calls [`wayland_adapter::SpellWin::remove_focus`]
-    RemoveKeyboardFocus,
-    /// Internally calls [`wayland_adapter::SpellWin::add_input_region`]
-    AddInputRegion(i32, i32, i32, i32),
-    /// Internally calls [`wayland_adapter::SpellWin::subtract_input_region`]
-    SubtractInputRegion(i32, i32, i32, i32),
-    /// Internally calls [`wayland_adapter::SpellWin::add_opaque_region`]
-    AddOpaqueRegion(i32, i32, i32, i32),
-    /// Internally calls [`wayland_adapter::SpellWin::subtract_opaque_region`]
-    SubtractOpaqueRegion(i32, i32, i32, i32),
-}
 
 type State = Arc<RwLock<Box<dyn ForeignController>>>;
 
@@ -99,14 +74,15 @@ where
                     &mut waywindows[index],
                 );
             });
-            waywindows.iter_mut().for_each(|win| {
-                helper_fn_win_handle(win);
-            });
 
             let _: Vec<_> = waywindows
                 .iter_mut()
                 .map(|waywindow| {
-                    run_loop_once(waywindow);
+                    let event_loop = waywindow.event_loop.clone();
+                    event_loop
+                        .borrow_mut()
+                        .dispatch(Duration::from_millis(1), waywindow)
+                        .unwrap();
                 })
                 .collect();
         }
@@ -117,22 +93,12 @@ where
     }
 }
 
-pub fn cast_spell<F>(
-    mut waywindow: SpellWin,
-    // mut event_queue: EventQueue<SpellWinInternal>,
-    // window_handle_option: Option<std::sync::mpsc::Receiver<Handle>>,
+pub fn cast_spell<'a>(
+    mut waywindow: Box<dyn SpellAssociated>,
     state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
-    mut set_callback: Option<F>,
-) -> Result<(), Box<dyn Error>>
-where
-    F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>),
-{
-    let mut rx = helper_fn_for_deploy(waywindow.layer_name.clone(), &state);
-    loop {
-        helper_fn_internal_handle(&state, &mut set_callback, &mut rx, &mut waywindow);
-        helper_fn_win_handle(&mut waywindow);
-        run_loop_once(&mut waywindow);
-    }
+    set_callback: Option<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'a>>,
+) -> Result<(), Box<dyn Error>> {
+    waywindow.on_call(state, set_callback)
 }
 
 fn helper_fn_internal_handle<F>(
@@ -190,71 +156,32 @@ fn helper_fn_for_deploy(
     rx
 }
 
-fn helper_fn_win_handle(waywindow: &mut SpellWin) {
-    if let Some(window_handle) = &waywindow.handler
-        && let Ok(handle) = window_handle.try_recv()
-    {
-        match handle {
-            Handle::HideWindow => waywindow.hide(),
-            Handle::ShowWinAgain => waywindow.show_again(),
-            Handle::ToggleWindow => waywindow.toggle(),
-            Handle::GrabKeyboardFocus => waywindow.grab_focus(),
-            Handle::RemoveKeyboardFocus => waywindow.remove_focus(),
-            Handle::AddInputRegion(x, y, width, height) => {
-                waywindow.add_input_region(x, y, width, height);
-            }
-            Handle::SubtractInputRegion(x, y, width, height) => {
-                waywindow.subtract_input_region(x, y, width, height);
-            }
-            Handle::AddOpaqueRegion(x, y, width, height) => {
-                waywindow.add_opaque_region(x, y, width, height);
-            }
-            Handle::SubtractOpaqueRegion(x, y, width, height) => {
-                waywindow.subtract_opaque_region(x, y, width, height);
-            }
-        }
-    }
+pub trait SpellAssociated {
+    fn on_call<'a>(
+        &mut self,
+        state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
+        set_callback: Option<Box<dyn FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'a>>,
+    ) -> Result<(), Box<dyn Error>>;
 }
 
-fn run_loop_once(waywindow: &mut SpellWin) {
-    let is_first_config = waywindow.first_configure;
-    let queue = waywindow.queue.clone();
-    if is_first_config {
-        // Primary erros are handled here in the first configration itself.
-        if let Err(err_value) = queue.borrow_mut().roundtrip(waywindow) {
-            report_error(err_value);
-        }
-        // event_queue.roundtrip(&mut waywindow).unwrap();
-    } else
-    /*if let Err(err_val) = queue.borrow_mut().blocking_dispatch(waywindow) {
-        panic!("{}", err_val);
-    }*/
-    {
-        waywindow.queue.borrow().flush().unwrap();
-        queue.borrow_mut().dispatch_pending(waywindow).unwrap();
-        if let Some(read_value) = waywindow.queue.borrow().prepare_read() {
-            let _ = read_value.read();
-        }
-    }
-}
-
-fn report_error(error_value: DispatchError) {
-    match error_value {
-        DispatchError::Backend(backend) => match backend {
-            backend::WaylandError::Io(std_error) => panic!("{}", std_error),
-            backend::WaylandError::Protocol(protocol) => {
-                if protocol.code == 2 && protocol.object_id == 6 {
-                    panic!("Maybe the width or height zero");
-                }
-            }
-        },
-        DispatchError::BadMessage {
-            sender_id,
-            interface,
-            opcode,
-        } => panic!("BadMessage Error: sender: {sender_id} interface: {interface} opcode {opcode}"),
-    }
-}
+// This function has become redundent as event_queue is internally being managed by callloop.
+// fn report_error(error_value: DispatchError) {
+//     match error_value {
+//         DispatchError::Backend(backend) => match backend {
+//             backend::WaylandError::Io(std_error) => panic!("{}", std_error),
+//             backend::WaylandError::Protocol(protocol) => {
+//                 if protocol.code == 2 && protocol.object_id == 6 {
+//                     panic!("Maybe the width or height zero");
+//                 }
+//             }
+//         },
+//         DispatchError::BadMessage {
+//             sender_id,
+//             interface,
+//             opcode,
+//         } => panic!("BadMessage Error: sender: {sender_id} interface: {interface} opcode {opcode}"),
+//     }
+// }
 // TODO it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
 // TODO see if the above loop can be replaced by callloop for better idomicity and
