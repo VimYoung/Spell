@@ -34,7 +34,6 @@ pub mod layer_properties {
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
 use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
-use smithay_client_toolkit::reexports::client::{DispatchError, backend};
 use std::{
     error::Error,
     sync::{Arc, RwLock},
@@ -126,7 +125,10 @@ fn helper_fn_internal_handle<F>(
             InternalHandle::ShowWinAgain => {
                 waywindow.show_again();
             }
-            InternalHandle::HideWindow => waywindow.hide(),
+            InternalHandle::HideWindow => {
+                waywindow.hide();
+                println!("Hide called");
+            }
         }
     };
 }

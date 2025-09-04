@@ -30,7 +30,8 @@ rust.
 
 ## When can we expect a stable release?
 
-No promises but I think I can push it to a release in 3-4 months.
+No promises but I think I can push it to a release in 3-4 months. A W.I.P. project which uses Spell
+in backend is my own shell which can be viewed [here](https://github.com/VimYoung/Young-Shell).
 
 ## Inspiration
 

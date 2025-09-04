@@ -1,4 +1,4 @@
-use crate::dbus_window_state::second_client::open_internal_clinet;
+use crate::dbus_window_state::second_client::{open_internal_clinet, open_sec_service};
 use std::{
     any::Any,
     future::pending,
@@ -43,22 +43,9 @@ struct VarHandler {
     layer_name: String,
 }
 
-#[interface(
-    name = "org.VimYoung.Spell1",
-    proxy(
-        gen_blocking = false,
-        // default_service = "org.VimYoung.Spell",
-        // default_path = "/org/VimYoung/VarHandler",
-    )
-)]
+#[interface(name = "org.VimYoung.Spell1", proxy(gen_blocking = false,))]
 impl VarHandler {
-    async fn set_value(
-        &mut self,
-        layer_name: &str,
-        key: &str,
-        val: &str,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
-    ) -> Result<(), BusError> {
+    async fn set_value(&mut self, layer_name: &str, key: &str, val: &str) -> Result<(), BusError> {
         if layer_name == self.layer_name {
             let returned_value: DataType = self.state.read().unwrap().get_type(key);
             match returned_value {
@@ -82,19 +69,14 @@ impl VarHandler {
                 DataType::Panic => Err(BusError::Failed("Error from Panic".to_string())),
             }
         } else {
-            emitter
-                .layer_var_value_changed(layer_name, key, val)
-                .await?;
-            Ok(())
+            todo!();
+            // emitter
+            //     .layer_var_value_changed(layer_name, key, val)
+            //     .await?;
         }
     }
 
-    async fn find_value(
-        &self,
-        layer_name: &str,
-        key: &str,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
-    ) -> String {
+    async fn find_value(&self, layer_name: &str, key: &str) -> String {
         if self.layer_name == layer_name {
             let value: DataType = self.state.read().unwrap().get_type(key);
             match value {
@@ -103,45 +85,81 @@ impl VarHandler {
                 // TODO this implementation needs to be improved after changing DATATYPE
                 _ => "".to_string(),
             }
-        } else if let Err(err_val) = emitter.layer_find_var(layer_name, key).await
-            && let zbus::Error::Address(val) = err_val
+        } else
+        /*if let Err(err_val) = emitter.layer_find_var(layer_name, key).await
+        && let zbus::Error::Address(val) = err_val */
         {
-            val
-        } else {
-            "".to_string()
+            todo!()
+            //     val
+            // } else {
+            //     "".to_string()
         }
     }
 
     async fn show_window_back(&self, layer_name: &str) -> Result<(), BusError> {
-        self.state_updater
-            .send(InternalHandle::ShowWinAgain)
-            .await
-            .unwrap();
-        Ok(())
+        if self.layer_name == layer_name {
+            self.state_updater
+                .send(InternalHandle::ShowWinAgain)
+                .await
+                .unwrap();
+            Ok(())
+        } else {
+            let path = "org.VimYoung.".to_string() + layer_name;
+            let conn = BusConn::session().await?;
+            let _ = conn
+                .call_method(
+                    Some(path.as_str()),
+                    "/org/VimYoung/VarHandler",
+                    Some("org.VimYoung.Widget"),
+                    "ShowWindowBack",
+                    &(layer_name),
+                )
+                .await;
+            Ok(())
+        }
     }
 
     async fn hide_window(&self, layer_name: &str) -> Result<(), BusError> {
-        self.state_updater
-            .send(InternalHandle::HideWindow)
-            .await
-            .unwrap();
-        Ok(())
+        println!("Hide command coming, layer name: {}", layer_name);
+        println!("{}", self.layer_name);
+        if self.layer_name == layer_name {
+            println!("In layer {}", layer_name);
+            self.state_updater
+                .send(InternalHandle::HideWindow)
+                .await
+                .unwrap();
+            Ok(())
+        } else {
+            // println!("In layer {}", layer_name);
+            let conn = BusConn::session().await?;
+            let path = "org.VimYoung.".to_string() + layer_name;
+            let _ = conn
+                .call_method(
+                    Some(path.as_str()),
+                    "/org/VimYoung/VarHandler",
+                    Some("org.VimYoung.Widget"),
+                    "ShowWindowBack",
+                    &(layer_name),
+                )
+                .await;
+            Ok(())
+        }
     }
-
-    #[zbus(signal)]
-    async fn layer_var_value_changed(
-        emitter: &SignalEmitter<'_>,
-        layer_name: &str,
-        var_name: &str,
-        value: &str,
-    ) -> zbus::Result<()>;
-
-    #[zbus(signal)]
-    async fn layer_find_var(
-        emitter: &SignalEmitter<'_>,
-        layer_name: &str,
-        var_name: &str,
-    ) -> zbus::Result<()>;
+    //
+    // #[zbus(signal)]
+    // async fn layer_var_value_changed(
+    //     emitter: &SignalEmitter<'_>,
+    //     layer_name: &str,
+    //     var_name: &str,
+    //     value: &str,
+    // ) -> zbus::Result<()>;
+    //
+    // #[zbus(signal)]
+    // async fn layer_find_var(
+    //     emitter: &SignalEmitter<'_>,
+    //     layer_name: &str,
+    //     var_name: &str,
+    // ) -> zbus::Result<()>;
 }
 
 pub async fn deploy_zbus_service(
@@ -165,21 +183,15 @@ pub async fn deploy_zbus_service(
             },
         )
         .await?;
-    // let _ = connection::Builder::session()?
-    //     .name("org.VimYoung.Spell")?
-    //     .serve_at(
-    //         "/org/VimYoung/VarHandler",
-    //         VarHandler {
-    //             state,
-    //             state_updater,
-    //             layer_name,
-    //         },
-    //     )?
-    //     .build();
-    if connection.request_name("org.VimYoung.Spell").await.is_err() {
-        // An instance of VimYoung Dbus session already exists.
-        open_internal_clinet(state, state_updater, layer_name).await?;
-    }
+    connection.request_name("org.VimYoung.Spell").await.unwrap();
+
+    open_sec_service(state, state_updater, layer_name).await?;
+    // if connection.request_name("org.VimYoung.Spell").await.is_err() {
+    //     // An instance of VimYoung Dbus session already exists.
+    //     // open_internal_clinet(state, state_updater, layer_name).await?;
+    //     println!("creating widget");
+    //     open_sec_service(state, state_updater, layer_name).await?;
+    // }
 
     pending::<()>().await;
 

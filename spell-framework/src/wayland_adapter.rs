@@ -194,7 +194,7 @@ impl SpellWin {
         win
     }
 
-    /// retrive the sender handle to pass [`Handle`] events to the windows.
+    /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
     pub fn get_handler(&mut self) -> WinHandle {
         WinHandle(self.loop_handle.clone())
     }
@@ -218,6 +218,7 @@ impl SpellWin {
 
     /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
+        println!("hide called");
         self.is_hidden.set(true);
         self.layer.wl_surface().attach(None, 0, 0);
     }
@@ -300,9 +301,12 @@ impl SpellWin {
 
         // Rendering from Skia
         if !self.is_hidden.get() {
-            // let skia_now = std::time::Instant::now();
+            let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            // println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            let elasped_time = skia_now.elapsed().as_millis();
+            if elasped_time != 0 {
+                println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            }
 
             let buffer = &self.buffer;
             if self.first_configure || redraw_val {
@@ -535,6 +539,7 @@ pub struct WinHandle(LoopHandle<'static, SpellWin>);
 impl WinHandle {
     /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
     pub fn hide(&self) {
+        println!("hide called");
         self.0.insert_idle(|win| win.hide());
     }
 
@@ -903,10 +908,13 @@ impl SpellAssociated for SpellLock {
     }
 }
 
+/// Struct to handle unlocking of a SpellLock instance.
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
-    /// call this method to unlock Spelllock
+    /// Call this method to unlock Spelllock. It also takes a callback which
+    /// is invoked when the password parsed is wrong. It can be used to invoke
+    /// UI specific changes for your slint frontend.
     pub fn unlock(
         &self,
         username: Option<String>,
