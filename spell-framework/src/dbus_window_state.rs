@@ -5,7 +5,8 @@ use std::{
     result::Result,
     sync::{Arc, RwLock},
 };
-use tokio::sync::mpsc::Sender;
+// use tokio::sync::mpsc::Sender;
+use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use zbus::{
     Connection as BusConn, fdo::Error as BusError, interface, object_server::SignalEmitter,
 };
@@ -52,13 +53,10 @@ impl VarHandler {
                 DataType::Boolean(_) => {
                     if let Ok(con_var) = val.trim().parse::<bool>() {
                         //TODO this needs to be handled once graceful shutdown is implemented.
-                        let _ = self
-                            .state_updater
-                            .send(InternalHandle::StateValChange((
-                                key.to_string(),
-                                DataType::Boolean(con_var),
-                            )))
-                            .await;
+                        let _ = self.state_updater.send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::Boolean(con_var),
+                        )));
                         Ok(())
                     } else {
                         Err(BusError::NotSupported("Value is not supported".to_string()))
@@ -100,7 +98,6 @@ impl VarHandler {
         if self.layer_name == layer_name {
             self.state_updater
                 .send(InternalHandle::ShowWinAgain)
-                .await
                 .unwrap();
             Ok(())
         } else {
@@ -123,14 +120,14 @@ impl VarHandler {
         println!("Hide command coming, layer name: {}", layer_name);
         println!("{}", self.layer_name);
         if self.layer_name == layer_name {
-            println!("In layer {}", layer_name);
-            self.state_updater
-                .send(InternalHandle::HideWindow)
-                .await
-                .unwrap();
+            println!("In layer same{}", layer_name);
+            if self.state_updater.send(InternalHandle::HideWindow).is_err() {
+                println!("Some error occured");
+            };
             Ok(())
         } else {
-            // println!("In layer {}", layer_name);
+            println!("In layer {}", layer_name);
+            println!("Called hide");
             let conn = BusConn::session().await?;
             let path = "org.VimYoung.".to_string() + layer_name;
             let _ = conn
@@ -141,7 +138,7 @@ impl VarHandler {
                     "ShowWindowBack",
                     &(layer_name),
                 )
-                .await;
+                .await?;
             Ok(())
         }
     }
@@ -167,8 +164,8 @@ pub async fn deploy_zbus_service(
     state_updater: Sender<InternalHandle>,
     layer_name: String,
 ) -> zbus::Result<()> {
-    println!("deplied zbus serive");
-    let connection = BusConn::session().await?;
+    println!("deploied zbus serive");
+    let connection = BusConn::session().await.unwrap();
 
     //Setting up object server.
     // TODO This clone might be avoided.
@@ -183,7 +180,8 @@ pub async fn deploy_zbus_service(
             },
         )
         .await?;
-    connection.request_name("org.VimYoung.Spell").await.unwrap();
+    println!("Object server set up");
+    connection.request_name("org.VimYoung.Spell").await?;
 
     open_sec_service(state, state_updater, layer_name).await?;
     // if connection.request_name("org.VimYoung.Spell").await.is_err() {

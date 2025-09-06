@@ -26,5 +26,23 @@ Arguments:
     --version | -v: Displays the version of spell-cli.
 ";
 
+pub const LOGS_HELP: &str = "
+Usage: spell-cli log [<argument>] [sub-command] ...
+
+`log` subcommand is used to retrieve logging information from currently running widget instances.
+
+Sub-commands:
+    slint_debug: links slint's debug!{} method output. You can view your debug
+                 statements from it.
+    debug: General errors and warning that might be helpful in debugging.
+    dump: Performance metric information of spell, generally not needed by
+          end user. It's output can be used to point issues.
+    dev: Development related logs not intended for end users.
+
+Arguments:
+    --layer | -l :  Specifies the name of layer (aka window) whose logs to show. Use
+                    unique names of layers to avoid undefined behaviour. You can also
+                    define the layer before like with `update` subcommand.
+    --help | -h :   Shows this help message.
+";
 pub const ENABLE_HELP: &str = "";
-pub const LOGS_HELP: &str = "";

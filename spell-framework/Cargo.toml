@@ -13,14 +13,14 @@ env_logger = "0.11.7"
 event-listener = "5.4.0"
 fs2 = "0.4.3"
 futures-util = "0.3.31"
-i-slint-core = "1.12.1"
-i-slint-renderer-skia = { version = "1.12.1", features = [
+i-slint-core = "1.13.0"
+i-slint-renderer-skia = { version = "1.13.0", features = [
   "wayland",
 ], optional = true }
 owo-colors = "4.2.2"
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.3.18"
-slint = { version = "1.12.1", features = [
+slint = { version = "1.13.0", features = [
   "raw-window-handle-06",
   "renderer-software",
 ] }
@@ -29,7 +29,7 @@ tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["std"] }
 tracing-rfc-5424 = "0.1.4"
-zbus = "5.7.1"
+zbus = "5.10.0"
 nonstick = "0.1.1"
 
 [package.metadata.docs.rs]

@@ -1,5 +1,5 @@
 pub mod constantvals;
-use constantvals::MAIN_HELP;
+use constantvals::{ENABLE_HELP, LOGS_HELP, MAIN_HELP};
 use std::env::{self, Args};
 use zbus::{Connection, Result as BusResult, proxy};
 
@@ -64,6 +64,7 @@ async fn main() -> Result<(), SpellError> {
                             "Provide the value of layer name".to_string(),
                         ))),
                     },
+                "--help" | "-h" => show_help(Some("log")),
                 _ => get_logs(None, values).await,
                 },
                 None => Err(SpellError::CLI(Cli::UndefinedArg("define a layer name to display user logs".to_string())))
@@ -72,11 +73,6 @@ async fn main() -> Result<(), SpellError> {
             // Will display all the existing features of your shell as configured by the user.
             // So, when showcasing, he would only need to run this command once.
             "test" => Ok(()),
-            // Following code will be used for opening clsing respected windows later on once
-            // Spell is made multi-window compatable.
-            "open" => Ok(()),
-            "close" => Ok(()),
-            "toggle" => Ok(()),
             // List the running instancs of windows and subwindows.
             "list" => Ok(()),
             "--help" | "-h" => show_help(None),
@@ -132,7 +128,6 @@ async fn main() -> Result<(), SpellError> {
                     _ => eprintln!("[Undocumented Error]: {bus_error}"),
                 },
             }
-            // eprintln!("[Error] : \n {recieved_error:?}");
         }
     } else {
         let _ = show_help(None);
@@ -174,7 +169,14 @@ fn get_tracing_debug(log_type: LogType, layer_name: String) -> Result<(), SpellE
 fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     match sub_command {
         // TODO Add help commands messages for sub-commands.
-        Some(_sub_comm) => Ok(()),
+        Some(sub_comm) => {
+            match sub_comm {
+                "log" => println!("{LOGS_HELP}"),
+                "enable" => println!("{ENABLE_HELP}"),
+                _ => {}
+            }
+            Ok(())
+        }
         None => {
             println!("{MAIN_HELP}");
             Ok(())

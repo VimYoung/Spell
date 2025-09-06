@@ -5,7 +5,8 @@
 use crate::{
     SpellAssociated,
     configure::{LayerConf, WindowConf},
-    helper_fn_for_deploy, helper_fn_internal_handle,
+    dbus_window_state::InternalHandle,
+    helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
@@ -20,7 +21,7 @@ use smithay_client_toolkit::{
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
     output::{self, OutputHandler, OutputState},
     reexports::{
-        calloop::{EventLoop, LoopHandle},
+        calloop::{EventLoop, LoopHandle, channel::Event},
         calloop_wayland_source::WaylandSource,
         client::{
             Connection, QueueHandle,
@@ -369,28 +370,58 @@ impl SpellWin {
 }
 
 impl SpellAssociated for SpellWin {
-    fn on_call<'a>(
+    fn on_call<F>(
         &mut self,
         state: Option<
             std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
         >,
-        mut set_callback: Option<
-            Box<
-                dyn FnMut(
-                        std::sync::Arc<
-                            std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
-                        >,
-                    ) + 'a,
-            >,
-        >,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut rx = helper_fn_for_deploy(self.layer_name.clone(), &state);
-
+        set_callback: Option<F>,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        F: FnMut(
+                std::sync::Arc<
+                    std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
+                >,
+            ) + 'static,
+    {
+        let rx = helper_fn_for_deploy(self.layer_name.clone(), &state);
         let event_loop = self.event_loop.clone();
+        if let Some(mut callback) = set_callback {
+            // let callback = Rc::new(RefCell::new(callback));
+            self.event_loop
+                .borrow()
+                .handle()
+                .insert_source(rx, move |event_msg, _, state_data| {
+                    println!("Hide being called internally");
+                    match event_msg {
+                        Event::Msg(int_handle) => {
+                            match int_handle {
+                                InternalHandle::StateValChange((key, data_type)) => {
+                                    println!("Inside statechange");
+                                    //Glad I could think of this sub scope for RwLock.
+                                    {
+                                        let mut state_inst =
+                                            state.as_ref().unwrap().write().unwrap();
+                                        state_inst.change_val(&key, data_type);
+                                    }
+                                    callback(state.as_ref().unwrap().clone());
+                                }
+                                InternalHandle::ShowWinAgain => {
+                                    state_data.show_again();
+                                }
+                                InternalHandle::HideWindow => {
+                                    state_data.hide();
+                                    println!("Hide called");
+                                }
+                            }
+                        }
+                        // TODO have to handle it properly.
+                        Event::Closed => {}
+                    }
+                })
+                .unwrap();
+        }
         loop {
-            helper_fn_internal_handle(&state, &mut set_callback, &mut rx, self);
-            // helper_fn_win_handle(self);
-            // run_loop_once(self);
             event_loop
                 .borrow_mut()
                 .dispatch(Duration::from_millis(1), self)
@@ -882,21 +913,20 @@ impl SpellLock {
 }
 
 impl SpellAssociated for SpellLock {
-    fn on_call<'a>(
+    fn on_call<F>(
         &mut self,
         _: Option<
             std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
         >,
-        _: Option<
-            Box<
-                dyn FnMut(
-                        std::sync::Arc<
-                            std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
-                        >,
-                    ) + 'a,
-            >,
-        >,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+        _: Option<F>,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        F: FnMut(
+                std::sync::Arc<
+                    std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
+                >,
+            ) + 'static,
+    {
         let event_loop = self.event_loop.clone();
         while self.is_locked {
             event_loop

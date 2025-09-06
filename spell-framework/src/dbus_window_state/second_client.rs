@@ -2,7 +2,8 @@ use crate::{ForeignController, dbus_window_state::InternalHandle, layer_properti
 use core::panic;
 use futures_util::StreamExt;
 use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc::Sender;
+// use tokio::sync::mpsc::Sender;
+use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use zbus::{Connection as BusConn, fdo::Error as BusError, interface, proxy};
 
 // Here var_name is nothing but the key
@@ -38,12 +39,10 @@ pub async fn open_internal_clinet(
                 DataType::Boolean(_) => {
                     if let Ok(con_var) = args.value.trim().parse::<bool>() {
                         //TODO this needs to be handled once graceful shutdown is implemented.
-                        let _ = state_updater
-                            .send(InternalHandle::StateValChange((
-                                args.var_name.to_string(),
-                                DataType::Boolean(con_var),
-                            )))
-                            .await;
+                        let _ = state_updater.send(InternalHandle::StateValChange((
+                            args.var_name.to_string(),
+                            DataType::Boolean(con_var),
+                        )));
                         return Ok(());
                     } else {
                         return Err(BusError::NotSupported("Value is not supported".to_string()));
@@ -83,6 +82,7 @@ pub async fn open_sec_service(
             "A Service for this widget name already exists, please change the name or don't restart an already running widget"
         );
     }
+    println!("Secondary clinet execution is complete.");
     Ok(())
 }
 
@@ -91,24 +91,17 @@ pub(crate) struct WidgetHandler {
     state_updater: Sender<InternalHandle>,
 }
 
-#[interface(name = "org.VimYoung.Widget",
-    // default_service = "org.VimYoung.Spell",
-        // default_path = "/org/VimYoung/VarHandler",
-    proxy(gen_blocking = false)
-)]
+#[interface(name = "org.VimYoung.Widget", proxy(gen_blocking = false))]
 impl WidgetHandler {
     pub(crate) async fn set_value(&mut self, key: &str, val: &str) -> Result<(), BusError> {
         let returned_value: DataType = self.state.read().unwrap().get_type(key);
         match returned_value {
             DataType::Boolean(_) => {
                 if let Ok(con_var) = val.trim().parse::<bool>() {
-                    let _ = self
-                        .state_updater
-                        .send(InternalHandle::StateValChange((
-                            key.to_string(),
-                            DataType::Boolean(con_var),
-                        )))
-                        .await;
+                    let _ = self.state_updater.send(InternalHandle::StateValChange((
+                        key.to_string(),
+                        DataType::Boolean(con_var),
+                    )));
                     Ok(())
                 } else {
                     Err(BusError::NotSupported("Value is not supported".to_string()))
@@ -123,7 +116,6 @@ impl WidgetHandler {
     pub(crate) async fn hide_window(&self, layer_name: &str) -> Result<(), BusError> {
         self.state_updater
             .send(InternalHandle::ShowWinAgain)
-            .await
             .unwrap();
         Ok(())
     }
