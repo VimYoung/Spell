@@ -13,5 +13,37 @@
 //! - Possible PowerProfiles and changes.
 //! - CPU and Temperature Analytics etc.
 
-/// Future implementation of Forge for timed events will happen here.
-pub struct Forge;
+use std::time::Duration;
+
+use crate::wayland_adapter::SpellWin;
+use smithay_client_toolkit::reexports::calloop::{
+    LoopHandle,
+    timer::{TimeoutAction, Timer},
+};
+
+/// An instance of Forge takes the LoopHandle of your window as input for
+/// instance creation
+pub struct Forge(LoopHandle<'static, SpellWin>);
+
+impl Forge {
+    // Create an instance on forge.
+    pub fn new(handle: LoopHandle<'static, SpellWin>) -> Self {
+        Forge(handle)
+    }
+
+    /// Add a recurring event. This function takes [`std::time::Duration`] to specify
+    /// time after which it will be polled again with a callback to run. The callback accepts
+    /// SpellWin instance of loop handle as argument for updating UI.
+    pub fn add_event<F: FnMut(&mut SpellWin) + 'static>(
+        &self,
+        duration: Duration,
+        mut callback: F,
+    ) {
+        self.0
+            .insert_source(Timer::from_duration(duration), move |_, _, data| {
+                callback(data);
+                TimeoutAction::ToDuration(duration)
+            })
+            .unwrap();
+    }
+}

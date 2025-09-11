@@ -8,6 +8,9 @@ significantly reduces necessary call from objects for use and streamlines the pr
 - `cast_spell` is made universal for both `SpellWin` and `SpellLock` (`run_lock` is removed).
 - Rather than directly handling the events, event_queue is converted to a calloop based event loop. This
 eliminates the need for using mpsc channels in the same thread (which was previously the case).
+  - This also involves removing of channels from internal handles which were called through the cli.
+- `Forge` is added to enable timed events.
+- Lockscreen leading to compositor(Hyprland) black screen error is resolved.
 
 0.1.5  & 0.1.1 CLI (25-08-19)
 ================

@@ -48,9 +48,9 @@ fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: b
                 if window_conf.exclusive_zone && first_configure {
                     match first_anchor {
                         Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
+                            layer.set_exclusive_zone((window_conf.width) as i32)
                         }
-                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
+                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(30),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.
                         _ => {}
@@ -64,9 +64,9 @@ fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: b
                 if window_conf.exclusive_zone && first_configure {
                     match sec_anchor {
                         Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
+                            layer.set_exclusive_zone((window_conf.width) as i32)
                         }
-                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(35),
+                        Anchor::TOP | Anchor::BOTTOM => layer.set_exclusive_zone(30),
                         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
                         // in which case no exclusive_zone will be set.
                         _ => {}

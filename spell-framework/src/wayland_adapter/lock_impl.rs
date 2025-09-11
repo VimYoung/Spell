@@ -146,17 +146,6 @@ impl SessionLockHandler for SpellLock {
     }
 }
 
-pub fn run_lock(mut lock: SpellLock) -> Result<(), Box<dyn Error>> {
-    let event_loop = lock.event_loop.clone();
-    while lock.is_locked {
-        event_loop
-            .borrow_mut()
-            .dispatch(Duration::from_millis(1), &mut lock)
-            .unwrap();
-    }
-    Ok(())
-}
-
 impl KeyboardHandler for SpellLock {
     fn enter(
         &mut self,

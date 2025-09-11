@@ -102,21 +102,6 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
             self.primary_slot.borrow_mut().canvas(pool).unwrap(),
         )
         .unwrap();
-
-        let native_buffer = {
-            let x = self.primary_slot.borrow().canvas(pool).unwrap();
-            // creates a copy
-            x.to_vec()
-        };
-        // *self.secondary_slot.borrow_mut().canvas(pool).unwrap() = *native_buffer.as_slice();
-
-        // let mut sec_buffer = self.primary_slot.canvas(pool).unwrap();
-        let nv = native_buffer[649728..649738].to_vec();
-        // let mv = sec_buffer[649728..649738].to_vec();
-        // println!("On iterations: {:?}", nv);
-        // println!("On iterations sec: {:?}", mv);
-        // core::mem::swap::<&mut [u8]>(&mut native_buffer.as_mut_slice(), &mut sec_buffer);
-        // println!("On iterations sec after: {:?}", mv);
         Ok(())
     }
 }
@@ -217,6 +202,7 @@ impl SpellSkiaWinAdapterReal {
     pub(crate) fn refersh_buffer(&self) -> Buffer {
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;
+        // self.needs_redraw.set(true);
         self.buffer_slint.refresh_buffer(width, height)
     }
 

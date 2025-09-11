@@ -51,7 +51,6 @@ type State = Arc<RwLock<Box<dyn ForeignController>>>;
 
 pub fn enchant_spells<F>(
     mut waywindows: Vec<SpellWin>,
-    // window_handles: Vec<Option<std::sync::mpsc::Receiver<Handle>>>,
     states: Vec<Option<State>>,
     mut set_callbacks: Vec<Option<F>>,
 ) -> Result<(), Box<dyn Error>>

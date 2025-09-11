@@ -10,7 +10,7 @@ use crate::{
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
 };
-pub use lock_impl::{SpellSlintLock, run_lock};
+pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
@@ -31,7 +31,7 @@ use smithay_client_toolkit::{
     },
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
-    session_lock::{SessionLock, SessionLockState, SessionLockSurface},
+    session_lock::{self, SessionLock, SessionLockState, SessionLockSurface},
     shell::{
         WaylandSurface,
         wlr_layer::{
@@ -77,6 +77,7 @@ pub(crate) struct States {
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     pub(crate) loop_handle: LoopHandle<'static, SpellWin>,
+    pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) size: PhysicalSize,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
@@ -166,6 +167,7 @@ impl SpellWin {
         let win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
+            queue: qh.clone(),
             size: PhysicalSize {
                 width: window_conf.width,
                 height: window_conf.height,
@@ -219,18 +221,27 @@ impl SpellWin {
 
     /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
-        println!("hide called");
-        self.is_hidden.set(true);
-        self.layer.wl_surface().attach(None, 0, 0);
+        if !self.is_hidden.replace(true) {
+            println!("hide called");
+            self.layer.wl_surface().attach(None, 0, 0);
+        }
     }
 
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
     pub fn show_again(&mut self) {
-        let primary_buf = self.adapter.refersh_buffer();
-        self.buffer = primary_buf;
-        self.set_config_internal();
-        self.is_hidden.set(false);
-        self.layer.commit();
+        if self.is_hidden.replace(false) {
+            println!("called show again");
+            let qh = self.queue.clone();
+            self.converter(&qh);
+            // let primary_buf = self.adapter.refersh_buffer();
+            // self.buffer = primary_buf;
+            // self.layer.commit();
+            // self.set_config_internal();
+            // self.layer
+            //     .wl_surface()
+            //     .attach(Some(self.buffer.wl_buffer()), 0, 0);
+            // self.layer.commit();
+        }
     }
 
     /// Hides the widget if visible or shows the widget back if hidden.
@@ -392,7 +403,7 @@ impl SpellAssociated for SpellWin {
                 .borrow()
                 .handle()
                 .insert_source(rx, move |event_msg, _, state_data| {
-                    println!("Hide being called internally");
+                    println!("Some event recieved internally");
                     match event_msg {
                         Event::Msg(int_handle) => {
                             match int_handle {
@@ -407,6 +418,7 @@ impl SpellAssociated for SpellWin {
                                     callback(state.as_ref().unwrap().clone());
                                 }
                                 InternalHandle::ShowWinAgain => {
+                                    println!("Show called");
                                     state_data.show_again();
                                 }
                                 InternalHandle::HideWindow => {
@@ -416,7 +428,9 @@ impl SpellAssociated for SpellWin {
                             }
                         }
                         // TODO have to handle it properly.
-                        Event::Closed => {}
+                        Event::Closed => {
+                            println!("In closed");
+                        }
                     }
                 })
                 .unwrap();
@@ -551,11 +565,11 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
-        // println!("Config event is called");
+        println!("Config event is called");
         if !self.first_configure {
             self.first_configure = true;
         } else {
-            // println!("[{}]: First draw called", self.layer_name);
+            println!("[{}]: First draw called", self.layer_name);
         }
         self.converter(qh);
     }
@@ -698,12 +712,6 @@ impl SpellLock {
         let mut win_handler_vec: Vec<(String, (u32, u32))> = Vec::new();
         let lock_surfaces = Vec::new();
 
-        let session_lock = Some(
-            session_lock_state
-                .lock(&qh)
-                .expect("ext-session-lock not supported"),
-        );
-
         let keyboard_state = KeyboardState {
             board: None,
             // board_data: None,
@@ -718,7 +726,7 @@ impl SpellLock {
             seat_state: SeatState::new(&globals, &qh),
             slint_part: None,
             shm,
-            session_lock,
+            session_lock: None,
             lock_surfaces,
             is_locked: true,
             event_loop: Rc::new(RefCell::new(event_loop)),
@@ -726,6 +734,13 @@ impl SpellLock {
 
         let _ = event_queue.roundtrip(&mut spell_lock);
 
+        let session_lock = Some(
+            session_lock_state
+                .lock(&qh)
+                .expect("ext-session-lock not supported"),
+        );
+
+        spell_lock.session_lock = session_lock;
         for output in spell_lock.output_state.outputs() {
             let output_info: output::OutputInfo = spell_lock.output_state.info(&output).unwrap();
             let output_name: String = output_info.name.unwrap_or_else(|| "SomeOutput".to_string());
@@ -870,7 +885,12 @@ impl SpellLock {
         // of the canvas.
     }
 
-    fn unlock(&mut self, username: Option<&str>, password: &str) -> PamResult<()> {
+    fn unlock(
+        &mut self,
+        username: Option<&str>,
+        password: &str,
+        on_unlock_callback: Box<dyn FnOnce()>,
+    ) -> PamResult<()> {
         let user_name;
         if let Some(username) = username {
             user_name = username.to_string();
@@ -899,6 +919,7 @@ impl SpellLock {
         txn.authenticate(AuthnFlags::empty())?;
         txn.account_management(AuthnFlags::empty())?;
 
+        on_unlock_callback();
         if let Some(locked_val) = self.session_lock.take() {
             locked_val.unlock();
         }
@@ -942,17 +963,22 @@ impl SpellAssociated for SpellLock {
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
-    /// Call this method to unlock Spelllock. It also takes a callback which
-    /// is invoked when the password parsed is wrong. It can be used to invoke
-    /// UI specific changes for your slint frontend.
+    /// Call this method to unlock Spelllock. It also takes two callbacks which
+    /// are invoked when the password parsed is wrong and when the lock is
+    /// opened respectively. It can be used to invoke UI specific changes for
+    /// your slint frontend.
     pub fn unlock(
         &self,
         username: Option<String>,
         password: String,
         on_err_callback: Box<dyn FnOnce()>,
+        on_unlock_callback: Box<dyn FnOnce()>,
     ) {
         self.0.insert_idle(move |app_data| {
-            if app_data.unlock(username.as_deref(), &password).is_err() {
+            if app_data
+                .unlock(username.as_deref(), &password, on_unlock_callback)
+                .is_err()
+            {
                 on_err_callback();
             }
         });
