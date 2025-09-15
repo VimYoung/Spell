@@ -143,6 +143,13 @@ impl SpellMultiWinHandler {
     /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
     /// event loop.
     pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
+        tracing_subscriber::fmt()
+            .without_time()
+            .with_env_filter(tracing_subscriber::EnvFilter::new(
+                "spell_framework=trace,info",
+            ))
+            // .with_max_level(tracing::Level::TRACE)
+            .init();
         let conn = Connection::connect_to_env().unwrap();
         let new_windows: Vec<(String, LayerConf)> = windows
             .iter()
@@ -152,8 +159,8 @@ impl SpellMultiWinHandler {
         let mut new_adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
         let mut windows_spell: Vec<SpellWin> = Vec::new();
         windows.iter().for_each(|(layer_name, conf)| {
-            let window: SpellWin;
-            window = SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
+            let window =
+                SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
             let adapter = window.adapter.clone();
             windows_spell.push(window);
             new_adapters.push(adapter);

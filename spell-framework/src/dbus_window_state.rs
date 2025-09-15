@@ -1,12 +1,12 @@
-use crate::dbus_window_state::second_client::{open_internal_clinet, open_sec_service};
+use crate::dbus_window_state::second_client::open_sec_service;
+use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use std::{
     any::Any,
     future::pending,
     result::Result,
     sync::{Arc, RwLock},
 };
-// use tokio::sync::mpsc::Sender;
-use smithay_client_toolkit::reexports::calloop::channel::Sender;
+use tracing::{info, trace};
 use zbus::{
     Connection as BusConn, fdo::Error as BusError, interface, object_server::SignalEmitter,
 };
@@ -14,7 +14,7 @@ use zbus::{
 mod second_client;
 /// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
 /// macro in the future.
-pub trait ForeignController: Send + Sync {
+pub trait ForeignController: Send + Sync + std::fmt::Debug {
     fn get_type(&self, key: &str) -> DataType;
     fn change_val(&mut self, key: &str, val: DataType);
     fn as_any(&self) -> &dyn Any;
@@ -164,11 +164,7 @@ pub async fn deploy_zbus_service(
     state_updater: Sender<InternalHandle>,
     layer_name: String,
 ) -> zbus::Result<()> {
-    println!("deploied zbus serive");
     let connection = BusConn::session().await.unwrap();
-
-    //Setting up object server.
-    // TODO This clone might be avoided.
     connection
         .object_server()
         .at(
@@ -180,16 +176,15 @@ pub async fn deploy_zbus_service(
             },
         )
         .await?;
-    println!("Object server set up");
-    connection.request_name("org.VimYoung.Spell").await?;
-
-    open_sec_service(state, state_updater, layer_name).await?;
-    // if connection.request_name("org.VimYoung.Spell").await.is_err() {
-    //     // An instance of VimYoung Dbus session already exists.
-    //     // open_internal_clinet(state, state_updater, layer_name).await?;
-    //     println!("creating widget");
-    //     open_sec_service(state, state_updater, layer_name).await?;
-    // }
+    trace!("Object server set up");
+    // connection.request_name("org.VimYoung.Spell").await?;
+    // open_sec_service(state, state_updater, layer_name).await?;
+    if let Err(err) = connection.request_name("org.VimYoung.Spell").await {
+        open_sec_service(state, state_updater, layer_name).await?;
+        info!("Successfully created secondary service, Error: {}", err);
+    } else {
+        info!("Successfully created main service");
+    }
 
     pending::<()>().await;
 

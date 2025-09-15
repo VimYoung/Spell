@@ -25,6 +25,7 @@ use smithay_client_toolkit::{
     },
     shell::WaylandSurface,
 };
+use tracing::info;
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -148,18 +149,14 @@ impl SeatHandler for SpellWin {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.states.keyboard_state.board.is_none() {
-            println!("Set keyboard capability");
+            info!("Set keyboard capability");
             let keyboard = self
                 .states
                 .seat_state
                 .get_keyboard(qh, &seat, None)
                 .expect("Failed to create keyboard");
-            // let keyboard_data = KeyboardData::new(seat);
             self.states.keyboard_state.board = Some(keyboard);
-            // TODO keyboard Data needs to be set later.
-            // self.keyboard_state.board_data = Some(keyboard_data::<Self>);
         }
-
         if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
             println!("Set pointer capability");
             let pointer = self

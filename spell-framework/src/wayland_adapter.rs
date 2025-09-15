@@ -31,7 +31,7 @@ use smithay_client_toolkit::{
     },
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
-    session_lock::{self, SessionLock, SessionLockState, SessionLockSurface},
+    session_lock::{SessionLock, SessionLockState, SessionLockSurface},
     shell::{
         WaylandSurface,
         wlr_layer::{
@@ -46,11 +46,10 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
-    ffi::{OsStr, OsString},
     process::Command,
     rc::Rc,
-    time::Duration,
 };
+use tracing::{Level, info, span, trace};
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -89,6 +88,18 @@ pub struct SpellWin {
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
+    pub(crate) span: span::Span,
+}
+
+impl std::fmt::Debug for SpellWin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpellWin")
+            .field("adapter", &self.adapter)
+            .field("first_configure", &self.first_configure)
+            .field("is_hidden", &self.is_hidden)
+            .field("config", &self.config)
+            .finish()
+    }
 }
 
 impl SpellWin {
@@ -184,11 +195,12 @@ impl SpellWin {
             layer,
             first_configure: true,
             is_hidden: Cell::new(false),
-            layer_name,
+            layer_name: layer_name.clone(),
             config: window_conf,
             input_region,
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
+            span: span!(Level::INFO, "widget", name = layer_name.as_str()),
         };
 
         WaylandSource::new(conn.clone(), event_queue)
@@ -215,6 +227,14 @@ impl SpellWin {
         // current_display_specs: (usize, usize, usize, usize),
     ) -> Self {
         // Initialisation of wayland components.
+
+        tracing_subscriber::fmt()
+            .without_time()
+            .with_env_filter(tracing_subscriber::EnvFilter::new(
+                "spell_framework=trace,info",
+            ))
+            // .with_max_level(tracing::Level::TRACE)
+            .init();
         let conn = Connection::connect_to_env().unwrap();
         SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true)
     }
@@ -222,7 +242,7 @@ impl SpellWin {
     /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
-            println!("hide called");
+            trace!("Win: Hiding window");
             self.layer.wl_surface().attach(None, 0, 0);
         }
     }
@@ -230,7 +250,7 @@ impl SpellWin {
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
     pub fn show_again(&mut self) {
         if self.is_hidden.replace(false) {
-            println!("called show again");
+            trace!("win: Showing window again");
             let qh = self.queue.clone();
             self.converter(&qh);
             // let primary_buf = self.adapter.refersh_buffer();
@@ -317,7 +337,7 @@ impl SpellWin {
             let redraw_val: bool = window_adapter.draw_if_needed();
             let elasped_time = skia_now.elapsed().as_millis();
             if elasped_time != 0 {
-                println!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+                // debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
             }
 
             let buffer = &self.buffer;
@@ -349,7 +369,7 @@ impl SpellWin {
                     .attach(Some(buffer.wl_buffer()), 0, 0);
             }
         } else {
-            // println!("Is_hidden is true.");
+            // debug!("Is hidden is true, window is true");
         }
 
         self.layer
@@ -387,6 +407,7 @@ impl SpellAssociated for SpellWin {
             std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
         >,
         set_callback: Option<F>,
+        span_log: tracing::span::Span,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
         F: FnMut(
@@ -395,52 +416,52 @@ impl SpellAssociated for SpellWin {
                 >,
             ) + 'static,
     {
-        let rx = helper_fn_for_deploy(self.layer_name.clone(), &state);
+        let rx = helper_fn_for_deploy(self.layer_name.clone(), &state, span_log);
         let event_loop = self.event_loop.clone();
         if let Some(mut callback) = set_callback {
-            // let callback = Rc::new(RefCell::new(callback));
             self.event_loop
                 .borrow()
                 .handle()
                 .insert_source(rx, move |event_msg, _, state_data| {
-                    println!("Some event recieved internally");
+                    trace!("Internal event recieved");
                     match event_msg {
-                        Event::Msg(int_handle) => {
-                            match int_handle {
-                                InternalHandle::StateValChange((key, data_type)) => {
-                                    println!("Inside statechange");
-                                    //Glad I could think of this sub scope for RwLock.
-                                    {
-                                        let mut state_inst =
-                                            state.as_ref().unwrap().write().unwrap();
-                                        state_inst.change_val(&key, data_type);
-                                    }
-                                    callback(state.as_ref().unwrap().clone());
+                        Event::Msg(int_handle) => match int_handle {
+                            InternalHandle::StateValChange((key, data_type)) => {
+                                trace!("Internal variable change called");
+                                {
+                                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
+                                    state_inst.change_val(&key, data_type);
                                 }
-                                InternalHandle::ShowWinAgain => {
-                                    println!("Show called");
-                                    state_data.show_again();
-                                }
-                                InternalHandle::HideWindow => {
-                                    state_data.hide();
-                                    println!("Hide called");
-                                }
+                                callback(state.as_ref().unwrap().clone());
                             }
-                        }
+                            InternalHandle::ShowWinAgain => {
+                                trace!("Internal show Called");
+                                state_data.show_again();
+                            }
+                            InternalHandle::HideWindow => {
+                                trace!("Internal hide called");
+                                state_data.hide();
+                            }
+                        },
                         // TODO have to handle it properly.
                         Event::Closed => {
-                            println!("In closed");
+                            info!("Internal Channel closed");
                         }
                     }
                 })
                 .unwrap();
         }
+        info!("Internal reciever set with start of event loop.");
         loop {
             event_loop
                 .borrow_mut()
-                .dispatch(Duration::from_millis(1), self)
+                .dispatch(std::time::Duration::from_millis(1), self)
                 .unwrap();
         }
+    }
+
+    fn get_span(&self) -> tracing::span::Span {
+        self.span.clone()
     }
 }
 
@@ -470,7 +491,7 @@ impl OutputHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _output: wl_output::WlOutput,
     ) {
-        println!("New Output Source Added");
+        trace!("New output Source Added");
     }
 
     fn update_output(
@@ -479,6 +500,7 @@ impl OutputHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _output: wl_output::WlOutput,
     ) {
+        trace!("Existing output is updated");
     }
 
     fn output_destroyed(
@@ -487,7 +509,7 @@ impl OutputHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _output: wl_output::WlOutput,
     ) {
-        println!("Output is destroyed");
+        trace!("Output is destroyed");
     }
 }
 
@@ -499,7 +521,7 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _new_factor: i32,
     ) {
-        // Not needed for this example.
+        trace!("Scale factor changed");
     }
 
     fn transform_changed(
@@ -509,7 +531,7 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _new_transform: wl_output::Transform,
     ) {
-        // Not needed for this example.
+        trace!("Compositor transformation changed");
     }
 
     fn frame(
@@ -529,8 +551,7 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _output: &wl_output::WlOutput,
     ) {
-        println!("Surface reentered");
-        // Not needed for this example.
+        trace!("Surface entered");
     }
 
     fn surface_leave(
@@ -540,15 +561,13 @@ impl CompositorHandler for SpellWin {
         _surface: &wl_surface::WlSurface,
         _output: &wl_output::WlOutput,
     ) {
-        println!("Surface left");
-        // Not needed for this example.
+        trace!("Surface left");
     }
 }
 
 impl LayerShellHandler for SpellWin {
     fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
-        println!("CLosed of layer called");
-        // self.exit = true;
+        trace!("Closure of layer called");
     }
 
     fn configure(
@@ -565,11 +584,11 @@ impl LayerShellHandler for SpellWin {
         //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
 
         // Initiate the first draw.
-        println!("Config event is called");
+        // println!("Config event is called");
         if !self.first_configure {
             self.first_configure = true;
         } else {
-            println!("[{}]: First draw called", self.layer_name);
+            // debug!("[{}]: First draw called", self.layer_name);
         }
         self.converter(qh);
     }
@@ -579,12 +598,11 @@ impl LayerShellHandler for SpellWin {
 /// for calling wayland specific features of `SpellWin`. It can be accessed from
 /// [`crate::wayland_adapter::SpellWin::get_handler`].
 #[derive(Clone, Debug)]
-pub struct WinHandle(LoopHandle<'static, SpellWin>);
+pub struct WinHandle(pub(crate) LoopHandle<'static, SpellWin>);
 
 impl WinHandle {
     /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
     pub fn hide(&self) {
-        println!("hide called");
         self.0.insert_idle(|win| win.hide());
     }
 
@@ -675,7 +693,6 @@ impl WinHandle {
 ///             );
 ///         }
 ///     });
-///     eprintln!("Ran till here");
 ///     cast_spell(Box::new(lock), None, None)
 /// }
 /// ```
@@ -940,6 +957,7 @@ impl SpellAssociated for SpellLock {
             std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
         >,
         _: Option<F>,
+        _: tracing::span::Span,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
         F: FnMut(
@@ -952,10 +970,14 @@ impl SpellAssociated for SpellLock {
         while self.is_locked {
             event_loop
                 .borrow_mut()
-                .dispatch(Duration::from_millis(1), self)
+                .dispatch(std::time::Duration::from_millis(1), self)
                 .unwrap();
         }
         Ok(())
+    }
+
+    fn get_span(&self) -> tracing::span::Span {
+        span!(Level::INFO, "widget")
     }
 }
 
@@ -1007,22 +1029,20 @@ struct UsernamePassConvo {
 // ConversationAdapter is a convenience wrapper for the common case
 // of only handling one request at a time.
 impl ConversationAdapter for UsernamePassConvo {
-    fn prompt(&self, _request: impl AsRef<OsStr>) -> PamResult<OsString> {
-        Ok(OsString::from(&self.username))
+    fn prompt(&self, _request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        Ok(std::ffi::OsString::from(&self.username))
     }
 
-    fn masked_prompt(&self, _request: impl AsRef<OsStr>) -> PamResult<OsString> {
-        Ok(OsString::from(&self.password))
+    fn masked_prompt(
+        &self,
+        _request: impl AsRef<std::ffi::OsStr>,
+    ) -> PamResult<std::ffi::OsString> {
+        Ok(std::ffi::OsString::from(&self.password))
     }
 
-    fn error_msg(&self, _message: impl AsRef<OsStr>) {
-        // Normally you would want to display this to the user somehow.
-        // In this case, we're just ignoring it.
-    }
+    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
 
-    fn info_msg(&self, _message: impl AsRef<OsStr>) {
-        // ibid.
-    }
+    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
 }
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.

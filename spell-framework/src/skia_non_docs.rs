@@ -10,6 +10,7 @@ use smithay_client_toolkit::{
 use std::{
     cell::Cell,
     cell::RefCell,
+    fmt::Debug,
     rc::{Rc, Weak},
 };
 
@@ -119,6 +120,15 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) renderer: SkiaRenderer,
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
+}
+
+impl Debug for SpellSkiaWinAdapterReal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpellSkiaWinAdapter")
+            .field("size", &self.size)
+            .field("redraw", &self.needs_redraw)
+            .finish()
+    }
 }
 
 impl WindowAdapter for SpellSkiaWinAdapterReal {

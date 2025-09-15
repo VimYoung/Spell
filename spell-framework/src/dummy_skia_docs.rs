@@ -4,6 +4,7 @@ use std::rc::Rc;
 /// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
 /// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
+#[derive(Debug)]
 pub struct SpellSkiaWinAdapterDummy {
     pub(crate) window: bool,
     pub(crate) size: bool,

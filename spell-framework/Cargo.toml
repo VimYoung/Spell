@@ -26,8 +26,8 @@ slint = { version = "1.13.0", features = [
 ] }
 smithay-client-toolkit = "0.20.0"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["std"] }
+tracing = { version = "0.1.41", features = ["max_level_trace"] }
+tracing-subscriber = { version = "0.3.19", features = ["std", "env-filter"] }
 tracing-rfc-5424 = "0.1.4"
 zbus = "5.10.0"
 nonstick = "0.1.1"

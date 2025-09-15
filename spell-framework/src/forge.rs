@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use crate::wayland_adapter::SpellWin;
+use crate::wayland_adapter::{SpellWin, WinHandle};
 use smithay_client_toolkit::reexports::calloop::{
     LoopHandle,
     timer::{TimeoutAction, Timer},
@@ -23,11 +23,11 @@ use smithay_client_toolkit::reexports::calloop::{
 
 /// An instance of Forge takes the LoopHandle of your window as input for
 /// instance creation
-pub struct Forge(LoopHandle<'static, SpellWin>);
+pub struct Forge(WinHandle);
 
 impl Forge {
     // Create an instance on forge.
-    pub fn new(handle: LoopHandle<'static, SpellWin>) -> Self {
+    pub fn new(handle: WinHandle) -> Self {
         Forge(handle)
     }
 
@@ -40,6 +40,7 @@ impl Forge {
         mut callback: F,
     ) {
         self.0
+            .0
             .insert_source(Timer::from_duration(duration), move |_, _, data| {
                 callback(data);
                 TimeoutAction::ToDuration(duration)
