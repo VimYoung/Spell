@@ -62,7 +62,6 @@ impl KeyboardHandler for SpellWin {
     ) {
         trace!("Key pressed");
         let string_val: SharedString = get_string(event);
-        // println!("Value of key: {:?}", string_val.as_bytes());
         // if *string_val.as_bytes() == [27] {
         //     self.adapter
         //         .try_dispatch_event(WindowEvent::KeyPressRepeated { text: string_val })
@@ -91,7 +90,6 @@ impl KeyboardHandler for SpellWin {
             .unwrap();
         // let value = event.keysym.key_char();
         // if let Some(val) = value {
-        //     println!("Value getting out :{}", val);
         //     self.adapter
         //         .try_dispatch_event(WindowEvent::KeyReleased {
         //             text: SharedString::from(val /*event.keysym.key_char().unwrap()*/),

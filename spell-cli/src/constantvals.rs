@@ -13,7 +13,7 @@ Sub-commands:
     enable: Enable services like lockscreen, notification etc if there is a
             provided implementation for it. Run `spell-cli enable --help` for
             more details.
-    logs: Display the specified logs. If -l is defined defaults to the logs
+    log: Display the specified logs. If -l is defined defaults to the logs
           of that layer only. Run `spell-cli [-l LAYER_NAME] logs --help` for
           more details.
     list: Lists the running instances of windows created by spell-framework.

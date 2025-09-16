@@ -64,7 +64,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
             slint::PlatformError,
         >,
     ) -> std::result::Result<(), slint::PlatformError> {
-        // println!("This trait implementation of RenderBuffer is Run");
+        // debug!("Render from Skia called");
         let Some((width, height)): Option<(std::num::NonZeroU32, std::num::NonZeroU32)> =
             size.width.try_into().ok().zip(size.height.try_into().ok())
         else {

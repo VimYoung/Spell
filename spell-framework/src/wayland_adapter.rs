@@ -685,36 +685,43 @@ impl WinHandle {
 /// manager config to use the program. It will be linked to spell-cli directly in coming releases.
 ///
 /// ## Example
-/// Here is a minimal example.
+/// Here is a minimal example of rust side, for complete code of slint, check
+/// the codebase of young-shell.
 ///
 /// ```rust
 /// use spell_framework::cast_spell;
-/// use std::{env, error::Error};
-///
+/// use std::{error::Error, sync::{Arc, RwLock}};
 /// use slint::ComponentHandle;
-/// use spell_framework::wayland_adapter::SpellLock;
+/// use spell_framework::{layer_properties::ForeignController, wayland_adapter::SpellLock};
 /// slint::include_modules!();
 ///
 /// fn main() -> Result<(), Box<dyn Error>> {
-///     env::set_var("SLINT_STYLE", "cosmic-dark");
-///     let mut lock = SpellLock::invoke_lock_spell();
+///     let lock = SpellLock::invoke_lock_spell();
 ///     let lock_ui = LockScreen::new().unwrap();
 ///     let looop_handle = lock.get_handler();
 ///     lock_ui.on_check_pass({
 ///         let lock_handle = lock_ui.as_weak();
 ///         move |string_val| {
-///             // let lock_handle_a = lock_handle.clone();
 ///             let lock_handle_a = lock_handle.clone().unwrap();
+///             let lock_handle_b = lock_handle.clone().unwrap();
 ///             looop_handle.unlock(
 ///                 None,
 ///                 string_val.to_string(),
 ///                 Box::new(move || {
 ///                     lock_handle_a.set_lock_error(true);
 ///                 }),
+///                 Box::new(move || {
+///                     lock_handle_b.set_is_lock_activated(false);
+///                 }),
 ///             );
 ///         }
 ///     });
-///     cast_spell(Box::new(lock), None, None)
+///     lock_ui.set_is_lock_activated(true);
+///     cast_spell(
+///         lock,
+///         None,
+///         None::<fn(Arc<RwLock<Box<dyn ForeignController>>>)>,
+///     )
 /// }
 /// ```
 pub struct SpellLock {
@@ -733,6 +740,13 @@ pub struct SpellLock {
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
 }
 
+impl std::fmt::Debug for SpellLock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpellLock")
+            .field("is_locked", &self.is_locked)
+            .finish()
+    }
+}
 impl SpellLock {
     pub fn invoke_lock_spell() -> Self {
         let conn = Connection::connect_to_env().unwrap();

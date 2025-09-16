@@ -2,7 +2,6 @@ use crate::dbus_window_state::second_client::open_sec_service;
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use std::{
     any::Any,
-    future::pending,
     result::Result,
     sync::{Arc, RwLock},
 };
@@ -117,17 +116,10 @@ impl VarHandler {
     }
 
     async fn hide_window(&self, layer_name: &str) -> Result<(), BusError> {
-        println!("Hide command coming, layer name: {}", layer_name);
-        println!("{}", self.layer_name);
         if self.layer_name == layer_name {
-            println!("In layer same{}", layer_name);
-            if self.state_updater.send(InternalHandle::HideWindow).is_err() {
-                println!("Some error occured");
-            };
+            if self.state_updater.send(InternalHandle::HideWindow).is_err() {};
             Ok(())
         } else {
-            println!("In layer {}", layer_name);
-            println!("Called hide");
             let conn = BusConn::session().await?;
             let path = "org.VimYoung.".to_string() + layer_name;
             let _ = conn
@@ -170,8 +162,6 @@ pub async fn deploy_zbus_service(
     } else {
         info!("Successfully created main service");
     }
-
-    pending::<()>().await;
-
+    std::future::pending::<()>().await;
     Ok(())
 }

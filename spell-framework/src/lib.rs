@@ -41,7 +41,7 @@ use std::{
     time::Duration,
 };
 
-use tracing::{Level, error, field, info, instrument, span, trace, warn};
+use tracing::{Level, error, info, instrument, span, trace, warn};
 use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
@@ -128,14 +128,13 @@ where
             }
         }
     } else {
-        error!("Lengths unequal coming");
+        error!("Lengths are unequal");
         panic!(
             "The lengths of given vectors are not equal. \n Make sure that given vector lengths are equal"
         );
     }
 }
 
-// #[instrument(skip(set_callback, state, waywindow))]
 pub fn cast_spell<
     S: SpellAssociated + std::fmt::Debug,
     F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'static,
@@ -144,6 +143,11 @@ pub fn cast_spell<
     state: Option<State>,
     set_callback: Option<F>,
 ) -> Result<(), Box<dyn Error>> {
+    // let mut args = std::env::args();
+    // args.next();
+    // if let Some(val) = args.next() {
+    //     println!("the val: {}", val);
+    // }
     let span = waywindow.get_span();
     let s = span.clone();
     span.in_scope(|| {
@@ -213,6 +217,5 @@ pub trait SpellAssociated {
 // TODO lock screen behaviour in a multi-monitor setup needs to be tested.
 // TODO merge cast_Spell with run_lock after implementing calloop in normal windows.
 // TODO t add tracing in following functions:
-// 1. open_sec_service
-//
+// 1. secondary and primary services
 // TODO implement logiing for SpellLock.

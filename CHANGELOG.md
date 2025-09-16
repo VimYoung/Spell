@@ -1,4 +1,4 @@
-W.I.P. 0.1.6 & 0.1.2 CLI (Due Date)
+0.1.6 & 0.1.2 CLI (25-09-16)
 ===========================
 
 Changes:
@@ -11,6 +11,12 @@ eliminates the need for using mpsc channels in the same thread (which was previo
   - This also involves removing of channels from internal handles which were called through the cli.
 - `Forge` is added to enable timed events.
 - Lockscreen leading to compositor(Hyprland) black screen error is resolved.
+- Print statements are removed in favour of proper log statements for both `SpellWin` and `SpellLock`. Upcoming releases will have a port in CLI to handle the logs and addition of logs in services of vault.
+- Repeated key issue and exclusive zone issue is delayed for next release.
+
+Changes(spell-cli):
+
+- Help statements for upcoming log hooks added.
 
 0.1.5  & 0.1.1 CLI (25-08-19)
 ================
