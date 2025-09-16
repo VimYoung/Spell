@@ -41,7 +41,7 @@ use std::{
     time::Duration,
 };
 
-use tracing::{error, info, instrument, span, trace, warn};
+use tracing::{Level, error, field, info, instrument, span, trace, warn};
 use wayland_adapter::SpellWin;
 
 use zbus::Error as BusError;
@@ -66,6 +66,7 @@ where
                 state,
                 waywindows[index].span.clone(),
             ));
+            trace!("{:?}", &waywindows[index]);
         });
         trace!("Grabbed Internal recievers");
         states.into_iter().enumerate().for_each(|(index, state)| {
@@ -127,7 +128,7 @@ where
             }
         }
     } else {
-        warn!("Lengths unequal coming");
+        error!("Lengths unequal coming");
         panic!(
             "The lengths of given vectors are not equal. \n Make sure that given vector lengths are equal"
         );
@@ -143,13 +144,6 @@ pub fn cast_spell<
     state: Option<State>,
     set_callback: Option<F>,
 ) -> Result<(), Box<dyn Error>> {
-    // tracing_subscriber::fmt()
-    //     .without_time()
-    //     .with_env_filter(tracing_subscriber::EnvFilter::new(
-    //         "spell_framework=trace,info",
-    //     ))
-    //     // .with_max_level(tracing::Level::TRACE)
-    //     .init();
     let span = waywindow.get_span();
     let s = span.clone();
     span.in_scope(|| {
@@ -169,6 +163,8 @@ fn helper_fn_for_deploy(
         let state_clone = some_state.clone();
         std::thread::spawn(move || {
             span_log.in_scope(move || {
+                let span_bus = span!(Level::INFO, "Zbus Logs",);
+                let _guard = span_bus.enter();
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()

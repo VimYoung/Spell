@@ -145,10 +145,10 @@ impl SpellMultiWinHandler {
     pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
         tracing_subscriber::fmt()
             .without_time()
+            .with_target(false)
             .with_env_filter(tracing_subscriber::EnvFilter::new(
                 "spell_framework=trace,info",
             ))
-            // .with_max_level(tracing::Level::TRACE)
             .init();
         let conn = Connection::connect_to_env().unwrap();
         let new_windows: Vec<(String, LayerConf)> = windows

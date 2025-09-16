@@ -49,7 +49,7 @@ use std::{
     process::Command,
     rc::Rc,
 };
-use tracing::{Level, info, span, trace};
+use tracing::{Level, field, info, span, trace};
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -171,10 +171,13 @@ impl SpellWin {
         );
 
         if if_single {
+            trace!("Single window layer platform set");
             let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
                 window_adapter: adapter_value.clone(),
             }));
         }
+
+        info!("Win: {} layer created successfully.", layer_name);
         let win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
@@ -200,7 +203,12 @@ impl SpellWin {
             input_region,
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
-            span: span!(Level::INFO, "widget", name = layer_name.as_str()),
+            span: span!(
+                Level::INFO,
+                "widget",
+                name = layer_name.as_str(),
+                zbus = field::Empty
+            ),
         };
 
         WaylandSource::new(conn.clone(), event_queue)
@@ -211,6 +219,7 @@ impl SpellWin {
 
     /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
     pub fn get_handler(&mut self) -> WinHandle {
+        info!("Win: Handle provided.");
         WinHandle(self.loop_handle.clone())
     }
 
@@ -221,15 +230,10 @@ impl SpellWin {
     ///
     /// This function needs to be called "before" initialising the slint window to avoid
     /// panicing of this function.
-    pub fn invoke_spell(
-        name: &str,
-        window_conf: WindowConf,
-        // current_display_specs: (usize, usize, usize, usize),
-    ) -> Self {
-        // Initialisation of wayland components.
-
+    pub fn invoke_spell(name: &str, window_conf: WindowConf) -> Self {
         tracing_subscriber::fmt()
             .without_time()
+            .with_target(false)
             .with_env_filter(tracing_subscriber::EnvFilter::new(
                 "spell_framework=trace,info",
             ))
@@ -242,7 +246,7 @@ impl SpellWin {
     /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
-            trace!("Win: Hiding window");
+            info!("Win: Hiding window");
             self.layer.wl_surface().attach(None, 0, 0);
         }
     }
@@ -250,7 +254,7 @@ impl SpellWin {
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
     pub fn show_again(&mut self) {
         if self.is_hidden.replace(false) {
-            trace!("win: Showing window again");
+            info!("Win: Showing window again");
             let qh = self.queue.clone();
             self.converter(&qh);
             // let primary_buf = self.adapter.refersh_buffer();
@@ -266,6 +270,7 @@ impl SpellWin {
 
     /// Hides the widget if visible or shows the widget back if hidden.
     pub fn toggle(&mut self) {
+        info!("Win: view toggled");
         if self.is_hidden.get() {
             self.show_again();
         } else {
@@ -279,6 +284,10 @@ impl SpellWin {
     /// events. Adding existing areas again as input region has no effect. This function
     /// combined with transparent base widgets can be used to mimic resizable widgets.
     pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!(
+            "Win: input region added: [x: {}, y: {}, width: {}, height: {}]",
+            x, y, width, height
+        );
         self.input_region.add(x, y, width, height);
         self.set_config_internal();
         self.layer.commit();
@@ -289,6 +298,10 @@ impl SpellWin {
     /// format from top left corener. By default, The whole layer is considered for input
     /// events. Substracting input areas which are already not input regions has no effect.
     pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!(
+            "Win: input region removed: [x: {}, y: {}, width: {}, height: {}]",
+            x, y, width, height
+        );
         self.input_region.subtract(x, y, width, height);
         self.set_config_internal();
         self.layer.commit();
@@ -300,6 +313,10 @@ impl SpellWin {
     /// left corener. Not adding opaque regions in it has no isuues but adding transparent
     /// regions of layer as opaque can cause weird behaviour and glitches.
     pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!(
+            "Win: opaque region added: [x: {}, y: {}, width: {}, height: {}]",
+            x, y, width, height
+        );
         self.opaque_region.add(x, y, width, height);
         self.set_config_internal();
         self.layer.commit();
@@ -310,6 +327,10 @@ impl SpellWin {
     /// this property is optional. The coordinates are in surface local format from top
     /// left corener.
     pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!(
+            "Win: opaque region removed: [x: {}, y: {}, width: {}, height: {}]",
+            x, y, width, height
+        );
         self.opaque_region.subtract(x, y, width, height);
         self.set_config_internal();
         self.layer.commit();

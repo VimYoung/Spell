@@ -142,21 +142,6 @@ impl VarHandler {
             Ok(())
         }
     }
-    //
-    // #[zbus(signal)]
-    // async fn layer_var_value_changed(
-    //     emitter: &SignalEmitter<'_>,
-    //     layer_name: &str,
-    //     var_name: &str,
-    //     value: &str,
-    // ) -> zbus::Result<()>;
-    //
-    // #[zbus(signal)]
-    // async fn layer_find_var(
-    //     emitter: &SignalEmitter<'_>,
-    //     layer_name: &str,
-    //     var_name: &str,
-    // ) -> zbus::Result<()>;
 }
 
 pub async fn deploy_zbus_service(

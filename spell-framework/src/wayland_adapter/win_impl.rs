@@ -1,5 +1,5 @@
 use crate::wayland_adapter::{SpellWin, way_helper::get_string};
-use owo_colors::OwoColorize;
+// use owo_colors::OwoColorize;
 use slint::{
     SharedString,
     platform::{PointerEventButton, WindowEvent},
@@ -25,7 +25,7 @@ use smithay_client_toolkit::{
     },
     shell::WaylandSurface,
 };
-use tracing::info;
+use tracing::{debug, info, trace};
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -38,7 +38,7 @@ impl KeyboardHandler for SpellWin {
         _raw: &[u32],
         _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
-        println!("Keyboard focus entered");
+        info!("Keyboard focus entered");
     }
 
     fn leave(
@@ -49,7 +49,7 @@ impl KeyboardHandler for SpellWin {
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _serial: u32,
     ) {
-        println!("Keyboard focus left");
+        info!("Keyboard focus left");
     }
 
     fn press_key(
@@ -60,7 +60,7 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        println!("A key is pressed");
+        trace!("Key pressed");
         let string_val: SharedString = get_string(event);
         // println!("Value of key: {:?}", string_val.as_bytes());
         // if *string_val.as_bytes() == [27] {
@@ -82,7 +82,7 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        println!("A key is released");
+        trace!("Key released");
         let key_sym = Keysym::new(event.raw_code);
         event.keysym = key_sym;
         let string_val: SharedString = get_string(event);
@@ -149,7 +149,7 @@ impl SeatHandler for SpellWin {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.states.keyboard_state.board.is_none() {
-            info!("Set keyboard capability");
+            info!("Setting keyboard capability");
             let keyboard = self
                 .states
                 .seat_state
@@ -158,7 +158,7 @@ impl SeatHandler for SpellWin {
             self.states.keyboard_state.board = Some(keyboard);
         }
         if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
-            println!("Set pointer capability");
+            info!("Setting pointer capability");
             let pointer = self
                 .states
                 .seat_state
@@ -178,12 +178,12 @@ impl SeatHandler for SpellWin {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.states.keyboard_state.board.is_some() {
-            println!("Unset keyboard capability");
+            info!("Unsetting keyboard capability");
             self.states.keyboard_state.board.take().unwrap().release();
         }
 
         if capability == Capability::Pointer && self.states.pointer_state.pointer.is_some() {
-            println!("Unset pointer capability");
+            info!("Unsetting pointer capability");
             self.states.pointer_state.pointer.take().unwrap().release();
         }
     }
@@ -207,7 +207,7 @@ impl PointerHandler for SpellWin {
             }
             match event.kind {
                 Enter { .. } => {
-                    // println!("Pointer entered @{:?}", event.position);
+                    info!("Pointer entered: {:?}", event.position);
 
                     // TODO this code is redundent, as it doesn't set the cursor shape.
                     let pointer = &self.states.pointer_state.pointer.as_ref().unwrap();
@@ -219,7 +219,6 @@ impl PointerHandler for SpellWin {
                         .unwrap()
                         .latest_enter_serial();
                     if let Some(no) = serial_no {
-                        println!("Cursor Shape set");
                         self.states
                             .pointer_state
                             .cursor_shape
@@ -229,13 +228,13 @@ impl PointerHandler for SpellWin {
                     }
                 }
                 Leave { .. } => {
-                    println!("{} left", "Pointer".red());
+                    info!("Pointer left: {:?}", event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap();
                 }
                 Motion { .. } => {
-                    // println!("Pointer entered @{:?}", event.position);
+                    // debug!("Pointer entered @{:?}", event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
@@ -246,7 +245,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Press { button, .. } => {
-                    println!("Press {:x} @ {:?}", button, event.position);
+                    info!("Press {:x} @ {:?}", button, event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
@@ -258,7 +257,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Release { button, .. } => {
-                    println!("Release {:x} @ {:?}", button, event.position);
+                    info!("Release {:x} @ {:?}", button, event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
@@ -274,7 +273,7 @@ impl PointerHandler for SpellWin {
                     vertical,
                     ..
                 } => {
-                    println!("Scroll H:{horizontal:?}, V:{vertical:?}");
+                    info!("Scroll H:{horizontal:?}, V:{vertical:?}");
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerScrolled {
                             position: slint::LogicalPosition {
