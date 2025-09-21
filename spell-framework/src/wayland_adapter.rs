@@ -49,7 +49,7 @@ use std::{
     process::Command,
     rc::Rc,
 };
-use tracing::{Level,/* debug,*/ field, info, span, trace};
+use tracing::{Level, debug, field, info, span, trace};
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -419,6 +419,13 @@ impl SpellWin {
             .set_keyboard_interactivity(KeyboardInteractivity::None);
         self.layer.commit();
     }
+
+    /// This method is used to set exclusive zone. Generally, useful when
+    /// dimensions of width are different than exclusive zone you want.
+    pub fn set_exclusive_zone(&self, val: i32) {
+        self.layer.set_exclusive_zone(val);
+        self.layer.commit();
+    }
 }
 
 impl SpellAssociated for SpellWin {
@@ -607,6 +614,7 @@ impl LayerShellHandler for SpellWin {
         // Initiate the first draw.
         // println!("Config event is called");
         if !self.first_configure {
+            // debug!("[{}]: First draw called", self.layer_name);
             self.first_configure = true;
         } else {
             // debug!("[{}]: First draw called", self.layer_name);

@@ -80,7 +80,6 @@ where
                     .insert_source(
                         internal_recievers.remove(0),
                         move |event_msg, _, state_data| {
-                            trace!("Internal event recieved");
                             match event_msg {
                                 Event::Msg(int_handle) => {
                                     match int_handle {

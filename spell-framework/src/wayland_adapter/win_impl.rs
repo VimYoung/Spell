@@ -242,7 +242,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Press { button, .. } => {
-                    info!("Press {:x} @ {:?}", button, event.position);
+                    trace!("Press {:x} @ {:?}", button, event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
@@ -254,7 +254,7 @@ impl PointerHandler for SpellWin {
                         .unwrap();
                 }
                 Release { button, .. } => {
-                    info!("Release {:x} @ {:?}", button, event.position);
+                    trace!("Release {:x} @ {:?}", button, event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
@@ -270,7 +270,7 @@ impl PointerHandler for SpellWin {
                     vertical,
                     ..
                 } => {
-                    info!("Scroll H:{horizontal:?}, V:{vertical:?}");
+                    trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerScrolled {
                             position: slint::LogicalPosition {

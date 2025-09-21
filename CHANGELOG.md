@@ -4,15 +4,23 @@ W.I.P. 0.1.7 & 0.1.3 CLI {Due Date}
 
 Changes:
 
+- Multipl dbus for interaction between windows enabled.
+  - This resulted in fixing the working of CLI in multi-widget system.
+- New method added to set exclusive zone other than window's dimensions.
+- CLI: Logs can now be managed from CLI. More information in CLI section.
 - Repeated key implemented for backspace for `SpellWin` and `SpellLock`.
-- Dbus error closing of window fixed for multi-window setup.
 - Keyboard enter issue fixed for all layers in multi-window setup.
-- Exclusive zone error fixed.
-- Porting logs in cli.
 - NetworkManger added.
 - Notification Manager.
 - Bluetooth manager added.
 - Process interupt command in Logs.
+
+Changes(spell-cli):
+
+- Logs expanded to include user, verbose and developer versions with documentation
+  for each.
+  - This included creation of space for spell in `$XDG_RUNTIME_DIR`. The socket to which
+    messages are sent.
 
 0.1.6 & 0.1.2 CLI (25-09-16)
 ===========================
