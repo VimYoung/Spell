@@ -118,6 +118,7 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) window: Window,
     pub(crate) size: PhysicalSize,
     pub(crate) renderer: SkiaRenderer,
+    #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
 }
@@ -209,6 +210,7 @@ impl SpellSkiaWinAdapterReal {
         self.window.try_dispatch_event(event)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn refersh_buffer(&self) -> Buffer {
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;

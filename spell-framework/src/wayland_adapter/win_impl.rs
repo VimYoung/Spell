@@ -25,7 +25,7 @@ use smithay_client_toolkit::{
     },
     shell::WaylandSurface,
 };
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -99,7 +99,6 @@ impl KeyboardHandler for SpellWin {
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
-
     fn update_modifiers(
         &mut self,
         _conn: &Connection,

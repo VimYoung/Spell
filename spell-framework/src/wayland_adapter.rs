@@ -49,7 +49,7 @@ use std::{
     process::Command,
     rc::Rc,
 };
-use tracing::{Level, field, info, span, trace};
+use tracing::{Level,/* debug,*/ field, info, span, trace};
 mod lock_impl;
 mod way_helper;
 mod win_impl;

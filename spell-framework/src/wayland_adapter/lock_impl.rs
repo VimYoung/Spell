@@ -17,7 +17,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::Buffer},
 };
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,

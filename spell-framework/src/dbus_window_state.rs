@@ -7,7 +7,9 @@ use std::{
 };
 use tracing::{info, trace};
 use zbus::{
-    Connection as BusConn, fdo::Error as BusError, interface, object_server::SignalEmitter,
+    Connection as BusConn,
+    fdo::{Error as BusError, RequestNameFlags},
+    interface,
 };
 
 mod second_client;
@@ -66,30 +68,44 @@ impl VarHandler {
                 DataType::Panic => Err(BusError::Failed("Error from Panic".to_string())),
             }
         } else {
-            todo!();
-            // emitter
-            //     .layer_var_value_changed(layer_name, key, val)
-            //     .await?;
+            let conn = BusConn::session().await?;
+            let path = "org.VimYoung.".to_string() + layer_name;
+            let _ = conn
+                .call_method(
+                    Some(path.as_str()),
+                    "/org/VimYoung/VarHandler",
+                    Some("org.VimYoung.Widget"),
+                    "SetValue",
+                    &(key, val),
+                )
+                .await?;
+            Ok(())
         }
     }
 
-    async fn find_value(&self, layer_name: &str, key: &str) -> String {
+    async fn find_value(&self, layer_name: &str, key: &str) -> Result<String, BusError> {
         if self.layer_name == layer_name {
             let value: DataType = self.state.read().unwrap().get_type(key);
             match value {
-                DataType::Int(int_value) => int_value.to_string(),
-                DataType::Boolean(bool_val) => bool_val.to_string().clone(),
+                DataType::Int(int_value) => Ok(int_value.to_string()),
+                DataType::Boolean(bool_val) => Ok(bool_val.to_string().clone()),
                 // TODO this implementation needs to be improved after changing DATATYPE
-                _ => "".to_string(),
+                _ => Ok("".to_string()),
             }
-        } else
-        /*if let Err(err_val) = emitter.layer_find_var(layer_name, key).await
-        && let zbus::Error::Address(val) = err_val */
-        {
-            todo!()
-            //     val
-            // } else {
-            //     "".to_string()
+        } else {
+            let conn = BusConn::session().await?;
+            let path = "org.VimYoung.".to_string() + layer_name;
+            let return_val = conn
+                .call_method(
+                    Some(path.as_str()),
+                    "/org/VimYoung/VarHandler",
+                    Some("org.VimYoung.Widget"),
+                    "FindValue",
+                    &(key),
+                )
+                .await?;
+            // TODO this unwrap needs to be better handleed.
+            Ok(return_val.body().deserialize().unwrap())
         }
     }
 
@@ -108,7 +124,7 @@ impl VarHandler {
                     "/org/VimYoung/VarHandler",
                     Some("org.VimYoung.Widget"),
                     "ShowWindowBack",
-                    &(layer_name),
+                    &(),
                 )
                 .await;
             Ok(())
@@ -127,8 +143,8 @@ impl VarHandler {
                     Some(path.as_str()),
                     "/org/VimYoung/VarHandler",
                     Some("org.VimYoung.Widget"),
-                    "ShowWindowBack",
-                    &(layer_name),
+                    "HideWindow",
+                    &(),
                 )
                 .await?;
             Ok(())
@@ -156,7 +172,10 @@ pub async fn deploy_zbus_service(
     trace!("Object server set up");
     // connection.request_name("org.VimYoung.Spell").await?;
     // open_sec_service(state, state_updater, layer_name).await?;
-    if let Err(err) = connection.request_name("org.VimYoung.Spell").await {
+    if let Err(err) = connection
+        .request_name_with_flags("org.VimYoung.Spell", RequestNameFlags::DoNotQueue.into())
+        .await
+    {
         open_sec_service(state, state_updater, layer_name).await?;
         info!("Successfully created secondary service, Error: {}", err);
     } else {

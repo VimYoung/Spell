@@ -5,23 +5,23 @@ use std::sync::{Arc, RwLock};
 // use tokio::sync::mpsc::Sender;
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use tracing::{info, trace};
-use zbus::{Connection as BusConn, fdo::Error as BusError, interface, proxy};
+use zbus::{Connection as BusConn, fdo::Error as BusError, interface};
 
 // Here var_name is nothing but the key
-#[proxy(
-    default_service = "org.VimYoung.Spell",
-    default_path = "/org/VimYoung/VarHandler",
-    interface = "org.VimYoung.Spell1"
-)]
-trait SecondClient {
-    #[zbus(signal)]
-    fn layer_var_value_changed(
-        &self,
-        layer_name: &str,
-        var_name: &str,
-        value: &str,
-    ) -> Result<(), zbus::Error>;
-}
+// #[proxy(
+//     default_service = "org.VimYoung.Spell",
+//     default_path = "/org/VimYoung/VarHandler",
+//     interface = "org.VimYoung.Spell1"
+// )]
+// trait SecondClient {
+//     #[zbus(signal)]
+//     fn layer_var_value_changed(
+//         &self,
+//         layer_name: &str,
+//         var_name: &str,
+//         value: &str,
+//     ) -> Result<(), zbus::Error>;
+// }
 
 // pub async fn open_internal_clinet(
 //     state: Arc<RwLock<Box<dyn ForeignController>>>,
@@ -116,10 +116,25 @@ impl WidgetHandler {
         }
     }
 
-    pub(crate) async fn hide_window(&self, layer_name: &str) -> Result<(), BusError> {
+    pub(crate) async fn hide_window(&self) -> Result<(), BusError> {
+        self.state_updater.send(InternalHandle::HideWindow).unwrap();
+        Ok(())
+    }
+
+    async fn show_window_back(&self) -> Result<(), BusError> {
         self.state_updater
             .send(InternalHandle::ShowWinAgain)
             .unwrap();
         Ok(())
+    }
+
+    async fn find_value(&self, key: &str) -> Result<String, BusError> {
+        let value: DataType = self.state.read().unwrap().get_type(key);
+        match value {
+            DataType::Int(int_value) => Ok(int_value.to_string()),
+            DataType::Boolean(bool_val) => Ok(bool_val.to_string().clone()),
+            // TODO this implementation needs to be improved after changing DATATYPE
+            _ => Ok("".to_string()),
+        }
     }
 }
