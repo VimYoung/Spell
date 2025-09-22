@@ -63,7 +63,6 @@ impl KeyboardHandler for SpellWin {
         trace!("Key pressed");
         let string_val: SharedString = get_string(event);
         if string_val == <slint::platform::Key as Into<SharedString>>::into(Key::Backspace) {
-            println!("Backspace entered");
             self.loop_handle.enable(&self.backspace).unwrap();
             self.adapter
                 .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })

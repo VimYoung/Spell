@@ -186,14 +186,14 @@ impl SpellWin {
         let backspace_event = event_loop
             .handle()
             .insert_source(
-                Timer::from_duration(Duration::from_millis(300)),
+                Timer::from_duration(Duration::from_millis(1500)),
                 |_, _, data| {
                     data.adapter
                         .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
                             text: Key::Backspace.into(),
                         })
                         .unwrap();
-                    TimeoutAction::ToDuration(Duration::from_millis(300))
+                    TimeoutAction::ToDuration(Duration::from_millis(1500))
                 },
             )
             .unwrap();
@@ -906,6 +906,27 @@ impl SpellLock {
             wayland_buffer: buffers,
         });
 
+        spell_lock.backspace = Some(
+            spell_lock
+                .loop_handle
+                .insert_source(
+                    Timer::from_duration(Duration::from_millis(1500)),
+                    |_, _, data| {
+                        data.slint_part.as_ref().unwrap().adapters[0]
+                            .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                                text: Key::Backspace.into(),
+                            })
+                            .unwrap();
+                        TimeoutAction::ToDuration(Duration::from_millis(1500))
+                    },
+                )
+                .unwrap(),
+        );
+
+        spell_lock
+            .loop_handle
+            .disable(&spell_lock.backspace.unwrap())
+            .unwrap();
         let _ = slint::platform::set_platform(Box::new(SpellLockShell {
             window_manager: multi_handler,
         }));

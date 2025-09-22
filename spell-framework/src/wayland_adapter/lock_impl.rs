@@ -1,4 +1,7 @@
-use slint::{PhysicalSize, SharedString, platform::WindowEvent};
+use slint::{
+    PhysicalSize, SharedString,
+    platform::{Key, WindowEvent},
+};
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     output::{OutputHandler, OutputState},
@@ -17,7 +20,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::Buffer},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
@@ -183,9 +186,16 @@ impl KeyboardHandler for SpellLock {
     ) {
         let string_val: SharedString = get_string(event);
         info!("Key pressed with value : {:?}", string_val);
-        self.slint_part.as_ref().unwrap().adapters[0]
-            .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap();
+        if string_val == <slint::platform::Key as Into<SharedString>>::into(Key::Backspace) {
+            self.loop_handle.enable(&self.backspace.unwrap()).unwrap();
+            self.slint_part.as_ref().unwrap().adapters[0]
+                .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
+                .unwrap();
+        } else {
+            self.slint_part.as_ref().unwrap().adapters[0]
+                .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
+                .unwrap();
+        }
     }
 
     fn release_key(
@@ -197,6 +207,9 @@ impl KeyboardHandler for SpellLock {
         mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         info!("Key is released");
+        if let Err(err) = self.loop_handle.disable(&self.backspace.unwrap()) {
+            warn!("{}", err);
+        }
         let key_sym = Keysym::new(event.raw_code);
         event.keysym = key_sym;
         let string_val: SharedString = get_string(event);
