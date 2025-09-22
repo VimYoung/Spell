@@ -2,7 +2,7 @@ use crate::wayland_adapter::{SpellWin, way_helper::get_string};
 // use owo_colors::OwoColorize;
 use slint::{
     SharedString,
-    platform::{PointerEventButton, WindowEvent},
+    platform::{Key, PointerEventButton, WindowEvent},
 };
 use smithay_client_toolkit::{
     output::OutputState,
@@ -25,7 +25,7 @@ use smithay_client_toolkit::{
     },
     shell::WaylandSurface,
 };
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -62,15 +62,17 @@ impl KeyboardHandler for SpellWin {
     ) {
         trace!("Key pressed");
         let string_val: SharedString = get_string(event);
-        // if *string_val.as_bytes() == [27] {
-        //     self.adapter
-        //         .try_dispatch_event(WindowEvent::KeyPressRepeated { text: string_val })
-        //         .unwrap();
-        // } else {
-        self.adapter
-            .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap();
-        //}
+        if string_val == <slint::platform::Key as Into<SharedString>>::into(Key::Backspace) {
+            println!("Backspace entered");
+            self.loop_handle.enable(&self.backspace).unwrap();
+            self.adapter
+                .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
+                .unwrap();
+        } else {
+            self.adapter
+                .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
+                .unwrap();
+        }
     }
 
     fn release_key(
@@ -82,6 +84,9 @@ impl KeyboardHandler for SpellWin {
         mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         trace!("Key released");
+        if let Err(err) = self.loop_handle.disable(&self.backspace) {
+            warn!("{}", err);
+        }
         let key_sym = Keysym::new(event.raw_code);
         event.keysym = key_sym;
         let string_val: SharedString = get_string(event);

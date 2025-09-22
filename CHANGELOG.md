@@ -14,6 +14,7 @@ Changes:
 - Notification Manager.
 - Bluetooth manager added.
 - Process interupt command in Logs.
+- Add some Popup implementation for xdg.
 
 Changes(spell-cli):
 

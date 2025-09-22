@@ -14,14 +14,18 @@ pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
-use slint::PhysicalSize;
+use slint::{PhysicalSize, platform::Key};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
     output::{self, OutputHandler, OutputState},
     reexports::{
-        calloop::{EventLoop, LoopHandle, channel::Event},
+        calloop::{
+            self, EventLoop, LoopHandle, RegistrationToken,
+            channel::Event,
+            timer::{TimeoutAction, Timer},
+        },
         calloop_wayland_source::WaylandSource,
         client::{
             Connection, QueueHandle,
@@ -48,6 +52,7 @@ use std::{
     cell::{Cell, RefCell},
     process::Command,
     rc::Rc,
+    time::Duration,
 };
 use tracing::{Level, debug, field, info, span, trace};
 mod lock_impl;
@@ -89,6 +94,7 @@ pub struct SpellWin {
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     pub(crate) span: span::Span,
+    pub(crate) backspace: calloop::RegistrationToken,
 }
 
 impl std::fmt::Debug for SpellWin {
@@ -177,7 +183,22 @@ impl SpellWin {
             }));
         }
 
-        info!("Win: {} layer created successfully.", layer_name);
+        let backspace_event = event_loop
+            .handle()
+            .insert_source(
+                Timer::from_duration(Duration::from_millis(300)),
+                |_, _, data| {
+                    data.adapter
+                        .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                            text: Key::Backspace.into(),
+                        })
+                        .unwrap();
+                    TimeoutAction::ToDuration(Duration::from_millis(300))
+                },
+            )
+            .unwrap();
+        event_loop.handle().disable(&backspace_event).unwrap();
+
         let win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
@@ -209,7 +230,10 @@ impl SpellWin {
                 name = layer_name.as_str(),
                 zbus = field::Empty
             ),
+            backspace: backspace_event,
         };
+
+        info!("Win: {} layer created successfully.", layer_name);
 
         WaylandSource::new(conn.clone(), event_queue)
             .insert(win.loop_handle.clone())
@@ -746,6 +770,7 @@ pub struct SpellLock {
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
+    pub(crate) backspace: Option<RegistrationToken>,
 }
 
 impl std::fmt::Debug for SpellLock {
@@ -790,6 +815,7 @@ impl SpellLock {
             lock_surfaces,
             is_locked: true,
             event_loop: Rc::new(RefCell::new(event_loop)),
+            backspace: None,
         };
 
         let _ = event_queue.roundtrip(&mut spell_lock);
