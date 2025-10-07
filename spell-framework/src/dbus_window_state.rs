@@ -5,7 +5,7 @@ use std::{
     result::Result,
     sync::{Arc, RwLock},
 };
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 use zbus::{
     Connection as BusConn,
     fdo::{Error as BusError, RequestNameFlags},
@@ -28,6 +28,7 @@ pub trait ForeignController: Send + Sync + std::fmt::Debug {
 #[derive(Debug)]
 pub enum DataType {
     Int(i32),
+    Float(f32),
     String(String),
     Boolean(bool),
     Panic,
@@ -53,18 +54,60 @@ impl VarHandler {
             match returned_value {
                 DataType::Boolean(_) => {
                     if let Ok(con_var) = val.trim().parse::<bool>() {
-                        //TODO this needs to be handled once graceful shutdown is implemented.
-                        let _ = self.state_updater.send(InternalHandle::StateValChange((
-                            key.to_string(),
-                            DataType::Boolean(con_var),
-                        )));
+                        self.state_updater
+                            .send(InternalHandle::StateValChange((
+                                key.to_string(),
+                                DataType::Boolean(con_var),
+                            )))
+                            .unwrap_or_else(|err| {
+                                warn!("{:?}", err);
+                            });
                         Ok(())
                     } else {
                         Err(BusError::NotSupported("Value is not supported".to_string()))
                     }
                 }
-                DataType::Int(_) => Ok(()),
-                DataType::String(_) => Ok(()),
+                DataType::Int(_) => {
+                    if let Ok(con_var) = val.trim().parse::<i32>() {
+                        self.state_updater
+                            .send(InternalHandle::StateValChange((
+                                key.to_string(),
+                                DataType::Int(con_var),
+                            )))
+                            .unwrap_or_else(|err| {
+                                warn!("{:?}", err);
+                            });
+                        Ok(())
+                    } else {
+                        Err(BusError::NotSupported("Value is not supported".to_string()))
+                    }
+                }
+                DataType::Float(_) => {
+                    if let Ok(con_var) = val.trim().parse::<f32>() {
+                        self.state_updater
+                            .send(InternalHandle::StateValChange((
+                                key.to_string(),
+                                DataType::Float(con_var),
+                            )))
+                            .unwrap_or_else(|err| {
+                                warn!("{:?}", err);
+                            });
+                        Ok(())
+                    } else {
+                        Err(BusError::NotSupported("Value is not supported".to_string()))
+                    }
+                }
+                DataType::String(_) => {
+                    self.state_updater
+                        .send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::String(val.to_string()),
+                        )))
+                        .unwrap_or_else(|err| {
+                            warn!("{:?}", err);
+                        });
+                    Ok(())
+                }
                 DataType::Panic => Err(BusError::Failed("Error from Panic".to_string())),
             }
         } else {
@@ -89,8 +132,11 @@ impl VarHandler {
             match value {
                 DataType::Int(int_value) => Ok(int_value.to_string()),
                 DataType::Boolean(bool_val) => Ok(bool_val.to_string().clone()),
-                // TODO this implementation needs to be improved after changing DATATYPE
-                _ => Ok("".to_string()),
+                DataType::Float(float_val) => Ok(float_val.to_string()),
+                DataType::String(val) => Ok(val.clone()),
+                DataType::Panic => Err(BusError::Failed(
+                    "Panic value could not be found".to_string(),
+                )),
             }
         } else {
             let conn = BusConn::session().await?;

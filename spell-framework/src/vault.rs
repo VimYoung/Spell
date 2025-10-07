@@ -148,7 +148,7 @@ impl Default for AppSelector {
                             } else if entry_or_dir.path().is_symlink() {
                                 println!("GOt the symlink");
                             } else {
-                                println!("Found something else");
+                                // println!("Found something else");
                             }
                         }
                     }

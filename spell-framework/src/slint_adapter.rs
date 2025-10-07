@@ -3,7 +3,7 @@
 //! either internal or not used anymore. Still their implementation is public because they had be
 //! set by the user of library in intial iterations of spell_framework.
 use crate::{
-    configure::{LayerConf, WindowConf},
+    configure::{LayerConf, WindowConf, set_up_tracing},
     wayland_adapter::SpellWin,
 };
 use slint::{
@@ -21,7 +21,7 @@ use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-// use tracing::debug;
+use tracing::{Level, info, span};
 
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -106,11 +106,32 @@ impl WindowAdapter for SpellWinAdapter {
 pub struct SpellLayerShell {
     /// An instance of [SpellSkiaWinAdapter].
     pub window_adapter: Rc<SpellSkiaWinAdapter>,
+    pub span: span::Span,
+}
+
+impl SpellLayerShell {
+    /// Creates an instance of this Platform implementation, for internal use.
+    pub fn new(window_adapter: Rc<SpellSkiaWinAdapter>) -> Self {
+        SpellLayerShell {
+            window_adapter,
+            span: span!(Level::INFO, "slint-log",),
+        }
+    }
 }
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         Ok(self.window_adapter.clone())
+    }
+
+    fn debug_log(&self, arguments: core::fmt::Arguments) {
+        self.span.in_scope(|| {
+            if let Some(val) = arguments.as_str() {
+                info!(val);
+            } else {
+                info!("{}", arguments.to_string());
+            }
+        })
     }
 }
 
@@ -121,12 +142,32 @@ impl Platform for SpellLayerShell {
 pub struct SpellMultiLayerShell {
     /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+    pub span: span::Span,
+}
+
+impl SpellMultiLayerShell {
+    fn new(window_manager: Rc<RefCell<SpellMultiWinHandler>>) -> Self {
+        SpellMultiLayerShell {
+            window_manager,
+            span: span!(Level::INFO, "slint-log",),
+        }
+    }
 }
 
 impl Platform for SpellMultiLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let value = self.window_manager.borrow_mut().request_new_window();
         Ok(value)
+    }
+
+    fn debug_log(&self, arguments: core::fmt::Arguments) {
+        self.span.in_scope(|| {
+            if let Some(val) = arguments.as_str() {
+                info!(val);
+            } else {
+                info!("{}", arguments.to_string());
+            }
+        })
     }
 }
 
@@ -151,6 +192,7 @@ impl SpellMultiWinHandler {
                 "spell_framework=trace,info",
             ))
             .init();
+        let handle = set_up_tracing("multi-window");
         let conn = Connection::connect_to_env().unwrap();
         let new_windows: Vec<(String, LayerConf)> = windows
             .iter()
@@ -160,8 +202,13 @@ impl SpellMultiWinHandler {
         let mut new_adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
         let mut windows_spell: Vec<SpellWin> = Vec::new();
         windows.iter().for_each(|(layer_name, conf)| {
-            let window =
-                SpellWin::create_window(&conn, conf.clone(), layer_name.to_string(), false);
+            let window = SpellWin::create_window(
+                &conn,
+                conf.clone(),
+                layer_name.to_string(),
+                false,
+                handle.clone(),
+            );
             let adapter = window.adapter.clone();
             windows_spell.push(window);
             new_adapters.push(adapter);
@@ -172,9 +219,7 @@ impl SpellMultiWinHandler {
             value_given: 0,
         }));
 
-        let _ = slint::platform::set_platform(Box::new(SpellMultiLayerShell {
-            window_manager: windows_handler,
-        }));
+        let _ = slint::platform::set_platform(Box::new(SpellMultiLayerShell::new(windows_handler)));
         windows_spell
     }
 

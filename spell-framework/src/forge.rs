@@ -23,7 +23,8 @@ use smithay_client_toolkit::reexports::calloop::{
 struct ForgeState;
 
 /// An instance of Forge takes the LoopHandle of your window as input for
-/// instance creation. It is currently not usable because of latency issues.
+/// instance creation. It is currently not usable because of latency issues. A macro
+/// build is in progress to fix latency issues and provide a more streamlined overview.
 pub struct Forge(EventLoop<'static, ForgeState>);
 impl Default for Forge {
     /// Create an instance on forge.

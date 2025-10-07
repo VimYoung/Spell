@@ -4,61 +4,8 @@ use core::panic;
 use std::sync::{Arc, RwLock};
 // use tokio::sync::mpsc::Sender;
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 use zbus::{Connection as BusConn, fdo::Error as BusError, interface};
-
-// Here var_name is nothing but the key
-// #[proxy(
-//     default_service = "org.VimYoung.Spell",
-//     default_path = "/org/VimYoung/VarHandler",
-//     interface = "org.VimYoung.Spell1"
-// )]
-// trait SecondClient {
-//     #[zbus(signal)]
-//     fn layer_var_value_changed(
-//         &self,
-//         layer_name: &str,
-//         var_name: &str,
-//         value: &str,
-//     ) -> Result<(), zbus::Error>;
-// }
-
-// pub async fn open_internal_clinet(
-//     state: Arc<RwLock<Box<dyn ForeignController>>>,
-//     state_updater: Sender<InternalHandle>,
-//     layer_name: String,
-// ) -> Result<(), BusError> {
-//     let conn = BusConn::session().await?;
-//     let recv = SecondClientProxy::new(&conn).await?;
-//
-//     let mut value_change_stream = recv.receive_layer_var_value_changed().await?;
-//     while let Some(msg) = value_change_stream.next().await {
-//         let args: LayerVarValueChangedArgs = msg.args().expect("Error parsing");
-//         if layer_name == args.layer_name {
-//             let returned_value: DataType = state.read().unwrap().get_type(args.var_name);
-//             match returned_value {
-//                 DataType::Boolean(_) => {
-//                     if let Ok(con_var) = args.value.trim().parse::<bool>() {
-//                         //TODO this needs to be handled once graceful shutdown is implemented.
-//                         let _ = state_updater.send(InternalHandle::StateValChange((
-//                             args.var_name.to_string(),
-//                             DataType::Boolean(con_var),
-//                         )));
-//                         return Ok(());
-//                     } else {
-//                         return Err(BusError::NotSupported("Value is not supported".to_string()));
-//                     }
-//                 }
-//                 // TODO to be implemented for other types.
-//                 DataType::Int(_) => return Ok(()),
-//                 DataType::String(_) => return Ok(()),
-//                 DataType::Panic => return Err(BusError::Failed("Error from Panic".to_string())),
-//             }
-//         }
-//     }
-//     Ok(())
-// }
-//
 pub async fn open_sec_service(
     state: Arc<RwLock<Box<dyn ForeignController>>>,
     state_updater: Sender<InternalHandle>,
@@ -101,17 +48,60 @@ impl WidgetHandler {
         match returned_value {
             DataType::Boolean(_) => {
                 if let Ok(con_var) = val.trim().parse::<bool>() {
-                    let _ = self.state_updater.send(InternalHandle::StateValChange((
-                        key.to_string(),
-                        DataType::Boolean(con_var),
-                    )));
+                    self.state_updater
+                        .send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::Boolean(con_var),
+                        )))
+                        .unwrap_or_else(|err| {
+                            warn!("{:?}", err);
+                        });
                     Ok(())
                 } else {
                     Err(BusError::NotSupported("Value is not supported".to_string()))
                 }
             }
-            DataType::Int(_) => Ok(()),
-            DataType::String(_) => Ok(()),
+            DataType::Int(_) => {
+                if let Ok(con_var) = val.trim().parse::<i32>() {
+                    self.state_updater
+                        .send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::Int(con_var),
+                        )))
+                        .unwrap_or_else(|err| {
+                            warn!("{:?}", err);
+                        });
+                    Ok(())
+                } else {
+                    Err(BusError::NotSupported("Value is not supported".to_string()))
+                }
+            }
+            DataType::Float(_) => {
+                if let Ok(con_var) = val.trim().parse::<f32>() {
+                    self.state_updater
+                        .send(InternalHandle::StateValChange((
+                            key.to_string(),
+                            DataType::Float(con_var),
+                        )))
+                        .unwrap_or_else(|err| {
+                            warn!("{:?}", err);
+                        });
+                    Ok(())
+                } else {
+                    Err(BusError::NotSupported("Value is not supported".to_string()))
+                }
+            }
+            DataType::String(_) => {
+                self.state_updater
+                    .send(InternalHandle::StateValChange((
+                        key.to_string(),
+                        DataType::String(val.to_string()),
+                    )))
+                    .unwrap_or_else(|err| {
+                        warn!("{:?}", err);
+                    });
+                Ok(())
+            }
             DataType::Panic => Err(BusError::Failed("Error from Panic".to_string())),
         }
     }
@@ -133,8 +123,11 @@ impl WidgetHandler {
         match value {
             DataType::Int(int_value) => Ok(int_value.to_string()),
             DataType::Boolean(bool_val) => Ok(bool_val.to_string().clone()),
-            // TODO this implementation needs to be improved after changing DATATYPE
-            _ => Ok("".to_string()),
+            DataType::Float(float_val) => Ok(float_val.to_string()),
+            DataType::String(val) => Ok(val.clone()),
+            DataType::Panic => Err(BusError::Failed(
+                "Panic value could not be found".to_string(),
+            )),
         }
     }
 }

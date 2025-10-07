@@ -218,3 +218,7 @@ pub trait SpellAssociated {
 // TODO t add tracing in following functions:
 // 1. secondary and primary services
 // TODO implement logiing for SpellLock.
+// TODO check if the dbus setup is working for more than 2 widgets when one is
+// primary and 2 are secondary.
+// Provide a method in the macro to disable tracing_subsriber completely for some project
+// which want's to do it themselves.

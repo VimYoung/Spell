@@ -4,7 +4,7 @@
 //! with [`SpellLock`].
 use crate::{
     SpellAssociated,
-    configure::{LayerConf, WindowConf},
+    configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
     helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
@@ -50,11 +50,16 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
+    fs,
+    io::{self, BufRead, BufReader},
+    os::unix::net::UnixDatagram,
+    path::Path,
     process::Command,
     rc::Rc,
     time::Duration,
 };
-use tracing::{Level, debug, field, info, span, trace};
+use tracing::{Level, info, span, trace};
+
 mod lock_impl;
 mod way_helper;
 mod win_impl;
@@ -94,6 +99,8 @@ pub struct SpellWin {
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     pub(crate) span: span::Span,
+    pub(crate) log_reader: UnixDatagram,
+    #[allow(dead_code)]
     pub(crate) backspace: calloop::RegistrationToken,
 }
 
@@ -114,6 +121,7 @@ impl SpellWin {
         window_conf: WindowConf,
         layer_name: String,
         if_single: bool,
+        handle: HomeHandle,
     ) -> Self {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
@@ -178,9 +186,9 @@ impl SpellWin {
 
         if if_single {
             trace!("Single window layer platform set");
-            let _ = slint::platform::set_platform(Box::new(SpellLayerShell {
-                window_adapter: adapter_value.clone(),
-            }));
+            let _ = slint::platform::set_platform(Box::new(SpellLayerShell::new(
+                adapter_value.clone(),
+            )));
         }
 
         let backspace_event = event_loop
@@ -198,6 +206,42 @@ impl SpellWin {
             )
             .unwrap();
         event_loop.handle().disable(&backspace_event).unwrap();
+
+        // Inserting tracing source
+        let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
+        let logging_dir = runtime_dir + "/spell/";
+        let socket_dir = logging_dir.clone() + "/spell_cli.sock";
+
+        let _ = fs::create_dir(Path::new(&logging_dir));
+        let _ = fs::File::create_new(&socket_dir);
+
+        let stream = UnixDatagram::unbound().unwrap();
+        stream
+            .set_nonblocking(true)
+            .expect("Non blocking couldn't be set");
+        event_loop
+            .handle()
+            .insert_source(
+                Timer::from_duration(Duration::from_secs(2)),
+                |_, _, data| {
+                    let mut buf = [0u8; 4096];
+                    match data.log_reader.recv_from(&mut buf) {
+                        Ok((0, _)) => {}
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                        Ok(_) => match String::from_utf8(buf.to_vec()).unwrap().as_str() {
+                            "slint_log" => {
+                                // handle.modify(f)
+                            }
+                            "debug" => {}
+                            "dev" => {}
+                            _ => {}
+                        },
+                        Err(_) => todo!(),
+                    }
+                    TimeoutAction::ToDuration(Duration::from_secs(2))
+                },
+            )
+            .unwrap();
 
         let win = SpellWin {
             adapter: adapter_value,
@@ -224,13 +268,9 @@ impl SpellWin {
             input_region,
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
-            span: span!(
-                Level::INFO,
-                "widget",
-                name = layer_name.as_str(),
-                zbus = field::Empty
-            ),
+            span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
             backspace: backspace_event,
+            log_reader: stream, // tracing_handle: handle,
         };
 
         info!("Win: {} layer created successfully.", layer_name);
@@ -255,16 +295,9 @@ impl SpellWin {
     /// This function needs to be called "before" initialising the slint window to avoid
     /// panicing of this function.
     pub fn invoke_spell(name: &str, window_conf: WindowConf) -> Self {
-        tracing_subscriber::fmt()
-            .without_time()
-            .with_target(false)
-            .with_env_filter(tracing_subscriber::EnvFilter::new(
-                "spell_framework=trace,info",
-            ))
-            // .with_max_level(tracing::Level::TRACE)
-            .init();
+        let handle = set_up_tracing(name);
         let conn = Connection::connect_to_env().unwrap();
-        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true)
+        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true, handle)
     }
 
     /// Hides the layer (aka the widget) if it is visible in screen.

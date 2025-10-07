@@ -1,6 +1,7 @@
 pub mod constantvals;
 use constantvals::{ENABLE_HELP, LOGS_HELP, MAIN_HELP};
 use std::env::{self, Args};
+use std::os::unix::net::UnixDatagram;
 use zbus::{Connection, Result as BusResult, proxy};
 
 #[proxy(
@@ -163,7 +164,17 @@ fn get_tracing_debug(log_type: LogType, layer_name: String) -> Result<(), SpellE
         LogType::Dump => {}
         LogType::Dev => {}
     }
-    Ok(())
+    let socket_path = "/run/user/1000/spell/spell.sock";
+    std::fs::remove_file(socket_path).ok();
+    let sock = UnixDatagram::bind(socket_path).unwrap();
+    println!("Listening for logs on {}", socket_path);
+
+    let mut buf = [0u8; 2048];
+    loop {
+        if let Ok((n, _)) = sock.recv_from(&mut buf) {
+            print!("{}", String::from_utf8_lossy(&buf[..n]));
+        };
+    }
 }
 
 fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {

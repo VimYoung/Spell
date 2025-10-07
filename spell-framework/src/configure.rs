@@ -1,6 +1,25 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
-use std::cell::Cell;
+use std::{
+    cell::Cell,
+    fs,
+    io::Write,
+    os::unix::net::{UnixDatagram, UnixStream},
+    path::Path,
+    sync::Mutex,
+};
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{
+    EnvFilter, Layer as TracingTraitLayer,
+    filter::Filtered,
+    fmt::{
+        self, FormatEvent, Layer as TracingLayer,
+        format::{DefaultFields, Format, Full},
+    },
+    layer::{Layered, SubscriberExt},
+    registry::Registry,
+    reload::{Handle, Layer as LoadLayer},
+};
 
 /// Unused Internal struct representation of a pixel, it is similar to slint's
 /// representation of [pixel]() but implement few more trait. Currently, redundent
@@ -111,6 +130,79 @@ impl WindowConf {
             board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
         }
+    }
+}
+
+pub(crate) type HomeHandle =
+    Handle<EnvFilter, Layered<TracingLayer<Registry, DefaultFields, Format<Full, ()>>, Registry>>;
+pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
+    let logging_dir = runtime_dir + "/spell/";
+    let socket_dir = logging_dir.clone() + "/spell.sock";
+
+    let _ = fs::create_dir(Path::new(&logging_dir));
+    let _ = fs::remove_file(&socket_dir);
+
+    let stream = UnixDatagram::unbound().unwrap();
+    // stream.connect(&socket_dir).unwrap();
+
+    stream
+        .set_nonblocking(true)
+        .expect("Non blocking couldn't be set");
+
+    let writer = RollingFileAppender::builder()
+        .rotation(Rotation::HOURLY) // rotate log files once every hour
+        .filename_prefix(widget_name) // log file names will be prefixed with `myapp.`
+        .filename_suffix("log") // log file names will be suffixed with `.log`
+        .build(&logging_dir) // try to build an appender that stores log files in `/var/log`
+        .expect("initializing rolling file appender failed");
+
+    let layer_writer = fmt::layer()
+        .without_time()
+        .with_target(false)
+        .with_writer(writer)
+        .with_filter(EnvFilter::new("spell_framework=trace,info"));
+
+    if let Ok(val) = std::env::var("RUST_LOG") {
+        println!("Rust log value: {}", val);
+    } else {
+        println!("Val not set");
+    }
+
+    let (layer_env, handle) = LoadLayer::new(EnvFilter::from_default_env());
+    let layer_socket = fmt::layer().with_writer(Mutex::new(SocketWriter::new(stream)));
+    let subs = tracing_subscriber::registry()
+        .with(fmt::layer().without_time().with_target(false))
+        .with(layer_env)
+        .with(layer_socket)
+        .with(layer_writer);
+    // .with(layer_std);
+    tracing::subscriber::set_global_default(subs).expect("Got error in setting subs");
+    handle
+}
+
+pub(crate) struct SocketWriter {
+    socket: UnixDatagram,
+    // formatter: Format<DefaultFields>,
+}
+
+impl SocketWriter {
+    fn new(socket: UnixDatagram) -> Self {
+        SocketWriter { socket }
+    }
+}
+
+impl Write for SocketWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
+        let logging_dir = runtime_dir + "/spell/";
+        let socket_dir = logging_dir.clone() + "/spell.sock";
+
+        self.socket.send_to(buf, Path::new(&socket_dir))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
