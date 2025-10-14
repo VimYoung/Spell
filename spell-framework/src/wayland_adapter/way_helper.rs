@@ -8,14 +8,14 @@ use smithay_client_toolkit::{
     },
     shell::{
         WaylandSurface,
-        wlr_layer::{Anchor, LayerSurface},
+        wlr_layer::{/*Anchor,*/ LayerSurface},
     },
 };
 
 pub(super) fn set_config(
     window_conf: &WindowConf,
     layer: &LayerSurface,
-    first_configure: bool,
+    // first_configure: bool,
     input_region: Option<&WlRegion>,
     opaque_region: Option<&WlRegion>,
 ) {
@@ -33,10 +33,10 @@ pub(super) fn set_config(
     if let Some(op_region) = opaque_region {
         layer.set_opaque_region(Some(op_region));
     }
-    set_anchor(window_conf, layer, first_configure);
+    set_anchor(window_conf, layer);
 }
 
-fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: bool) {
+fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface) {
     match window_conf.anchor.0 {
         Some(mut first_anchor) => match window_conf.anchor.1 {
             Some(sec_anchor) => {
@@ -45,39 +45,42 @@ fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface, first_configure: b
             }
             None => {
                 layer.set_anchor(first_anchor);
-                if window_conf.exclusive_zone && first_configure {
-                    match first_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
+                // if window_conf.exclusive_zone && first_configure {
+                //     match first_anchor {
+                //         Anchor::LEFT | Anchor::RIGHT => {
+                //             layer.set_exclusive_zone(window_conf.width as i32)
+                //         }
+                //         Anchor::TOP | Anchor::BOTTOM => {
+                //             layer.set_exclusive_zone(window_conf.height as i32)
+                //         }
+                //         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                //         // in which case no exclusive_zone will be set.
+                //         _ => {}
+                //     }
+                // }
             }
         },
         None => {
             if let Some(sec_anchor) = window_conf.anchor.1 {
                 layer.set_anchor(sec_anchor);
-                if window_conf.exclusive_zone && first_configure {
-                    match sec_anchor {
-                        Anchor::LEFT | Anchor::RIGHT => {
-                            layer.set_exclusive_zone(window_conf.width as i32)
-                        }
-                        Anchor::TOP | Anchor::BOTTOM => {
-                            layer.set_exclusive_zone(window_conf.height as i32)
-                        }
-                        // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                        // in which case no exclusive_zone will be set.
-                        _ => {}
-                    }
-                }
+                // if window_conf.exclusive_zone && first_configure {
+                //     match sec_anchor {
+                //         Anchor::LEFT | Anchor::RIGHT => {
+                //             layer.set_exclusive_zone(window_conf.width as i32)
+                //         }
+                //         Anchor::TOP | Anchor::BOTTOM => {
+                //             layer.set_exclusive_zone(window_conf.height as i32)
+                //         }
+                //         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
+                //         // in which case no exclusive_zone will be set.
+                //         _ => {}
+                //     }
+                // }
             }
         }
+    }
+    if let Some(val) = window_conf.exclusive_zone {
+        layer.set_exclusive_zone(val);
     }
 }
 

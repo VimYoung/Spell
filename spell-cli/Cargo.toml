@@ -1,6 +1,6 @@
 [package]
 name = "spell-cli"
-version = "0.1.2"
+version = "1.0.0"
 edition = "2024"
 description = "CLI for spell-framework"
 license = "GPL-3.0-or-later"
@@ -8,8 +8,9 @@ repository = "https://github.com/VimYoung/Spell"
 keywords = ["widget", "spell-framework", "spell", "slint", "wayland"]
 
 [dependencies]
-spell-framework = { version = "0.1.1", path = "../spell-framework/" }
-zbus = "5.8.0"
+# spell-framework = { path = "../spell-framework/" }
+spell-framework = "1.0.0"
+zbus = "5.11.0"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "sync"] }
 
 [package.metadata.docs.rs]
@@ -17,4 +18,4 @@ no-default-features = true
 features = ["docs-only"]
 
 [build-dependencies]
-slint-build = "1.8.0"
+slint-build = "1.13.0"

@@ -7,12 +7,12 @@ So, by the dark arts of spell, one can program their widgets creation in every k
 Apart from that, spell also provides convenience functions and method implementations for various common tasks (like Apps search backend, mpris backend etc) according to [freedesktop specs](https://specifications.freedesktop.org/) standards. Though a lot of them are still partially complete, incomplete or not even started.
 
 <div class="warning">
-The crate is under active development and is not ready for full fledged end use. Base functionalities are complete but more goddies needs to be added. I am now receiving PRs and Issues now so feel free to fix something or report something that needs to be fixed.
+The crate is under active development and breaking changes are expected. Base functionalities are complete but more goodies need to be added. I am now receiving PRs and Issues now so feel free to fix something or report something that needs to be fixed.
 </div>
 
 ## Why use Spell and Slint?
 
-It is a necessary question to answer. Spell was created as a personal project to fill a gap, i.e. absence of proper widget making toolkits and frameworks in rust. Moreover, I didn't want to make yet another abstraction over gtk_layer_shell and call it a day. [Slint](https://slint.dev/) is simple yet powerful declarative language which provides excellent support for rust as backend. Spell fills this gap, it implements slint's backend for usage in making widgets. This was rather than bending a verbose language(like rust) to write widgets, people can use slint which was made for it, and still get the excellent support of rust in backend. Another reason was to inspect the inner workings of wayland and how display is managed in linux systems in modern days, don't talk about Xorg :).
+It is a necessary question to answer. Spell was created as a personal project to fill a gap, i.e. absence of proper widget making toolkits and frameworks in rust. Moreover, I didn't want to make yet another abstraction over gtk_layer_shell and call it a day. [Slint](https://slint.dev/) is simple yet powerful declarative language which provides excellent support for rust as backend. Spell fills this gap, it implements slint's backend for usage in making widgets. This was rather than bending a verbose language(like rust) to write widgets, people can use slint which was made for it, and still get the excellent support of rust in backend. Another reason was to inspect the inner workings of wayland and how display is managed in linux systems in modern days.
 
 ## Panics and Errors
 
@@ -24,11 +24,11 @@ Create a new project with `cargo new project_name`. Let's start by adding Slint 
 
 ```toml
 [dependencies]
-slint = { version = "1.8.0", features = ["renderer-software"] }
-spell = { git = "https://github.com/VimYoung/Spell"}
+slint = { version = "1.13.1", features = ["renderer-software"] }
+spell = "1.0.0"
 
 [build-dependencies]
-slint-build = "1.8.0"
+slint-build = "1.13.1"
 
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }
@@ -120,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention at this point that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to certain
-undefined behaviour. For details of arguments and use of  [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
+undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
 For code examples , tips and common functionalities like timed re-running of code, callbacks etc, head over to the book on Spell which contain these guides.
 The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 

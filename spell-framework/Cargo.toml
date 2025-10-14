@@ -1,6 +1,6 @@
 [package]
 name = "spell-framework"
-version = "0.1.6"
+version = "1.0.0"
 edition = "2024"
 description = "Make desktop widgets by the Mystic Arts of Spell"
 license = "GPL-3.0-or-later"
@@ -17,7 +17,6 @@ i-slint-core = "1.13.1"
 i-slint-renderer-skia = { version = "1.13.1", features = [
   "wayland",
 ], optional = true }
-owo-colors = "4.2.2"
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.3.18"
 slint = { version = "1.13.1", features = [

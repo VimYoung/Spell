@@ -16,16 +16,13 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
-        Capability,
-        SeatHandler,
-        SeatState,
-        // keyboard::KeyboardData,
-        keyboard::{KeyboardHandler, Keysym},
+        Capability, SeatHandler, SeatState,
+        keyboard::{KeyboardHandler /* Keysym*/},
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
     },
     shell::WaylandSurface,
 };
-use tracing::{info, trace, warn};
+use tracing::{info, trace};
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -80,7 +77,7 @@ impl KeyboardHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
-        mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+        /*mut*/ event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         trace!("Key released");
         // if let Err(err) = self.loop_handle.disable(&self.backspace) {

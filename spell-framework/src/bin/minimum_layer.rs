@@ -1,22 +1,14 @@
-use std::{
-    convert::TryInto,
-    num::NonZeroU32,
-    time::{Duration, Instant},
-};
+use std::{convert::TryInto, num::NonZeroU32, time::Instant};
 
-use futures_util::future::Inspect;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
-    reexports::{
-        client::{
-            Connection, QueueHandle,
-            globals::registry_queue_init,
-            protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
-        },
-        protocols::wp::text_input::zv1::client::zwp_text_input_v1::EVT_LANGUAGE_SINCE,
+    reexports::client::{
+        Connection, QueueHandle,
+        globals::registry_queue_init,
+        protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,

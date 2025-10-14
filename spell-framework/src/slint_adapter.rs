@@ -21,7 +21,7 @@ use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-use tracing::{Level, info, span};
+use tracing::{Level, info, span, warn};
 
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -183,7 +183,8 @@ pub struct SpellMultiWinHandler {
 impl SpellMultiWinHandler {
     /// This function is finally called to create instances of windows (in a multi
     /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
-    /// event loop.
+    /// event loop, multi-window setup is unstable though and is not recommended for end use just
+    /// now.
     pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
         tracing_subscriber::fmt()
             .without_time()
@@ -219,7 +220,11 @@ impl SpellMultiWinHandler {
             value_given: 0,
         }));
 
-        let _ = slint::platform::set_platform(Box::new(SpellMultiLayerShell::new(windows_handler)));
+        if let Err(error) =
+            slint::platform::set_platform(Box::new(SpellMultiLayerShell::new(windows_handler)))
+        {
+            warn!("Error setting multilayer platform: {}", error);
+        }
         windows_spell
     }
 
@@ -252,6 +257,16 @@ impl SpellMultiWinHandler {
 pub struct SpellLockShell {
     /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+    pub span: span::Span,
+}
+
+impl SpellLockShell {
+    pub fn new(window_manager: Rc<RefCell<SpellMultiWinHandler>>) -> Self {
+        SpellLockShell {
+            window_manager,
+            span: span!(Level::INFO, "slint-lock-log",),
+        }
+    }
 }
 
 impl Platform for SpellLockShell {

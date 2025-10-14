@@ -1,3 +1,5 @@
+use i_slint_core::item_rendering::DirtyRegion;
+// use i_slint_core::partial_renderer::DirtyRegion;
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
 use smithay_client_toolkit::shm::slot::Buffer;
@@ -25,7 +27,7 @@ use i_slint_renderer_skia::{
 pub struct SkiaSoftwareBufferReal {
     pub primary_slot: RefCell<Slot>,
     pub pool: Rc<RefCell<SlotPool>>,
-    pub last_dirty_region: RefCell<Option<i_slint_core::item_rendering::DirtyRegion>>,
+    pub last_dirty_region: RefCell<Option<DirtyRegion>>,
 }
 
 impl SkiaSoftwareBufferReal {
@@ -60,7 +62,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
             u8,
             &'a mut [u8],
         ) -> Result<
-            Option<i_slint_core::item_rendering::DirtyRegion>,
+            Option<DirtyRegion>,
             slint::PlatformError,
         >,
     ) -> std::result::Result<(), slint::PlatformError> {

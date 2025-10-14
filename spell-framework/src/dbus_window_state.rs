@@ -1,10 +1,6 @@
-use crate::dbus_window_state::second_client::open_sec_service;
+use crate::{State, dbus_window_state::second_client::open_sec_service};
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
-use std::{
-    any::Any,
-    result::Result,
-    sync::{Arc, RwLock},
-};
+use std::result::Result;
 use tracing::{info, trace, warn};
 use zbus::{
     Connection as BusConn,
@@ -13,14 +9,6 @@ use zbus::{
 };
 
 mod second_client;
-/// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
-/// macro in the future.
-pub trait ForeignController: Send + Sync + std::fmt::Debug {
-    fn get_type(&self, key: &str) -> DataType;
-    fn change_val(&mut self, key: &str, val: DataType);
-    fn as_any(&self) -> &dyn Any;
-}
-
 // TODO Currently doesn't support brush, this enum needs to be updated to incorporate
 // every type in which slint can convert its values to.
 // TODO, I can support a vector type which someone might use for using external
@@ -41,7 +29,7 @@ pub enum InternalHandle {
 }
 
 struct VarHandler {
-    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state: State,
     state_updater: Sender<InternalHandle>,
     layer_name: String,
 }
@@ -199,7 +187,7 @@ impl VarHandler {
 }
 
 pub async fn deploy_zbus_service(
-    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state: State,
     state_updater: Sender<InternalHandle>,
     layer_name: String,
 ) -> zbus::Result<()> {

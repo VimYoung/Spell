@@ -1,19 +1,12 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
-use std::{
-    cell::Cell,
-    fs,
-    io::Write,
-    os::unix::net::{UnixDatagram, UnixStream},
-    path::Path,
-    sync::Mutex,
-};
+use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
+use tracing::{level_filters::LevelFilter, warn};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     EnvFilter, Layer as TracingTraitLayer,
-    filter::Filtered,
     fmt::{
-        self, FormatEvent, Layer as TracingLayer,
+        self, Layer as TracingLayer,
         format::{DefaultFields, Format, Full},
     },
     layer::{Layered, SubscriberExt},
@@ -75,18 +68,18 @@ impl std::clone::Clone for Rgba8Pixel {
 ///
 /// ## Panics
 ///
-/// event_loop will panic if 0 is provided as width and height.
+/// event loops like [cast_spell](crate::cast_spell) and [encahnt_spells](crate::enchant_spells) will panic if 0 is provided as width or height.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
     /// Defines the widget width in pixels. On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's prectangular monitor space. It is important to
+    /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
     /// note that the value should be the maximum width the widget will ever attain, not the
     /// current width in case of resizeable widgets.
     pub width: u32,
     /// Defines the widget height in pixels. On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's prectangular monitor space. It is important to
-    /// note that the value should be the maximum width the widget will ever attain, not the
-    /// current width in case of resizeable widgets.
+    /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
+    /// note that the value should be the maximum height the widget will ever attain, not the
+    /// current height in case of resizeable widgets.
     pub height: u32,
     /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
     /// related explaination of usage. If both values are None, then widget is displayed in the
@@ -101,12 +94,9 @@ pub struct WindowConf {
     /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`] for more
     /// details.
     pub board_interactivity: Cell<KeyboardInteractivity>,
-    /// Defines if the widget is exclusive of not, if marked true, further laying of widgets in the
-    /// same area is avoided. View [wayland docs](https://wayland.app/protocols/wlr-layer-shell-unstable-v1#zwlr_layer_surface_v1:request:set_exclusive_zone)
-    /// for details. By default, spell takes the value of width if anchored at top or bottom and
-    /// height if anchored left or right and set that to the exclusive zone.
-    /// TOTEST, define the case when widget is resizeable.
-    pub exclusive_zone: bool,
+    /// Defines if the widget is exclusive of not,if not set to None, else set to number of pixels to
+    /// set as exclusive zone as i32.
+    pub exclusive_zone: Option<i32>,
 }
 
 impl WindowConf {
@@ -119,7 +109,7 @@ impl WindowConf {
         margin: (i32, i32, i32, i32),
         layer_type: Layer,
         board_interactivity: KeyboardInteractivity,
-        exclusive_zone: bool,
+        exclusive_zone: Option<i32>,
     ) -> Self {
         WindowConf {
             width: max_width,
@@ -139,13 +129,13 @@ pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
     let logging_dir = runtime_dir + "/spell/";
     let socket_dir = logging_dir.clone() + "/spell.sock";
+    let socket_cli_dir = logging_dir.clone() + "/spell_cli";
 
     let _ = fs::create_dir(Path::new(&logging_dir));
     let _ = fs::remove_file(&socket_dir);
+    let _ = fs::File::create(&socket_cli_dir);
 
     let stream = UnixDatagram::unbound().unwrap();
-    // stream.connect(&socket_dir).unwrap();
-
     stream
         .set_nonblocking(true)
         .expect("Non blocking couldn't be set");
@@ -163,13 +153,19 @@ pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
         .with_writer(writer)
         .with_filter(EnvFilter::new("spell_framework=trace,info"));
 
-    if let Ok(val) = std::env::var("RUST_LOG") {
-        println!("Rust log value: {}", val);
-    } else {
-        println!("Val not set");
-    }
+    // if let Ok(val) = std::env::var("RUST_LOG") {
+    //     println!("Rust log value: {}", val);
+    // } else {
+    //     println!("Val not set");
+    // }
 
-    let (layer_env, handle) = LoadLayer::new(EnvFilter::from_default_env());
+    let (layer_env, handle) = LoadLayer::new(
+        EnvFilter::from_default_env().add_directive(
+            "spell-framework=info,warn"
+                .parse()
+                .unwrap_or(LevelFilter::INFO.into()),
+        ),
+    );
     let layer_socket = fmt::layer().with_writer(Mutex::new(SocketWriter::new(stream)));
     let subs = tracing_subscriber::registry()
         .with(fmt::layer().without_time().with_target(false))
@@ -177,7 +173,7 @@ pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
         .with(layer_socket)
         .with(layer_writer);
     // .with(layer_std);
-    tracing::subscriber::set_global_default(subs).expect("Got error in setting subs");
+    let _ = tracing::subscriber::set_global_default(subs);
     handle
 }
 

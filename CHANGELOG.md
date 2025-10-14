@@ -1,8 +1,8 @@
-# W.I.P. 0.1.7 & 0.1.3 CLI {Due Date}
+# 0.1.7 & 0.1.3 CLI (25-10-10)
 
 Changes:
 
-- Multipl dbus for interaction between windows enabled.
+- Multiple dbus for interaction between windows enabled.
   - This resulted in fixing the working of CLI in multi-widget system.
 - New method added to set exclusive zone other than window's dimensions.
 - `forge` and repeated backspace temporarily disabled in search of better
@@ -13,8 +13,7 @@ Changes:
 
 Changes(spell-cli):
 
-- Logs expanded to include user, verbose and developer versions with documentation
-  for each.
+- Logs are implemented to be accessible from CLI.
   - This included creation of space for spell in `$XDG_RUNTIME_DIR`. The socket to which
     messages are sent.
 

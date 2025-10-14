@@ -25,17 +25,15 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::{
-        configure::WindowConf,
-        dbus_window_state::{DataType, ForeignController},
-    };
+    pub use crate::{configure::WindowConf, dbus_window_state::DataType};
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
-use dbus_window_state::{ForeignController, InternalHandle, deploy_zbus_service};
+use dbus_window_state::{DataType, InternalHandle, deploy_zbus_service};
 use smithay_client_toolkit::reexports::calloop::channel::{Channel, Event, channel};
 use std::{
+    any::Any,
     error::Error,
     sync::{Arc, RwLock},
     time::Duration,
@@ -43,19 +41,62 @@ use std::{
 
 use tracing::{Level, error, info, instrument, span, trace, warn};
 use wayland_adapter::SpellWin;
-
 use zbus::Error as BusError;
 
-type State = Arc<RwLock<Box<dyn ForeignController>>>;
+/// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
+/// macro in the future.
+/// In the mean time, this function is implemented on a struct you would define in
+/// your `.slint` file. Then state of widgets should be stored as single property
+/// of that data type rather than on individual values.
+///
+/// ## Example
+///
+/// ```slint
+/// // Wrong Method is you want to handle on-close and is-expanded locally.
+/// export component MyWindow inherits Window {
+///   in-out property <bool> on-close: false;
+///   in-out property <bool> is-expanded: true;
+///   Rectangle {
+///      // Other widgets will come here.
+///   }
+/// }
+///
+/// // Correct method
+/// export component MyWindow inherits Window {
+///   in-out property <MyWinState> state: {on-close: false, is-expanded: true};
+///   Rectangle {
+///      // Other widgets will come here.
+///   }
+/// }
+/// export struct MyWinState {
+///   on-close: bool,
+///   is-expanded: true,
+/// }
+/// ```
+pub trait ForeignController: Send + Sync + std::fmt::Debug {
+    /// On calling `spell-cli -l layer_name look
+    /// var_name`, the cli calls `get_type` method of the trait with `var_name` as input.
+    fn get_type(&self, key: &str) -> DataType;
+    /// It is called on `spell-cli -l layer_name update key value`. `as_any` is for syncing the changes
+    /// internally for now and need not be implemented by the end user.
+    fn change_val(&mut self, key: &str, val: DataType);
+    /// It is a type needed internally, it's implementation should return `self` to
+    /// avoid undefined behaviour.
+    fn as_any(&self) -> &dyn Any;
+}
 
-pub fn enchant_spells<F>(
+type State = Arc<RwLock<dyn ForeignController>>;
+type States = Vec<Option<Box<dyn FnMut(State)>>>;
+/// This is the event loop which is to be called when initialising multiple windows through
+/// a single `main` file. It is important to remember that Each value of these vectors corresponds
+/// to the number on which a widget is initialised. So, this function will panic if the length of
+/// vectors of various types mentioned here are not equal.For more information on checking the
+/// arguments, view [cast_spell].
+pub fn enchant_spells(
     mut waywindows: Vec<SpellWin>,
     states: Vec<Option<State>>,
-    mut set_callbacks: Vec<Option<F>>,
-) -> Result<(), Box<dyn Error>>
-where
-    F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'static,
-{
+    mut set_callbacks: States,
+) -> Result<(), Box<dyn Error>> {
     if waywindows.len() == states.len() && waywindows.len() == set_callbacks.len() {
         info!("Starting windows");
         let spans: Vec<span::Span> = waywindows.iter().map(|win| win.span.clone()).collect();
@@ -134,19 +175,35 @@ where
     }
 }
 
-pub fn cast_spell<
-    S: SpellAssociated + std::fmt::Debug,
-    F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'static,
->(
+/// This is the primary function used for starting the event loop after creating the widgets,
+/// setting values and initialising windows. Example of the use can be found [here](https://github.com/VimYoung/Young-Shell/tree/main/src/bin).
+/// The function takes in the following function arguments:-
+/// 1. Wayland side of widget corresponding to it's slint window.
+/// 2. A instance of struct implementing [ForeignController]. This will be wrapped in `Arc` and
+///    `RwLock` as it would be used across threads internally, if the widget is static in nature
+///    and doesn't need state that needs to be changed remotely via CLI. You can parse in None.
+/// 3. A callback which is called when a CLI command is invoked changing the value. The closure
+///    gets an updated value of your state struct. The common method is to take the updated value
+///    and replace your existing state with it to reflect back the changes in the slint code. If
+///    state is provided, then it is important for now to pass a callback corresponding to it too.
+///    You can use this callback for example.
+/// ```rust
+/// move |state_value| {
+///     let controller_val = state_value.read().unwrap();
+///     let val = controller_val
+///         .as_any()
+///         .downcast_ref::<State>()
+///         .unwrap()
+///         .clone();
+///     ui_clone.unwrap().set_state(val);
+/// }
+/// // here `ui_clone` is weak pointer to my slint window for setting back the `state` property.
+/// ```
+pub fn cast_spell<S: SpellAssociated + std::fmt::Debug>(
     mut waywindow: S,
     state: Option<State>,
-    set_callback: Option<F>,
+    set_callback: Option<Box<dyn FnMut(State)>>,
 ) -> Result<(), Box<dyn Error>> {
-    // let mut args = std::env::args();
-    // args.next();
-    // if let Some(val) = args.next() {
-    //     println!("the val: {}", val);
-    // }
     let span = waywindow.get_span();
     let s = span.clone();
     span.in_scope(|| {
@@ -158,7 +215,7 @@ pub fn cast_spell<
 #[instrument(skip(state))]
 fn helper_fn_for_deploy(
     layer_name: String,
-    state: &Option<Arc<RwLock<Box<dyn ForeignController>>>>,
+    state: &Option<State>,
     span_log: span::Span,
 ) -> Channel<InternalHandle> {
     let (tx, rx) = channel::<InternalHandle>();
@@ -188,19 +245,20 @@ fn helper_fn_for_deploy(
     rx
 }
 
+/// Internal function for running event loops, implemented by [SpellWin] and
+/// [SpellLock][`crate::wayland_adapter::SpellLock`].
 pub trait SpellAssociated {
-    fn on_call<F>(
+    fn on_call(
         &mut self,
-        state: Option<Arc<RwLock<Box<dyn ForeignController>>>>,
-        set_callback: Option<F>,
+        state: Option<State>,
+        set_callback: Option<Box<dyn FnMut(State)>>,
         span_log: tracing::span::Span,
-    ) -> Result<(), Box<dyn Error>>
-    where
-        F: FnMut(Arc<RwLock<Box<dyn ForeignController>>>) + 'static;
+    ) -> Result<(), Box<dyn Error>>;
 
     fn get_span(&self) -> span::Span;
 }
 
+// TODO set logging values in Option so that only a single value reads or writes.
 // TODO it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
 // TODO The project should have a live preview feature. It can be made by leveraging

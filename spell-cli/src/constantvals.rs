@@ -32,6 +32,7 @@ Usage: spell-cli log [<argument>] [sub-command] ...
 `log` subcommand is used to retrieve logging information from currently running widget instances.
 
 Sub-commands:
+    NOTE: CURRENTLY THIS SPECIFICATION DOESN'T WORK AND IS W.I.P.
     slint_debug: links slint's debug!{} method output. You can view your debug
                  statements from it.
     debug: General errors and warning that might be helpful in debugging.
@@ -42,7 +43,13 @@ Sub-commands:
 Arguments:
     --layer | -l :  Specifies the name of layer (aka window) whose logs to show. Use
                     unique names of layers to avoid undefined behaviour. You can also
-                    define the layer before like with `update` subcommand.
+                    define the layer before like with `update` subcommand. Currently,
+                    logs can't be specified on the basis of layer_name.
     --help | -h :   Shows this help message.
 ";
-pub const ENABLE_HELP: &str = "";
+pub const ENABLE_HELP: &str = "
+Usage: spell-cli enable [<argument>] [sub-command] ...
+
+`enable` subcommand could be used in order to trigger events for vault. Complete
+implementation willl come in upcoming versions.
+";

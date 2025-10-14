@@ -204,7 +204,7 @@ impl KeyboardHandler for SpellLock {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
-        mut event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+        /*mut*/ event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         info!("Key is released");
         // if let Err(err) = self.loop_handle.disable(&self.backspace.unwrap()) {

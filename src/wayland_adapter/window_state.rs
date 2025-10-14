@@ -17,13 +17,6 @@ pub struct PointerState {
     pub cursor_shape: CursorShapeManager,
 }
 
-// This a boilerplate trait for connection with CLI, it will be replaced by a procedural
-// macro in the future.
-pub trait ForeignController: Send + Sync {
-    fn get_type(&self, key: &str) -> DataType;
-    fn change_val(&mut self, key: &str, val: DataType);
-    fn as_any(&self) -> &dyn Any;
-
 // TODO Currently doesn't support brush, this enum needs to be updated to incorporate
 // every type in which slint can convert its values to.
 // TODO, I can support a vector type which someone might use for using external

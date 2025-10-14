@@ -1,13 +1,10 @@
-use crate::{ForeignController, dbus_window_state::InternalHandle, layer_properties::DataType};
+use crate::{State, dbus_window_state::InternalHandle, layer_properties::DataType};
 use core::panic;
-// use futures_util::StreamExt;
-use std::sync::{Arc, RwLock};
-// use tokio::sync::mpsc::Sender;
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
 use tracing::{info, trace, warn};
 use zbus::{Connection as BusConn, fdo::Error as BusError, interface};
 pub async fn open_sec_service(
-    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state: State,
     state_updater: Sender<InternalHandle>,
     layer_name: String,
 ) -> zbus::Result<()> {
@@ -37,7 +34,7 @@ pub async fn open_sec_service(
 }
 
 pub(crate) struct WidgetHandler {
-    state: Arc<RwLock<Box<dyn ForeignController>>>,
+    state: State,
     state_updater: Sender<InternalHandle>,
 }
 

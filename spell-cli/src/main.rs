@@ -1,7 +1,11 @@
 pub mod constantvals;
 use constantvals::{ENABLE_HELP, LOGS_HELP, MAIN_HELP};
-use std::env::{self, Args};
-use std::os::unix::net::UnixDatagram;
+use std::{
+    env::{self, Args},
+    fs::OpenOptions,
+    io::Write,
+    os::unix::net::UnixDatagram,
+};
 use zbus::{Connection, Result as BusResult, proxy};
 
 #[proxy(
@@ -32,7 +36,7 @@ async fn main() -> Result<(), SpellError> {
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.trim() {
             "--version" | "-v" => {
-                println!("spell-cli version 0.1.3");
+                println!("spell-cli version 1.0.0");
             Ok(())
             },
             "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l|--layer `name` sub command".to_string()))),
@@ -157,13 +161,25 @@ async fn get_logs(layer_name: Option<String>, mut values: Args) -> Result<(), Sp
     }
 }
 
-fn get_tracing_debug(log_type: LogType, layer_name: String) -> Result<(), SpellError> {
+fn get_tracing_debug(log_type: LogType, _layer_name: String) -> Result<(), SpellError> {
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
+    let logging_dir = runtime_dir + "/spell/";
+    let socket_cli_dir = logging_dir.clone() + "/spell_cli";
+    // let _ = fs::remove_file(&socket_cli_dir);
+    // stream.connect(&socket_dir).unwrap();
+    // TODO have to return error here in the match sttement to avoid unwrap.
+    let mut file = OpenOptions::new()
+        .append(true) // open in append mode
+        .create(true) // create the file if it doesn’t exist
+        .open(&socket_cli_dir)
+        .unwrap();
     match log_type {
-        LogType::Slint => {}
-        LogType::Debug => {}
-        LogType::Dump => {}
-        LogType::Dev => {}
-    }
+        LogType::Slint => file.write_all(b"slint_log").unwrap(),
+        LogType::Debug => file.write_all(b"debug").unwrap(),
+        LogType::Dump => file.write_all(b"dump").unwrap(),
+        LogType::Dev => file.write_all(b"dev").unwrap(),
+    };
+
     let socket_path = "/run/user/1000/spell/spell.sock";
     std::fs::remove_file(socket_path).ok();
     let sock = UnixDatagram::bind(socket_path).unwrap();

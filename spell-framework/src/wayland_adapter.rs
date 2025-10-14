@@ -3,7 +3,7 @@
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
 use crate::{
-    SpellAssociated,
+    SpellAssociated, State,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
     helper_fn_for_deploy,
@@ -50,15 +50,17 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
+    // os::unix::net::{UnixListener, UnixStream},
+    // path::Path,
     fs,
-    io::{self, BufRead, BufReader},
-    os::unix::net::UnixDatagram,
-    path::Path,
+    io::{BufReader, prelude::*},
+
     process::Command,
     rc::Rc,
     time::Duration,
 };
-use tracing::{Level, info, span, trace};
+use tracing::{Level, info, level_filters::LevelFilter, span, trace, warn};
+use tracing_subscriber::EnvFilter;
 
 mod lock_impl;
 mod way_helper;
@@ -78,11 +80,12 @@ pub(crate) struct States {
 /// implementation, thus providing various features.
 /// ## Panics
 ///
-/// The constructor method [conjure_spells](crate::wayland_adapter::SpellMultiWinHandler::conjure_spells) will
-/// panic if the number of WindowConfs provided is not equal to the amount of widgets that are
-/// initialised in the scope. The solution to avoid panic is to add more `let _ =
+/// Event loop [enchant_spells](crate::enchant_spells) will
+/// panic if the number of `WindowConf`s provided to  method [conjure_spells](crate::wayland_adapter::SpellMultiWinHandler::conjure_spells) are
+/// not equal to the amount of slint widgets that are
+/// initialised in the scope. The solution to avoid panic is to add more `let _name =
 /// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
-/// slint files and adding [WindowConf]s for in [SpellMultiWinHandler].
+/// slint files and adding [WindowConf]s in [SpellMultiWinHandler].
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     pub(crate) loop_handle: LoopHandle<'static, SpellWin>,
@@ -99,7 +102,6 @@ pub struct SpellWin {
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     pub(crate) span: span::Span,
-    pub(crate) log_reader: UnixDatagram,
     #[allow(dead_code)]
     pub(crate) backspace: calloop::RegistrationToken,
 }
@@ -150,7 +152,7 @@ impl SpellWin {
         set_config(
             &window_conf,
             &layer,
-            true,
+            //true,
             Some(input_region.wl_region()),
             None,
         );
@@ -207,36 +209,76 @@ impl SpellWin {
             .unwrap();
         event_loop.handle().disable(&backspace_event).unwrap();
 
-        // Inserting tracing source
+        // // Inserting tracing source
         let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
         let logging_dir = runtime_dir + "/spell/";
-        let socket_dir = logging_dir.clone() + "/spell_cli.sock";
+        let socket_cli_dir = logging_dir.clone() + "/spell_cli";
 
-        let _ = fs::create_dir(Path::new(&logging_dir));
-        let _ = fs::File::create_new(&socket_dir);
+        // let _ = fs::create_dir(Path::new(&logging_dir));
+        // let _ = fs::remove_file(&socket_cli_dir);
 
-        let stream = UnixDatagram::unbound().unwrap();
-        stream
-            .set_nonblocking(true)
-            .expect("Non blocking couldn't be set");
         event_loop
             .handle()
             .insert_source(
                 Timer::from_duration(Duration::from_secs(2)),
-                |_, _, data| {
-                    let mut buf = [0u8; 4096];
-                    match data.log_reader.recv_from(&mut buf) {
-                        Ok((0, _)) => {}
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                        Ok(_) => match String::from_utf8(buf.to_vec()).unwrap().as_str() {
-                            "slint_log" => {
-                                // handle.modify(f)
-                            }
-                            "debug" => {}
-                            "dev" => {}
+                move |_, _, _| {
+                    // let mut buf = [0u8; 4096];
+
+                    let file = fs::File::open(&socket_cli_dir).unwrap();
+                    let buf = BufReader::new(file);
+                    let file_contents: Vec<String> = buf
+                        .lines()
+                        .map(|l| l.expect("Could not parse line"))
+                        .collect();
+                    if file_contents.len() > 1 {
+                        match file_contents[0].as_str() {
+                            "slint_log" => handle
+                                .modify(|layer| {
+                                    *layer = EnvFilter::from_default_env().add_directive(
+                                        "[slint-log]=info,warn"
+                                            .parse()
+                                            .unwrap_or(LevelFilter::INFO.into()),
+                                    );
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                }),
+                            "debug" => handle
+                                .modify(|layer| {
+                                    *layer = EnvFilter::from_default_env().add_directive(
+                                        "[slint-log]=info,warn"
+                                            .parse()
+                                            .unwrap_or(LevelFilter::INFO.into()),
+                                    );
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                }),
+                            "dump" => handle
+                                .modify(|layer| {
+                                    *layer = EnvFilter::from_default_env().add_directive(
+                                        "[slint-log]=info,warn"
+                                            .parse()
+                                            .unwrap_or(LevelFilter::INFO.into()),
+                                    );
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                }),
+                            "dev" => handle
+                                .modify(|layer| {
+                                    *layer = EnvFilter::from_default_env().add_directive(
+                                        "[slint-log]=info,warn"
+                                            .parse()
+                                            .unwrap_or(LevelFilter::INFO.into()),
+                                    );
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                }),
+
                             _ => {}
-                        },
-                        Err(_) => todo!(),
+                        }
                     }
                     TimeoutAction::ToDuration(Duration::from_secs(2))
                 },
@@ -270,7 +312,6 @@ impl SpellWin {
             event_loop: Rc::new(RefCell::new(event_loop)),
             span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
             backspace: backspace_event,
-            log_reader: stream, // tracing_handle: handle,
         };
 
         info!("Win: {} layer created successfully.", layer_name);
@@ -292,7 +333,7 @@ impl SpellWin {
     ///
     /// # Panics
     ///
-    /// This function needs to be called "before" initialising the slint window to avoid
+    /// This function needs to be called "before" initialising your slint window to avoid
     /// panicing of this function.
     pub fn invoke_spell(name: &str, window_conf: WindowConf) -> Self {
         let handle = set_up_tracing(name);
@@ -394,13 +435,17 @@ impl SpellWin {
     }
 
     fn set_config_internal(&self) {
+        // if self.exclusive_zone.get() == 0 {
         set_config(
             &self.config,
             &self.layer,
-            self.first_configure,
+            //self.first_configure,
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
         );
+        // } else {
+        //
+        // }
     }
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
@@ -479,28 +524,21 @@ impl SpellWin {
 
     /// This method is used to set exclusive zone. Generally, useful when
     /// dimensions of width are different than exclusive zone you want.
-    pub fn set_exclusive_zone(&self, val: i32) {
+    pub fn set_exclusive_zone(&mut self, val: i32) {
+        // self.set_config_internal();
+        self.config.exclusive_zone = Some(val);
         self.layer.set_exclusive_zone(val);
         self.layer.commit();
     }
 }
 
 impl SpellAssociated for SpellWin {
-    fn on_call<F>(
+    fn on_call(
         &mut self,
-        state: Option<
-            std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
-        >,
-        set_callback: Option<F>,
+        state: Option<State>,
+        set_callback: Option<Box<dyn FnMut(State)>>,
         span_log: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-        F: FnMut(
-                std::sync::Arc<
-                    std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
-                >,
-            ) + 'static,
-    {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let rx = helper_fn_for_deploy(self.layer_name.clone(), &state, span_log);
         let event_loop = self.event_loop.clone();
         if let Some(mut callback) = set_callback {
@@ -960,9 +998,7 @@ impl SpellLock {
             .loop_handle
             .disable(&spell_lock.backspace.unwrap())
             .unwrap();
-        let _ = slint::platform::set_platform(Box::new(SpellLockShell {
-            window_manager: multi_handler,
-        }));
+        let _ = slint::platform::set_platform(Box::new(SpellLockShell::new(multi_handler)));
 
         WaylandSource::new(spell_lock.conn.clone(), event_queue)
             .insert(spell_lock.loop_handle.clone())
@@ -1074,21 +1110,12 @@ impl SpellLock {
 }
 
 impl SpellAssociated for SpellLock {
-    fn on_call<F>(
+    fn on_call(
         &mut self,
-        _: Option<
-            std::sync::Arc<std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>>,
-        >,
-        _: Option<F>,
+        _: Option<State>,
+        _: Option<Box<dyn FnMut(State)>>,
         _: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    where
-        F: FnMut(
-                std::sync::Arc<
-                    std::sync::RwLock<Box<dyn crate::layer_properties::ForeignController>>,
-                >,
-            ) + 'static,
-    {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
         while self.is_locked {
             event_loop
