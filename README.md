@@ -18,6 +18,11 @@
 
 **Don't forget to star the project if you liked it 🌟🌟**
 
+
+https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77
+> This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/YoungShell).
+
+
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
 
