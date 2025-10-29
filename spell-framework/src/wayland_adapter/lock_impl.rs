@@ -7,13 +7,14 @@ use smithay_client_toolkit::{
     output::{OutputHandler, OutputState},
     reexports::client::{
         Connection, QueueHandle,
-        protocol::{wl_output, wl_seat, wl_surface},
+        protocol::{wl_output, wl_pointer, wl_seat, wl_surface},
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
         keyboard::{KeyboardHandler /*Keysym*/},
+        pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
     },
     session_lock::{
         SessionLock, SessionLockHandler, SessionLockSurface, SessionLockSurfaceConfigure,
@@ -31,7 +32,7 @@ impl ProvidesRegistryState for SpellLock {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.registry_state
     }
-    registry_handlers![OutputState,];
+    registry_handlers![OutputState, SeatState];
 }
 
 impl ShmHandler for SpellLock {
@@ -274,6 +275,16 @@ impl SeatHandler for SpellLock {
                 .expect("Failed to create keyboard");
             self.keyboard_state.board = Some(keyboard);
         }
+        if capability == Capability::Pointer && self.pointer_state.pointer.is_none() {
+            info!("Setting pointer capability");
+            let pointer = self
+                .seat_state
+                .get_pointer(qh, &seat)
+                .expect("Failed to create pointer");
+            let pointer_data = PointerData::new(seat);
+            self.pointer_state.pointer = Some(pointer);
+            self.pointer_state.pointer_data = Some(pointer_data);
+        }
     }
 
     fn remove_capability(
@@ -287,11 +298,113 @@ impl SeatHandler for SpellLock {
             info!("Unsettting keyboard capability");
             self.keyboard_state.board.take().unwrap().release();
         }
+        if capability == Capability::Pointer && self.pointer_state.pointer.is_some() {
+            info!("Unsetting pointer capability");
+            self.pointer_state.pointer.take().unwrap().release();
+        }
     }
 
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
+impl PointerHandler for SpellLock {
+    fn pointer_frame(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _pointer: &wl_pointer::WlPointer,
+        events: &[PointerEvent],
+    ) {
+        use PointerEventKind::*;
+        for event in events {
+            // Ignore events for other surfaces
+            for surface in self.lock_surfaces.iter() {
+                if event.surface != *surface.wl_surface() {
+                    continue;
+                }
+            }
+            match event.kind {
+                Enter { .. } => {
+                    info!("Pointer entered: {:?}", event.position);
+
+                    // TODO this code is redundent, as it doesn't set the cursor shape.
+                    let pointer = &self.pointer_state.pointer.as_ref().unwrap();
+                    let serial_no: Option<u32> = self
+                        .pointer_state
+                        .pointer_data
+                        .as_ref()
+                        .unwrap()
+                        .latest_enter_serial();
+                    if let Some(no) = serial_no {
+                        self.pointer_state
+                            .cursor_shape
+                            .get_shape_device(pointer, qh)
+                            .set_shape(no, Shape::Pointer);
+                        // self.layer.commit();
+                    }
+                }
+                Leave { .. } => {
+                    info!("Pointer left: {:?}", event.position);
+                    self.slint_part.as_ref().unwrap().adapters[0]
+                        .try_dispatch_event(WindowEvent::PointerExited)
+                        .unwrap();
+                }
+                Motion { .. } => {
+                    // debug!("Pointer entered @{:?}", event.position);
+                    self.adapter
+                        .try_dispatch_event(WindowEvent::PointerMoved {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                        })
+                        .unwrap();
+                }
+                Press { button, .. } => {
+                    trace!("Press {:x} @ {:?}", button, event.position);
+                    self.adapter
+                        .try_dispatch_event(WindowEvent::PointerPressed {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                            button: PointerEventButton::Left,
+                        })
+                        .unwrap();
+                }
+                Release { button, .. } => {
+                    trace!("Release {:x} @ {:?}", button, event.position);
+                    self.adapter
+                        .try_dispatch_event(WindowEvent::PointerReleased {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                            button: PointerEventButton::Left,
+                        })
+                        .unwrap();
+                }
+                Axis {
+                    horizontal,
+                    vertical,
+                    ..
+                } => {
+                    trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
+                    self.adapter
+                        .try_dispatch_event(WindowEvent::PointerScrolled {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                            delta_x: horizontal.absolute as f32,
+                            delta_y: vertical.absolute as f32,
+                        })
+                        .unwrap();
+                }
+            }
+        }
+    }
+}
 /// It is an internal struct used by [`SpellLock`] internally.
 pub struct SpellSlintLock {
     pub(crate) adapters: Vec<std::rc::Rc<SpellSkiaWinAdapter>>,

@@ -1,7 +1,7 @@
-use i_slint_core::item_rendering::DirtyRegion;
-// use i_slint_core::partial_renderer::DirtyRegion;
+// use i_slint_core::item_rendering::DirtyRegion;
+use i_slint_core::partial_renderer::DirtyRegion;
 #[cfg(not(docsrs))]
-use slint::{PhysicalSize, Window, platform::WindowAdapter};
+use slint::{platform::WindowAdapter, PhysicalSize, Window};
 use smithay_client_toolkit::shm::slot::Buffer;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -110,7 +110,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
 }
 
 #[cfg(feature = "i-slint-renderer-skia")]
-use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
+use i_slint_renderer_skia::{software_surface::SoftwareSurface, SkiaRenderer, SkiaSharedContext};
 #[cfg(feature = "i-slint-renderer-skia")]
 /// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
 /// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.

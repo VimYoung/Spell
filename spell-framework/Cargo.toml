@@ -13,13 +13,13 @@ env_logger = "0.11.7"
 event-listener = "5.4.0"
 fs2 = "0.4.3"
 futures-util = "0.3.31"
-i-slint-core = "1.13.1"
-i-slint-renderer-skia = { version = "1.13.1", features = [
+i-slint-core = "1.14.1"
+i-slint-renderer-skia = { version = "1.14.1", features = [
   "wayland",
 ], optional = true }
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.3.18"
-slint = { version = "1.13.1", features = [
+slint = { version = "1.14.1", features = [
   "raw-window-handle-06",
   "renderer-software",
 ] }

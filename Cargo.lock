@@ -887,7 +887,8 @@ dependencies = [
 [[package]]
 name = "const-field-offset"
 version = "0.1.5"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91fcde4ca1211b5a94b573083c472ee19e86b19a441913f66e1cc5c41daf0255"
 dependencies = [
  "const-field-offset-macro",
  "field-offset",
@@ -896,7 +897,8 @@ dependencies = [
 [[package]]
 name = "const-field-offset-macro"
 version = "0.1.5"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5387f5bbc9e9e6c96436ea125afa12614cebf8ac67f49abc08c1e7a891466c90"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1967,33 +1969,35 @@ dependencies = [
 
 [[package]]
 name = "i-slint-backend-linuxkms"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8fd06c00fbdac3dd490cf5c10da7daad3820d775060a19ea277d8ab944a160b"
 dependencies = [
  "bytemuck",
  "calloop 0.14.3",
  "drm",
  "gbm",
  "glutin",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-renderer-femtovg",
  "input",
  "memmap2",
  "nix",
  "raw-window-handle",
- "xkbcommon",
+ "xkbcommon 0.9.0",
 ]
 
 [[package]]
 name = "i-slint-backend-qt"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c946891ff0bfa95a5944c7cfc18828b8e123edea1168301f1e1b5505aa82933e"
 dependencies = [
  "const-field-offset",
  "cpp",
  "cpp_build",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-core-macros",
  "lyon_path",
@@ -2005,22 +2009,24 @@ dependencies = [
 
 [[package]]
 name = "i-slint-backend-selector"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e138660c634d6bbdf98bb2d0cfa487cda28e032e133a2a2c974f1cc494198765"
 dependencies = [
  "cfg-if",
  "i-slint-backend-linuxkms",
  "i-slint-backend-qt",
  "i-slint-backend-winit",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-core-macros",
 ]
 
 [[package]]
 name = "i-slint-backend-winit"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69bf9167fb1165942ef1f034e039645b60b07b23c0c76069cb83595f979243a4"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -2032,7 +2038,7 @@ dependencies = [
  "futures",
  "glutin",
  "glutin-winit",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-core-macros",
  "i-slint-renderer-femtovg",
@@ -2066,6 +2072,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "i-slint-common"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3566194c13f8dcf6e9f41a2090c96f08cf3f59b60c91380a86c1ed72f6e7d19"
+dependencies = [
+ "fontique",
+ "ttf-parser 0.25.1",
+]
+
+[[package]]
 name = "i-slint-compiler"
 version = "1.14.0"
 source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
@@ -2075,7 +2091,7 @@ dependencies = [
  "codemap-diagnostic",
  "derive_more",
  "fontdue",
- "i-slint-common",
+ "i-slint-common 1.14.0",
  "image",
  "itertools 0.14.0",
  "linked_hash_set",
@@ -2095,9 +2111,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "i-slint-compiler"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a301031f6c1da6acdd483641cc44109b34990e5edd67478eb0cbca359ab7ae3f"
+dependencies = [
+ "by_address",
+ "codemap",
+ "codemap-diagnostic",
+ "derive_more",
+ "i-slint-common 1.14.1",
+ "itertools 0.14.0",
+ "linked_hash_set",
+ "lyon_extra",
+ "lyon_path",
+ "num_enum",
+ "proc-macro2",
+ "quote",
+ "rowan",
+ "smol_str 0.3.2",
+ "strum",
+ "typed-index-collections",
+ "url",
+]
+
+[[package]]
 name = "i-slint-core"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc140f1218cfc4451b9e8753306c42afbcaf0386cc888e53664c1a5f5330ae19"
 dependencies = [
  "auto_enums",
  "bitflags 2.9.4",
@@ -2109,7 +2151,7 @@ dependencies = [
  "derive_more",
  "euclid",
  "fontdue",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core-macros",
  "image",
  "integer-sqrt",
@@ -2126,9 +2168,9 @@ dependencies = [
  "raw-window-handle",
  "resvg",
  "rgb",
- "rustybuzz",
  "scoped-tls-hkt",
  "scopeguard",
+ "skrifa",
  "slab",
  "strum",
  "sys-locale",
@@ -2143,8 +2185,9 @@ dependencies = [
 
 [[package]]
 name = "i-slint-core-macros"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4c6a3975ccaa66415f5524292750e631879e69178aa97e3928d2396b790d00d"
 dependencies = [
  "quote",
  "serde_json",
@@ -2153,15 +2196,16 @@ dependencies = [
 
 [[package]]
 name = "i-slint-renderer-femtovg"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03d85d77f899ecb1f05c50c659a6d356fba44463686713f1f925c8be48de6afb"
 dependencies = [
  "cfg-if",
  "const-field-offset",
  "derive_more",
  "femtovg",
  "glow",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-core-macros",
  "imgref",
@@ -2175,8 +2219,9 @@ dependencies = [
 
 [[package]]
 name = "i-slint-renderer-skia"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e26ed0d42d66c457b7937d7f5ee07d2fbef3691c896a26212a69b30288844ddd"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -2185,7 +2230,7 @@ dependencies = [
  "derive_more",
  "glow",
  "glutin",
- "i-slint-common",
+ "i-slint-common 1.14.1",
  "i-slint-core",
  "i-slint-core-macros",
  "lyon_path",
@@ -4347,8 +4392,9 @@ checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
 name = "slint"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c35c4bdca2c42c69b21ceb416aa4ba76c3f54df30e9ce85dcad0742229422a6"
 dependencies = [
  "const-field-offset",
  "i-slint-backend-qt",
@@ -4371,17 +4417,18 @@ version = "1.14.0"
 source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
 dependencies = [
  "derive_more",
- "i-slint-compiler",
+ "i-slint-compiler 1.14.0",
  "spin_on",
  "toml_edit 0.23.7",
 ]
 
 [[package]]
 name = "slint-macros"
-version = "1.14.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+version = "1.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6b4b4bada19852716991153ddd93bf133548ac74383a05db8df399b9003bbfe"
 dependencies = [
- "i-slint-compiler",
+ "i-slint-compiler 1.14.1",
  "proc-macro2",
  "quote",
  "spin_on",
@@ -4453,7 +4500,7 @@ dependencies = [
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "wayland-scanner",
- "xkbcommon",
+ "xkbcommon 0.8.0",
  "xkeysym",
 ]
 
@@ -4523,7 +4570,7 @@ name = "spell-cli"
 version = "1.0.0"
 dependencies = [
  "slint-build",
- "spell-framework",
+ "spell-framework 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "zbus",
 ]
@@ -4531,6 +4578,31 @@ dependencies = [
 [[package]]
 name = "spell-framework"
 version = "1.0.0"
+dependencies = [
+ "env_logger",
+ "event-listener",
+ "fs2",
+ "futures-util",
+ "i-slint-core",
+ "i-slint-renderer-skia",
+ "nonstick",
+ "rust-fuzzy-search",
+ "signal-hook",
+ "slint",
+ "smithay-client-toolkit 0.20.0",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-rfc-5424",
+ "tracing-subscriber",
+ "zbus",
+]
+
+[[package]]
+name = "spell-framework"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b56725b13063ed45e7faea6918014ade59d8bc3fe39db770f262bfd690dc89d3"
 dependencies = [
  "env_logger",
  "event-listener",
@@ -5269,7 +5341,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vtable"
 version = "0.3.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "753be81c38dff787d177b5939af1fa16f72f0d0d21a6b7d74ae56e29cd26f2a6"
 dependencies = [
  "const-field-offset",
  "portable-atomic",
@@ -5280,7 +5353,8 @@ dependencies = [
 [[package]]
 name = "vtable-macro"
 version = "0.3.0"
-source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cfcf6171aa2b0f85718ca5888ca32f6edf61d1849f8e4b3786ad890e5b68f68"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6316,6 +6390,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "xkbcommon"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7a974f48060a14e95705c01f24ad9c3345022f4d97441b8a36beb7ed5c4a02d"
+dependencies = [
+ "libc",
+ "memmap2",
+ "xkeysym",
+]
+
+[[package]]
 name = "xkbcommon-dl"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6630,3 +6715,18 @@ dependencies = [
  "syn",
  "winnow",
 ]
+
+[[patch.unused]]
+name = "i-slint-core"
+version = "1.14.0"
+source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+
+[[patch.unused]]
+name = "i-slint-renderer-skia"
+version = "1.14.0"
+source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"
+
+[[patch.unused]]
+name = "slint"
+version = "1.14.0"
+source = "git+https://github.com/slint-ui/slint#16c9ee91107349feb69a51ebfddd9a6428d57fc6"

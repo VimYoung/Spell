@@ -280,3 +280,12 @@ pub trait SpellAssociated {
 // primary and 2 are secondary.
 // Provide a method in the macro to disable tracing_subsriber completely for some project
 // which want's to do it themselves.
+// cast spell macro should be having following values.
+// 1. Disable log: should disable setting subscriber, generally for the project to use or for
+// someone to set their own.
+// 2. forge: provide a forge instance to run independently.
+// 3. exclusive_zone: true or false or with specified value.
+// 4. it should have the option to take a window_conf or directly the window configurations
+// into the macro, removing the need to define it previously.
+//
+// Also, a procedural macro to mimic the functionalities of ForeignController.

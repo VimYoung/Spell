@@ -834,6 +834,7 @@ pub struct SpellLock {
     pub(crate) registry_state: RegistryState,
     pub(crate) output_state: OutputState,
     pub(crate) keyboard_state: KeyboardState,
+    pub(crate) pointer_state: PointerState,
     pub(crate) seat_state: SeatState,
     pub(crate) shm: Shm,
     pub(crate) session_lock: Option<SessionLock>,
@@ -865,6 +866,8 @@ impl SpellLock {
         let session_lock_state = SessionLockState::new(&globals, &qh);
         let compositor_state =
             CompositorState::bind(&globals, &qh).expect("Faild to create compositor state");
+        let cursor_manager =
+            CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let mut win_handler_vec: Vec<(String, (u32, u32))> = Vec::new();
         let lock_surfaces = Vec::new();
 
@@ -872,12 +875,18 @@ impl SpellLock {
             board: None,
             // board_data: None,
         };
+        let pointer_state = PointerState {
+            pointer: None,
+            pointer_data: None,
+            cursor_shape: cursor_manager,
+        };
         let mut spell_lock = SpellLock {
             loop_handle: event_loop.handle().clone(),
             conn: conn.clone(),
             compositor_state,
             output_state,
             keyboard_state,
+            pointer_state,
             registry_state,
             seat_state: SeatState::new(&globals, &qh),
             slint_part: None,
@@ -1162,6 +1171,7 @@ delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
 delegate_shm!(SpellLock);
 delegate_registry!(SpellLock);
+delegate_pointer!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
 // TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
