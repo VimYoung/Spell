@@ -18,13 +18,14 @@
 
 **Don't forget to star the project if you liked it 🌟🌟**
 
+<https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77>
 
-https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
-
 
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
+
+> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell) is a tutorial for new comers to get a hang of spell.
 
 Rather then leveraging Gtk for widget creation, Slint declarative language provides
 a very easy but comprehensive way to make aesthetic interfaces. It, supports rust

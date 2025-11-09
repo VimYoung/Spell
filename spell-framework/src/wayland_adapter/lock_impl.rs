@@ -1,13 +1,16 @@
 use slint::{
     PhysicalSize, SharedString,
-    platform::{/*Key,*/ WindowEvent},
+    platform::{PointerEventButton, /*Key,*/ WindowEvent},
 };
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     output::{OutputHandler, OutputState},
-    reexports::client::{
-        Connection, QueueHandle,
-        protocol::{wl_output, wl_pointer, wl_seat, wl_surface},
+    reexports::{
+        client::{
+            Connection, QueueHandle,
+            protocol::{wl_output, wl_pointer, wl_seat, wl_surface},
+        },
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -21,7 +24,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::Buffer},
 };
-use tracing::{info /*warn*/};
+use tracing::{info /*warn*/, trace};
 
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
@@ -351,7 +354,7 @@ impl PointerHandler for SpellLock {
                 }
                 Motion { .. } => {
                     // debug!("Pointer entered @{:?}", event.position);
-                    self.adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -362,7 +365,7 @@ impl PointerHandler for SpellLock {
                 }
                 Press { button, .. } => {
                     trace!("Press {:x} @ {:?}", button, event.position);
-                    self.adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -374,7 +377,7 @@ impl PointerHandler for SpellLock {
                 }
                 Release { button, .. } => {
                     trace!("Release {:x} @ {:?}", button, event.position);
-                    self.adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -390,7 +393,7 @@ impl PointerHandler for SpellLock {
                     ..
                 } => {
                     trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
-                    self.adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerScrolled {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
