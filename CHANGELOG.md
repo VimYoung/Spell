@@ -1,4 +1,11 @@
-# 0.1.7 & 0.1.3 CLI (25-10-10)
+# 1.0.1 (Due date)
+
+Changes:
+
+- Added touch input event in Lockscreens.
+- bridged `debug!` messages in slint to show in logs directly in lockscreen like for `SpellWin`.
+
+# 1.0.0 & 1.0.0 CLI (25-10-10)
 
 Changes:
 
@@ -17,7 +24,7 @@ Changes(spell-cli):
   - This included creation of space for spell in `$XDG_RUNTIME_DIR`. The socket to which
     messages are sent.
 
-  # 0.1.6 & 0.1.2 CLI (25-09-16)
+# 0.1.6 & 0.1.2 CLI (25-09-16)
 
 Changes:
 

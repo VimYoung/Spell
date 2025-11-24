@@ -1,7 +1,10 @@
 // use i_slint_core::item_rendering::DirtyRegion;
 use i_slint_core::partial_renderer::DirtyRegion;
 #[cfg(not(docsrs))]
-use slint::{platform::WindowAdapter, PhysicalSize, Window};
+use slint::{
+    PhysicalSize, Window,
+    platform::{EventLoopProxy, WindowAdapter},
+};
 use smithay_client_toolkit::shm::slot::Buffer;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -14,6 +17,7 @@ use std::{
     cell::RefCell,
     fmt::Debug,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -110,7 +114,7 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
 }
 
 #[cfg(feature = "i-slint-renderer-skia")]
-use i_slint_renderer_skia::{software_surface::SoftwareSurface, SkiaRenderer, SkiaSharedContext};
+use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
 #[cfg(feature = "i-slint-renderer-skia")]
 /// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
 /// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
@@ -123,6 +127,7 @@ pub struct SpellSkiaWinAdapterReal {
     #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
+    pub(crate) slint_event_proxy: Box<dyn EventLoopProxy>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -189,6 +194,7 @@ impl SpellSkiaWinAdapterReal {
             renderer,
             buffer_slint: buffer,
             needs_redraw: Cell::new(true),
+            slint_event_proxy: Box::new(SlintEventProxy::default()),
         })
     }
 
@@ -232,4 +238,30 @@ impl SpellSkiaWinAdapterReal {
     //         slint::LogicalPosition::new(origin.x as _, origin.y as _)
     //     })
     // }
+}
+
+struct SlintEventProxy(Arc<SlintEventProxyInternal>);
+
+impl Default for SlintEventProxy {
+    fn default() -> Self {
+        SlintEventProxy(Arc::new(SlintEventProxyInternal::default()))
+    }
+}
+
+impl EventLoopProxy for SlintEventProxy {
+    fn quit_event_loop(&self) -> Result<(), i_slint_core::api::EventLoopError> {
+        Ok(())
+    }
+
+    fn invoke_from_event_loop(
+        &self,
+        event: Box<dyn FnOnce() + Send>,
+    ) -> Result<(), i_slint_core::api::EventLoopError> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct SlintEventProxyInternal {
+    event: Option<Box<dyn FnOnce() + Send>>,
 }

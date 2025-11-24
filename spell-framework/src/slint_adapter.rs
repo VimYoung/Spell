@@ -9,7 +9,7 @@ use crate::{
 use slint::{
     PhysicalSize, Window,
     platform::{
-        Platform, WindowAdapter,
+        EventLoopProxy, Platform, WindowAdapter,
         software_renderer::{
             RepaintBufferType::{self},
             SoftwareRenderer,
@@ -51,7 +51,7 @@ pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 pub struct SpellWinAdapter {
     pub window: Window,
     pub rendered: SoftwareRenderer,
-    pub size: PhysicalSize, //I am not adding any more properties for now and not puttinting it in a
+    pub size: PhysicalSize,
     pub needs_redraw: Cell<bool>,
 }
 
@@ -132,6 +132,10 @@ impl Platform for SpellLayerShell {
                 info!("{}", arguments.to_string());
             }
         })
+    }
+
+    fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
+        Some(self.window_adapter.clone().as_ref().slint_event_proxy)
     }
 }
 
@@ -273,5 +277,15 @@ impl Platform for SpellLockShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let value = self.window_manager.borrow_mut().request_new_lock();
         Ok(value)
+    }
+
+    fn debug_log(&self, arguments: core::fmt::Arguments) {
+        self.span.in_scope(|| {
+            if let Some(val) = arguments.as_str() {
+                info!(val);
+            } else {
+                info!("{}", arguments.to_string());
+            }
+        })
     }
 }
