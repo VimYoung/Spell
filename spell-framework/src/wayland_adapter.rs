@@ -54,9 +54,9 @@ use std::{
     // path::Path,
     fs,
     io::{BufReader, prelude::*},
-
     process::Command,
     rc::Rc,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use tracing::{Level, info, level_filters::LevelFilter, span, trace, warn};
@@ -179,11 +179,14 @@ impl SpellWin {
             // board_data: None,
         };
 
+        let slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>> =
+            Arc::new(Mutex::new(Vec::new()));
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
             Rc::new(RefCell::new(pool)),
             RefCell::new(primary_slot),
             window_conf.width,
             window_conf.height,
+            slint_proxy.clone(),
         );
 
         if if_single {
@@ -281,6 +284,28 @@ impl SpellWin {
                         }
                     }
                     TimeoutAction::ToDuration(Duration::from_secs(2))
+                },
+            )
+            .unwrap();
+
+        event_loop
+            .handle()
+            .insert_source(
+                Timer::from_duration(Duration::from_millis(1000)),
+                |_, _, data| {
+                    let slint_event_proxy = data.adapter.slint_event_proxy.clone();
+                    if let Ok(mut list_of_events) = slint_event_proxy.try_lock()
+                        && !(*list_of_events).is_empty()
+                    {
+                        let original_len = (*list_of_events).len();
+                        let mut x = 0;
+                        while x < original_len {
+                            let event = (*list_of_events).pop().unwrap();
+                            event();
+                            x += 1;
+                        }
+                    }
+                    TimeoutAction::ToDuration(Duration::from_millis(1000))
                 },
             )
             .unwrap();
@@ -963,7 +988,7 @@ impl SpellLock {
                 wayland_buffer
             })
             .collect();
-
+        let slint_proxy = Arc::new(Mutex::new(Vec::new()));
         let pool: Rc<RefCell<SlotPool>> = Rc::new(RefCell::new(pool));
         let mut adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
         buffer_slots
@@ -975,6 +1000,7 @@ impl SpellLock {
                     slot,
                     sizes[index].width,
                     sizes[index].height,
+                    slint_proxy.clone(),
                 );
                 adapters.push(adapter);
             });

@@ -1,10 +1,7 @@
 // use i_slint_core::item_rendering::DirtyRegion;
 use i_slint_core::partial_renderer::DirtyRegion;
 #[cfg(not(docsrs))]
-use slint::{
-    PhysicalSize, Window,
-    platform::{EventLoopProxy, WindowAdapter},
-};
+use slint::{PhysicalSize, Window, platform::WindowAdapter};
 use smithay_client_toolkit::shm::slot::Buffer;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -17,7 +14,7 @@ use std::{
     cell::RefCell,
     fmt::Debug,
     rc::{Rc, Weak},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -127,7 +124,7 @@ pub struct SpellSkiaWinAdapterReal {
     #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
-    pub(crate) slint_event_proxy: Box<dyn EventLoopProxy>,
+    pub(crate) slint_event_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -178,6 +175,7 @@ impl SpellSkiaWinAdapterReal {
         primary_slot: RefCell<Slot>,
         width: u32,
         height: u32,
+        slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
     ) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBufferReal {
             primary_slot,
@@ -194,7 +192,7 @@ impl SpellSkiaWinAdapterReal {
             renderer,
             buffer_slint: buffer,
             needs_redraw: Cell::new(true),
-            slint_event_proxy: Box::new(SlintEventProxy::default()),
+            slint_event_proxy: slint_proxy,
         })
     }
 
@@ -238,30 +236,4 @@ impl SpellSkiaWinAdapterReal {
     //         slint::LogicalPosition::new(origin.x as _, origin.y as _)
     //     })
     // }
-}
-
-struct SlintEventProxy(Arc<SlintEventProxyInternal>);
-
-impl Default for SlintEventProxy {
-    fn default() -> Self {
-        SlintEventProxy(Arc::new(SlintEventProxyInternal::default()))
-    }
-}
-
-impl EventLoopProxy for SlintEventProxy {
-    fn quit_event_loop(&self) -> Result<(), i_slint_core::api::EventLoopError> {
-        Ok(())
-    }
-
-    fn invoke_from_event_loop(
-        &self,
-        event: Box<dyn FnOnce() + Send>,
-    ) -> Result<(), i_slint_core::api::EventLoopError> {
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-struct SlintEventProxyInternal {
-    event: Option<Box<dyn FnOnce() + Send>>,
 }

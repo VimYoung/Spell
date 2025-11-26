@@ -20,6 +20,7 @@ use smithay_client_toolkit::reexports::client::Connection;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 use tracing::{Level, info, span, warn};
 
@@ -135,7 +136,9 @@ impl Platform for SpellLayerShell {
     }
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
-        Some(self.window_adapter.clone().as_ref().slint_event_proxy)
+        Some(Box::new(SlintEventProxy(
+            self.window_adapter.slint_event_proxy.clone(),
+        )))
     }
 }
 
@@ -287,5 +290,25 @@ impl Platform for SpellLockShell {
                 info!("{}", arguments.to_string());
             }
         })
+    }
+}
+
+struct SlintEventProxy(Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>);
+
+impl EventLoopProxy for SlintEventProxy {
+    fn quit_event_loop(&self) -> Result<(), i_slint_core::api::EventLoopError> {
+        Ok(())
+    }
+
+    fn invoke_from_event_loop(
+        &self,
+        event: Box<dyn FnOnce() + Send>,
+    ) -> Result<(), i_slint_core::api::EventLoopError> {
+        if let Ok(mut list_of_event) = self.0.try_lock() {
+            (*list_of_event).push(event);
+        } else {
+            warn!("Slint proxy event could not be processed");
+        }
+        Ok(())
     }
 }
