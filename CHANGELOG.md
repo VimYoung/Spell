@@ -1,9 +1,16 @@
-# 1.0.1 (Due date)
+# 1.0.1 & 1.0.1 CLI (Due date)
 
 Changes:
 
 - Added touch input event in Lockscreens.
-- bridged `debug!` messages in slint to show in logs directly in lockscreen like for `SpellWin`.
+- Bridged `debug!` messages in slint to show in logs directly in lockscreen like for `SpellWin`.
+- Fractional scaling for spell windows in now available making spell experience better for
+  large display monitors.
+
+Changes(spell-cli):
+
+- Added a subcommand to create spell project directly with dependencies added and a minimal
+  example present.
 
 # 1.0.0 & 1.0.0 CLI (25-10-10)
 

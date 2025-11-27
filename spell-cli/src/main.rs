@@ -1,10 +1,15 @@
 pub mod constantvals;
-use constantvals::{ENABLE_HELP, LOGS_HELP, MAIN_HELP};
+use constantvals::{
+    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, LOGS_HELP, MAIN_FILE, MAIN_HELP,
+};
+use core::panic;
 use std::{
     env::{self, Args},
-    fs::OpenOptions,
-    io::Write,
+    fs::{self, OpenOptions},
+    io::{self, Write},
     os::unix::net::UnixDatagram,
+    path::Path,
+    process::Command,
 };
 use zbus::{Connection, Result as BusResult, proxy};
 
@@ -60,6 +65,12 @@ async fn main() -> Result<(), SpellError> {
             },
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
+            "new" => match values.next() {
+                Some(dest_dir) => {
+                    create_spell_project(dest_dir)
+                }
+                None => Err(SpellError::CLI(Cli::UndefinedArg("Provide a destination for creating the project.".to_string())))
+            }
             // TODO tracing subscriber logs here plus debug logs of slint here in sub commands.
             "log" => match values.next() {
                 Some(log_type) =>  match log_type.trim() {
@@ -132,11 +143,63 @@ async fn main() -> Result<(), SpellError> {
                     }
                     _ => eprintln!("[Undocumented Error]: {bus_error}"),
                 },
+                SpellError::IO(err_val) => {
+                    eprintln!(
+                        "[IO Error]: IO error while running the commands internally. \n Error: {}",
+                        err_val
+                    )
+                }
             }
         }
     } else {
         let _ = show_help(None);
     }
+    Ok(())
+}
+
+fn create_spell_project(path: String) -> Result<(), SpellError> {
+    if let Ok(output) = Command::new("cargo").args(["new", &path]).output() {
+        io::stdout().write_all(&output.stdout)?;
+        io::stderr().write_all(&output.stderr)?;
+    } else {
+        panic!("Error running cargo command, is it installed?");
+    }
+    let path_ui: String;
+    let slint_file: String;
+    let build_file: String;
+    let main_file: String;
+    let cargo_file: String;
+
+    if path.ends_with('/') {
+        path_ui = path.clone() + "ui";
+        slint_file = path.clone() + "ui/app-window.slint";
+        build_file = path.clone() + "build.rs";
+        main_file = path.clone() + "src/main.rs";
+        cargo_file = path.clone() + "Cargo.toml";
+    } else {
+        path_ui = path.clone() + "/ui";
+        slint_file = path.clone() + "/ui/app-window.slint";
+        build_file = path.clone() + "/build.rs";
+        main_file = path.clone() + "/src/main.rs";
+        cargo_file = path.clone() + "/Cargo.toml";
+    }
+
+    fs::create_dir(Path::new(&path_ui))?;
+    let mut app_window_slint = fs::File::create(Path::new(&slint_file))?;
+    let mut build_rs = fs::File::create(Path::new(&build_file))?;
+    let mut main_rs = fs::File::create(Path::new(&main_file))?;
+    let mut cargo_toml = fs::File::create(Path::new(&cargo_file))?;
+
+    app_window_slint.write_all(APP_WINDOW_SLINT.as_bytes())?;
+    println!("Writing slint file...");
+    build_rs.write_all(BUILD_FILE.as_bytes())?;
+    println!("Writing build file...");
+    main_rs.write_all(MAIN_FILE.as_bytes())?;
+    println!("Writing main file...");
+    let file_name = Path::new(&path).file_name().unwrap().to_str().unwrap();
+    cargo_toml
+        .write_all(format!("[package] \nname = \"{file_name}\" \n {CARGO_TOML}").as_bytes())?;
+    println!("Spell enchanted!!");
     Ok(())
 }
 
@@ -262,6 +325,7 @@ enum LogType {
 pub enum SpellError {
     Buserror(zbus::Error),
     CLI(Cli),
+    IO(std::io::Error),
 }
 
 // TODO it needs to be more comprehensive for handling all the edge cases.
@@ -270,6 +334,12 @@ pub enum Cli {
     BadSubCommand(String),
     UndefinedArg(String),
     UnknownVal(String),
+}
+
+impl From<std::io::Error> for SpellError {
+    fn from(value: std::io::Error) -> Self {
+        SpellError::IO(value)
+    }
 }
 
 impl From<zbus::Error> for SpellError {

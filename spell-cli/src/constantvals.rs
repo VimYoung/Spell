@@ -10,6 +10,8 @@ Sub-commands:
     [-l] look KEY: Fetched the key's value for the specifed layer.
     [-l] show: Shows the specified window if hidden.
     [-l] hide: Hides the specified window.
+    new: Create a new spell project with git initialised dependencies added and a
+         minimial example to run given the path/name of project.
     enable: Enable services like lockscreen, notification etc if there is a
             provided implementation for it. Run `spell-cli enable --help` for
             more details.
@@ -53,3 +55,81 @@ Usage: spell-cli enable [<argument>] [sub-command] ...
 `enable` subcommand could be used in order to trigger events for vault. Complete
 implementation willl come in upcoming versions.
 ";
+
+pub const APP_WINDOW_SLINT: &str = r#"export component AppWindow inherits Window {
+    in-out property <int> counter: 42;
+    callback request-increase-value();
+    width: 276px;
+    height: 576px;
+    VerticalBox {
+        Text {
+            text: "Counter: \{root.counter}";
+        }
+
+        Button {
+            text: "Increase value";
+            clicked => {
+                root.request-increase-value();
+            }
+        }
+    }
+}
+"#;
+
+pub const BUILD_FILE: &str = r#"fn main() {
+    let config = slint_build::CompilerConfiguration::new().with_style("cosmic-dark".into());
+    // let config = slint_build::CompilerConfiguration::new().with_style("material-dark".into());
+    slint_build::compile_with_config("ui/app-window.slint", config).expect("Slint build failed");
+}
+"#;
+
+pub const CARGO_TOML: &str = r#"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+slint = { version = "1.14.1", features = ["live-preview", "renderer-software"] }
+spell-framework = "1.0.1"
+
+[build-dependencies]
+slint-build = "1.14.1"
+
+[patch.crates-io]
+slint = { git = "https://github.com/slint-ui/slint" }
+slint-build = { git = "https://github.com/slint-ui/slint" }
+i-slint-core = { git = "https://github.com/slint-ui/slint" }
+i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
+"#;
+pub const MAIN_FILE: &str = r#"use std::{ env, error::Error};
+
+use slint::ComponentHandle;
+use spell_framework::{
+    cast_spell,
+    layer_properties::{BoardType, LayerAnchor, LayerType, WindowConf},
+    wayland_adapter::SpellWin,
+};
+slint::include_modules!();
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let window_conf = WindowConf::new(
+        376,
+        576,
+        (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
+        (5, 0, 0, 10),
+        LayerType::Top,
+        BoardType::None,
+        None,
+    );
+
+    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
+    let ui = AppWindow::new().unwrap();
+    ui.on_request_increase_value({
+        let ui_handle = ui.as_weak();
+        move || {
+            let ui = ui_handle.unwrap();
+            ui.set_counter(ui.get_counter() + 1);
+        }
+    });
+    cast_spell(waywindow, None, None)
+}
+"#;
