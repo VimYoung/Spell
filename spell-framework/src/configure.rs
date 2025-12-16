@@ -97,6 +97,8 @@ pub struct WindowConf {
     /// Defines if the widget is exclusive of not,if not set to None, else set to number of pixels to
     /// set as exclusive zone as i32.
     pub exclusive_zone: Option<i32>,
+    /// Defines the monitor name on which to spawn the window.
+    pub monitor_name: Option<String>,
 }
 
 impl WindowConf {
@@ -110,6 +112,7 @@ impl WindowConf {
         layer_type: Layer,
         board_interactivity: KeyboardInteractivity,
         exclusive_zone: Option<i32>,
+        monitor_name: Option<String>,
     ) -> Self {
         WindowConf {
             width: max_width,
@@ -119,6 +122,7 @@ impl WindowConf {
             layer_type,
             board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
+            monitor_name
         }
     }
 }

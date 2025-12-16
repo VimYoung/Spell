@@ -127,6 +127,36 @@ impl SpellWin {
     ) -> Self {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
+
+        // TODO: Clean up code & try to remove unwraps
+        let target_output = if let Some(monitor_name) = &window_conf.monitor_name {
+            // Create a temporary queue and state to discover outputs logic
+            let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).unwrap();
+            // TODO: try & use main queue
+            let temp_qh = temp_queue.handle();
+            let output_state = OutputState::new(&temp_globals, &temp_qh);
+            let mut temp_state = TempState { output_state };
+
+            // Roundtrip to process initial events (output names)
+            temp_queue.roundtrip(&mut temp_state).unwrap();
+
+            let mut found = None;
+            for output in temp_state.output_state.outputs() {
+                if let Some(info) = temp_state.output_state.info(&output) {
+                    if info.name.as_deref() == Some(monitor_name) {
+                        found = Some(output);
+                        break;
+                    }
+                }
+            }
+            if found.is_none() {
+                warn!("Could not find monitor: {}", monitor_name);
+            }
+            found
+        } else {
+            None
+        };
+
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let event_loop: EventLoop<'static, SpellWin> =
@@ -147,7 +177,7 @@ impl SpellWin {
             surface,
             window_conf.layer_type,
             Some(layer_name.clone()),
-            None,
+            target_output.as_ref(),
         );
         set_config(
             &window_conf,
@@ -1233,3 +1263,54 @@ impl ConversationAdapter for UsernamePassConvo {
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;
+
+struct TempState {
+    output_state: OutputState,
+}
+
+delegate_output!(TempState);
+
+impl OutputHandler for TempState {
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.output_state
+    }
+    fn new_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+    }
+    fn update_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+    }
+    fn output_destroyed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+    }
+}
+
+impl
+    smithay_client_toolkit::reexports::client::Dispatch<
+        smithay_client_toolkit::reexports::client::protocol::wl_registry::WlRegistry,
+        smithay_client_toolkit::reexports::client::globals::GlobalListContents,
+    > for TempState
+{
+    fn event(
+        _state: &mut Self,
+        _proxy: &smithay_client_toolkit::reexports::client::protocol::wl_registry::WlRegistry,
+        _event: smithay_client_toolkit::reexports::client::protocol::wl_registry::Event,
+        _data: &smithay_client_toolkit::reexports::client::globals::GlobalListContents,
+        _conn: &smithay_client_toolkit::reexports::client::Connection,
+        _qh: &smithay_client_toolkit::reexports::client::QueueHandle<Self>,
+    ) {
+        // We don't care about updates during specific discovery roundtrip
+    }
+}
