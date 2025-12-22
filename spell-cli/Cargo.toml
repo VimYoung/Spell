@@ -7,6 +7,10 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/VimYoung/Spell"
 keywords = ["widget", "spell-framework", "spell", "slint", "wayland"]
 
+[[bin]]
+name = "sp"
+path = "src/main.rs"
+
 [dependencies]
 # spell-framework = { path = "../spell-framework/" }
 spell-framework = "1.0.0"

@@ -216,7 +216,6 @@ impl SpellSkiaWinAdapterReal {
         self.window.try_dispatch_event(event)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn refersh_buffer(&self) -> Buffer {
         let width: u32 = self.size.width;
         let height: u32 = self.size.height;

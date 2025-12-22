@@ -6,9 +6,12 @@ use crate::{
     SpellAssociated, State,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
-    helper_fn_for_deploy,
+    delegate_fractional_scale, helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
+    wayland_adapter::{
+        fractional_scaling::{FractionalScale, FractionalScaleHandler},
+        way_helper::{KeyboardState, PointerState, set_config},
+    },
 };
 pub use lock_impl::SpellSlintLock;
 use nonstick::{
@@ -50,8 +53,6 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
-    // os::unix::net::{UnixListener, UnixStream},
-    // path::Path,
     fs,
     io::{BufReader, prelude::*},
     process::Command,
@@ -59,10 +60,12 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{Level, info, level_filters::LevelFilter, span, trace, warn};
+use tracing::{Level, info, span, trace, warn};
 use tracing_subscriber::EnvFilter;
 
+mod fractional_scaling;
 mod lock_impl;
+mod viewporter;
 mod way_helper;
 mod win_impl;
 
@@ -102,8 +105,8 @@ pub struct SpellWin {
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     pub(crate) span: span::Span,
-    #[allow(dead_code)]
-    pub(crate) backspace: calloop::RegistrationToken,
+    // #[allow(dead_code)]
+    // pub(crate) backspace: calloop::RegistrationToken,
 }
 
 impl std::fmt::Debug for SpellWin {
@@ -179,6 +182,7 @@ impl SpellWin {
             // board_data: None,
         };
 
+        #[allow(clippy::type_complexity)]
         let slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>> =
             Arc::new(Mutex::new(Vec::new()));
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
@@ -196,21 +200,21 @@ impl SpellWin {
             )));
         }
 
-        let backspace_event = event_loop
-            .handle()
-            .insert_source(
-                Timer::from_duration(Duration::from_millis(1500)),
-                |_, _, data| {
-                    data.adapter
-                        .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
-                            text: Key::Backspace.into(),
-                        })
-                        .unwrap();
-                    TimeoutAction::ToDuration(Duration::from_millis(1500))
-                },
-            )
-            .unwrap();
-        event_loop.handle().disable(&backspace_event).unwrap();
+        // let backspace_event = event_loop
+        //     .handle()
+        //     .insert_source(
+        //         Timer::from_duration(Duration::from_millis(1500)),
+        //         |_, _, data| {
+        //             data.adapter
+        //                 .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
+        //                     text: Key::Backspace.into(),
+        //                 })
+        //                 .unwrap();
+        //             TimeoutAction::ToDuration(Duration::from_millis(1500))
+        //         },
+        //     )
+        //     .unwrap();
+        // event_loop.handle().disable(&backspace_event).unwrap();
 
         // // Inserting tracing source
         let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
@@ -220,67 +224,66 @@ impl SpellWin {
         // let _ = fs::create_dir(Path::new(&logging_dir));
         // let _ = fs::remove_file(&socket_cli_dir);
 
+        // This is currently redundent source as it is not working in any way
         event_loop
             .handle()
             .insert_source(
                 Timer::from_duration(Duration::from_secs(2)),
                 move |_, _, _| {
-                    // let mut buf = [0u8; 4096];
-
-                    let file = fs::File::open(&socket_cli_dir).unwrap();
+                    let file = fs::File::open(&socket_cli_dir)
+                        .unwrap_or_else(|_| fs::File::create_new(&socket_cli_dir).unwrap());
                     let buf = BufReader::new(file);
                     let file_contents: Vec<String> = buf
                         .lines()
                         .map(|l| l.expect("Could not parse line"))
                         .collect();
-                    if file_contents.len() > 1 {
+                    if !file_contents.is_empty() {
                         match file_contents[0].as_str() {
-                            "slint_log" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "debug" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "dump" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "dev" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-
-                            _ => {}
+                            "slint_log" => {
+                                handle
+                                    .modify(|layer| {
+                                        *layer.filter_mut() = EnvFilter::new(
+                                            "spell_framework::slint_adapter=info,warn",
+                                        );
+                                    })
+                                    .unwrap_or_else(|error| {
+                                        warn!("Error when setting slint_log: {}", error);
+                                    });
+                            }
+                            "debug" => {
+                                handle
+                                    .modify(|layer| {
+                                        *layer.filter_mut() =
+                                            EnvFilter::new("spell_framework=info,warn"); //*layer;
+                                    })
+                                    .unwrap_or_else(|error| {
+                                        warn!("Error when setting slint_log: {}", error);
+                                    });
+                            }
+                            "dump" => {
+                                handle
+                                    .modify(|layer| {
+                                        *layer.filter_mut() =
+                                            EnvFilter::new("spell_framework=trace,info"); //*layer;
+                                    })
+                                    .unwrap_or_else(|error| {
+                                        warn!("Error when setting slint_log: {}", error);
+                                    });
+                            }
+                            "dev" => {
+                                println!("ENtered the dev mode");
+                                handle
+                                    .modify(|layer| {
+                                        *layer.filter_mut() =
+                                            EnvFilter::new("spell_framework=trace,warn"); //*layer;
+                                    })
+                                    .unwrap_or_else(|error| {
+                                        warn!("Error when setting slint_log: {}", error);
+                                    });
+                            }
+                            val => {
+                                warn!("Something else came: {}", val);
+                            }
                         }
                     }
                     TimeoutAction::ToDuration(Duration::from_secs(2))
@@ -336,7 +339,7 @@ impl SpellWin {
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
             span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
-            backspace: backspace_event,
+            //backspace: backspace_event,
         };
 
         info!("Win: {} layer created successfully.", layer_name);
@@ -621,6 +624,7 @@ delegate_seat!(SpellWin);
 delegate_keyboard!(SpellWin);
 delegate_pointer!(SpellWin);
 delegate_layer!(SpellWin);
+delegate_fractional_scale!(SpellWin);
 
 impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
@@ -667,9 +671,17 @@ impl CompositorHandler for SpellWin {
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
         _surface: &wl_surface::WlSurface,
-        _new_factor: i32,
+        new_factor: i32,
     ) {
-        trace!("Scale factor changed");
+        // self.adapter
+        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged {
+        //         scale_factor: new_factor as f32,
+        //     })
+        //     .unwrap();
+        info!(
+            "Scale factor changed, invoked from compositor handler.{}",
+            new_factor
+        );
     }
 
     fn transform_changed(
@@ -710,6 +722,18 @@ impl CompositorHandler for SpellWin {
         _output: &wl_output::WlOutput,
     ) {
         trace!("Surface left");
+    }
+}
+
+impl FractionalScaleHandler for SpellWin {
+    fn preferred_scale(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        surface: &wl_surface::WlSurface,
+        scale: u32,
+    ) {
+        info!("Scale factor changed, invoked from custom trait");
     }
 }
 
@@ -1162,7 +1186,7 @@ impl SpellAssociated for SpellLock {
     }
 
     fn get_span(&self) -> tracing::span::Span {
-        span!(Level::INFO, "widget")
+        span!(Level::INFO, "lock-screen")
     }
 }
 

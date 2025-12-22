@@ -34,10 +34,9 @@ Usage: spell-cli log [<argument>] [sub-command] ...
 `log` subcommand is used to retrieve logging information from currently running widget instances.
 
 Sub-commands:
-    NOTE: CURRENTLY THIS SPECIFICATION DOESN'T WORK AND IS W.I.P.
+    debug: General errors and warning that might be helpful in debugging(Default type).
     slint_debug: links slint's debug!{} method output. You can view your debug
                  statements from it.
-    debug: General errors and warning that might be helpful in debugging.
     dump: Performance metric information of spell, generally not needed by
           end user. It's output can be used to point issues.
     dev: Development related logs not intended for end users.
