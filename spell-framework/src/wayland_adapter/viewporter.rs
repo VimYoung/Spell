@@ -1,3 +1,7 @@
+// Courtesy DrepDays
+// Implementaion is taken and modified from here.
+// https://github.com/DerpDays/draw/blob/main/platform%2Fwayland%2Fsrc%2Fviewporter.rs
+use crate::wayland_adapter::fractional_scaling::FractionalScale;
 use smithay_client_toolkit::{
     globals::GlobalData,
     reexports::{
@@ -11,7 +15,6 @@ use smithay_client_toolkit::{
 };
 
 #[derive(Debug)]
-#[allow(unused)]
 pub struct ViewporterState {
     viewporter: WpViewporter,
 }
@@ -21,9 +24,10 @@ pub struct ViewporterState {
 #[derive(Debug)]
 pub struct Viewport {
     viewport: WpViewport,
+    // This is not required but yet stored so that it doesn't get distroyed.
+    fractional_scale: FractionalScale,
 }
 
-#[allow(unused)]
 impl ViewporterState {
     pub fn bind<State>(
         globals: &GlobalList,
@@ -40,6 +44,7 @@ impl ViewporterState {
         &self,
         surface: &WlSurface,
         queue_handle: &QueueHandle<State>,
+        fractional_scale: FractionalScale,
     ) -> Viewport
     where
         State: Dispatch<WpViewport, GlobalData> + 'static,
@@ -47,12 +52,12 @@ impl ViewporterState {
         Viewport {
             viewport: self
                 .viewporter
-                .get_viewport(surface, &queue_handle, GlobalData),
+                .get_viewport(surface, queue_handle, GlobalData),
+            fractional_scale,
         }
     }
 }
 
-#[allow(unused)]
 impl Viewport {
     pub fn set_source(&self, x: f64, y: f64, width: f64, height: f64) {
         self.viewport.set_source(x, y, width, height);
@@ -103,11 +108,11 @@ where
 #[macro_export]
 macro_rules! delegate_viewporter {
     ($(@<$( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+>)? $ty: ty) => {
-        wayland_client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
-            wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport: smithay_client_toolkit::globals::GlobalData
-        ] => $crate::viewporter::ViewporterState);
-        wayland_client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
-            wayland_protocols::wp::viewporter::client::wp_viewporter::WpViewporter: smithay_client_toolkit::globals::GlobalData
-        ] => $crate::viewporter::ViewporterState);
+        smithay_client_toolkit::reexports::client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
+            smithay_client_toolkit::reexports::protocols::wp::viewporter::client::wp_viewport::WpViewport: smithay_client_toolkit::globals::GlobalData
+        ] => $crate::wayland_adapter::viewporter::ViewporterState);
+        smithay_client_toolkit::reexports::client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
+            smithay_client_toolkit::reexports::protocols::wp::viewporter::client::wp_viewporter::WpViewporter: smithay_client_toolkit::globals::GlobalData
+        ] => $crate::wayland_adapter::viewporter::ViewporterState);
     };
 }

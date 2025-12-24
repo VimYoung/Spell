@@ -16,6 +16,7 @@ use std::{
     rc::{Rc, Weak},
     sync::{Arc, Mutex},
 };
+use tracing::info;
 
 #[cfg(feature = "i-slint-renderer-skia")]
 use i_slint_renderer_skia::{
@@ -31,24 +32,24 @@ pub struct SkiaSoftwareBufferReal {
     pub last_dirty_region: RefCell<Option<DirtyRegion>>,
 }
 
-impl SkiaSoftwareBufferReal {
-    pub(crate) fn refresh_buffer(&self, width: u32, height: u32) -> Buffer {
-        let (wayland_buffer, _) = self
-            .pool
-            .borrow_mut()
-            .create_buffer(
-                width as i32,
-                height as i32,
-                (width * 4) as i32,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("Creating Buffer");
-        // TODO this was previously set, if rendering causes issues, uncomment this.
-        // self.set_config_internal();
-        *self.primary_slot.borrow_mut() = wayland_buffer.slot();
-        wayland_buffer
-    }
-}
+// impl SkiaSoftwareBufferReal {
+//     pub(crate) fn refresh_buffer(&self, width: u32, height: u32) -> Buffer {
+//         let (wayland_buffer, _) = self
+//             .pool
+//             .borrow_mut()
+//             .create_buffer(
+//                 width as i32,
+//                 height as i32,
+//                 (width * 4) as i32,
+//                 wl_shm::Format::Argb8888,
+//             )
+//             .expect("Creating Buffer");
+//         // TODO this was previously set, if rendering causes issues, uncomment this.
+//         // self.set_config_internal();
+//         *self.primary_slot.borrow_mut() = wayland_buffer.slot();
+//         wayland_buffer
+//     }
+// }
 
 #[allow(unused_variables)]
 impl RenderBuffer for SkiaSoftwareBufferReal {
@@ -118,12 +119,15 @@ use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::S
 /// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 pub struct SpellSkiaWinAdapterReal {
-    pub(crate) window: Window,
-    pub(crate) size: PhysicalSize,
+    pub(crate) window: Window, // TODO size is no longer required to be in cell as it is never modified
+    // and scaling is handled on the end of wayland only.
+    pub(crate) size: Cell<PhysicalSize>,
     pub(crate) renderer: SkiaRenderer,
     #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
+    pub(crate) scale_factor: Cell<f32>,
+    #[allow(clippy::type_complexity)]
     pub(crate) slint_event_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
 }
 
@@ -142,34 +146,29 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
     }
 
     fn size(&self) -> PhysicalSize {
-        self.size
+        self.size.get()
     }
 
     fn renderer(&self) -> &dyn slint::platform::Renderer {
         &self.renderer
     }
 
-    // fn set_size(&self, size: slint::WindowSize) {
-    //     self.size.set(size.to_physical(1.));
-    //     self.window
-    //         .dispatch_event(slint::platform::WindowEvent::Resized {
-    //             size: size.to_logical(1.),
-    //         })
-    // }
-    //
+    fn set_size(&self, size: slint::WindowSize) {
+        info!("Set_size is called");
+        self.size.set(size.to_physical(self.scale_factor.get()));
+        self.window
+            .dispatch_event(slint::platform::WindowEvent::Resized {
+                size: size.to_logical(self.scale_factor.get()),
+            })
+    }
+
     fn request_redraw(&self) {
         self.needs_redraw.set(true);
     }
 }
-//
-// impl std::fmt::Debug for SpellSkiaWinAdapterReal {
-//     // TODO this needs to be implemented properly
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         Ok(())
-//     }
-// }
 
 impl SpellSkiaWinAdapterReal {
+    #[allow(clippy::type_complexity)]
     pub fn new(
         pool: Rc<RefCell<SlotPool>>,
         primary_slot: RefCell<Slot>,
@@ -188,10 +187,11 @@ impl SpellSkiaWinAdapterReal {
         );
         Rc::new_cyclic(|w: &Weak<Self>| Self {
             window: slint::Window::new(w.clone()),
-            size: PhysicalSize { width, height },
+            size: Cell::new(PhysicalSize { width, height }),
             renderer,
             buffer_slint: buffer,
             needs_redraw: Cell::new(true),
+            scale_factor: Cell::new(1.),
             slint_event_proxy: slint_proxy,
         })
     }
@@ -216,13 +216,13 @@ impl SpellSkiaWinAdapterReal {
         self.window.try_dispatch_event(event)
     }
 
-    pub(crate) fn refersh_buffer(&self) -> Buffer {
-        let width: u32 = self.size.width;
-        let height: u32 = self.size.height;
-        // self.needs_redraw.set(true);
-        self.buffer_slint.refresh_buffer(width, height)
-    }
-
+    // pub(crate) fn refersh_buffer(&self) -> Buffer {
+    //     let width: u32 = self.size.get().width;
+    //     let height: u32 = self.size.get().height;
+    //     // self.needs_redraw.set(true);
+    //     self.buffer_slint.refresh_buffer(width, height)
+    // }
+    //
     // fn last_dirty_region_bounding_box_size(&self) -> Option<slint::LogicalSize> {
     //     self.buffer.last_dirty_region.borrow().as_ref().map(|r| {
     //         let size = r.bounding_rect().size;

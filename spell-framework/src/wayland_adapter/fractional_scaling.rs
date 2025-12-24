@@ -1,3 +1,6 @@
+// Courtesy DrepDays
+// Implementaion is taken and modified from here.
+// https://github.com/DerpDays/draw/blob/main/platform%2Fwayland%2Fsrc%2Ffractional_scale.rs
 use smithay_client_toolkit::globals::GlobalData;
 use smithay_client_toolkit::reexports::{
     client::{
@@ -25,7 +28,7 @@ pub struct FractionalScale {
 }
 
 impl FractionalScaleState {
-    pub fn bind<State>(
+    pub(crate) fn bind<State>(
         globals: &GlobalList,
         queue_handle: &QueueHandle<State>,
     ) -> Result<Self, BindError>
@@ -38,7 +41,7 @@ impl FractionalScaleState {
         Ok(FractionalScaleState { manager })
     }
 
-    pub fn get_scale<State>(
+    pub(crate) fn get_scale<State>(
         &self,
         surface: &WlSurface,
         queue_handle: &QueueHandle<State>,
@@ -49,7 +52,7 @@ impl FractionalScaleState {
         FractionalScale {
             fractional_scale: self.manager.get_fractional_scale(
                 surface,
-                &queue_handle,
+                queue_handle,
                 surface.clone(),
             ),
         }

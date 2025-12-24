@@ -17,7 +17,7 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        keyboard::{KeyboardHandler /* Keysym*/},
+        keyboard::KeyboardHandler,
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
     },
     shell::WaylandSurface,
