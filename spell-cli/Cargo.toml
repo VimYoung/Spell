@@ -1,6 +1,6 @@
 [package]
 name = "spell-cli"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "CLI for spell-framework"
 license = "GPL-3.0-or-later"
