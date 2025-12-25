@@ -21,8 +21,15 @@ use nonstick::{
 use slint::{PhysicalSize, platform::Key};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
-    delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
+    delegate_compositor,
+    delegate_keyboard,
+    delegate_layer,
+    delegate_output,
+    delegate_pointer,
+    delegate_registry,
+    delegate_seat,
+    delegate_session_lock,
+    delegate_shm, // delegate_touch,
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
@@ -508,6 +515,7 @@ delegate_shm!(SpellWin);
 delegate_seat!(SpellWin);
 delegate_keyboard!(SpellWin);
 delegate_pointer!(SpellWin);
+// delegate_touch!(SpellWin);
 delegate_layer!(SpellWin);
 delegate_fractional_scale!(SpellWin);
 delegate_viewporter!(SpellWin);

@@ -2,13 +2,9 @@
 use i_slint_core::partial_renderer::DirtyRegion;
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
-use smithay_client_toolkit::shm::slot::Buffer;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
-use smithay_client_toolkit::{
-    reexports::client::protocol::wl_shm,
-    shm::slot::{Slot, SlotPool},
-};
+use smithay_client_toolkit::shm::slot::{Slot, SlotPool};
 use std::{
     cell::Cell,
     cell::RefCell,

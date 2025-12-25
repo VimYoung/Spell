@@ -25,6 +25,7 @@ pub struct ViewporterState {
 pub struct Viewport {
     viewport: WpViewport,
     // This is not required but yet stored so that it doesn't get distroyed.
+    #[allow(dead_code)]
     fractional_scale: FractionalScale,
 }
 

@@ -16,13 +16,83 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
-        Capability, SeatHandler, SeatState,
+        Capability,
+        SeatHandler,
+        SeatState,
         keyboard::KeyboardHandler,
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
+        // touch::TouchHandler,
     },
     shell::WaylandSurface,
 };
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
+
+// This could be implemented but slint doesn't hve very specific
+// APIs for touch support (I think). I am talking with them on what
+// can be done so that things like multi-touch support, gestures etc
+// can be made possible. For now I am going to place it on standby.
+// impl TouchHandler for SpellWin {
+//     fn up(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//         serial: u32,
+//         time: u32,
+//         id: i32,
+//     ) {
+//     }
+//     fn down(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//         serial: u32,
+//         time: u32,
+//         surface: smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+//         id: i32,
+//         position: (f64, f64),
+//     ) {
+//     }
+//
+//     fn motion(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//         time: u32,
+//         id: i32,
+//         position: (f64, f64),
+//     ) {
+//     }
+//
+//     fn shape(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//         id: i32,
+//         major: f64,
+//         minor: f64,
+//     ) {
+//     }
+//     fn orientation(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//         id: i32,
+//         orientation: f64,
+//     ) {
+//     }
+//     fn cancel(
+//         &mut self,
+//         conn: &Connection,
+//         qh: &QueueHandle<Self>,
+//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+//     ) {
+//     }
+// }
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -67,7 +137,7 @@ impl KeyboardHandler for SpellWin {
         // } else {
         self.adapter
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap();
+            .unwrap_or_else(|err| warn!("Key press event failed with error: {:?}", err));
         // }
     }
 
@@ -88,7 +158,7 @@ impl KeyboardHandler for SpellWin {
         let string_val: SharedString = get_string(event);
         self.adapter
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
-            .unwrap();
+            .unwrap_or_else(|err| warn!("Key release event failed with error: {:?}", err));
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
@@ -111,6 +181,7 @@ impl KeyboardHandler for SpellWin {
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
     ) {
+        trace!("Key repeat info updated");
     }
 
     fn repeat_key(
@@ -121,6 +192,7 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
+        trace!("Repeat key called");
     }
 }
 
@@ -221,7 +293,9 @@ impl PointerHandler for SpellWin {
                     info!("Pointer left: {:?}", event.position);
                     self.adapter
                         .try_dispatch_event(WindowEvent::PointerExited)
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer exit event failed with error: {:?}", err)
+                        });
                 }
                 Motion { .. } => {
                     // debug!("Pointer entered @{:?}", event.position);
@@ -232,7 +306,9 @@ impl PointerHandler for SpellWin {
                                 y: event.position.1 as f32,
                             },
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer move event failed with error: {:?}", err)
+                        });
                 }
                 Press { button, .. } => {
                     trace!("Press {:x} @ {:?}", button, event.position);
@@ -244,7 +320,9 @@ impl PointerHandler for SpellWin {
                             },
                             button: PointerEventButton::Left,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer press event failed with error: {:?}", err)
+                        });
                 }
                 Release { button, .. } => {
                     trace!("Release {:x} @ {:?}", button, event.position);
@@ -256,7 +334,9 @@ impl PointerHandler for SpellWin {
                             },
                             button: PointerEventButton::Left,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer release event failed with error: {:?}", err)
+                        });
                 }
                 Axis {
                     horizontal,
@@ -273,7 +353,9 @@ impl PointerHandler for SpellWin {
                             delta_x: horizontal.absolute as f32,
                             delta_y: vertical.absolute as f32,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer scroll event failed with error: {:?}", err)
+                        });
                 }
             }
         }
