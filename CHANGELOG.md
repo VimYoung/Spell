@@ -7,7 +7,8 @@ Changes:
 - Added touch input event in Lockscreens.
 - Bridged `debug!` messages in slint to show in logs directly in lockscreen like for `SpellWin`.
 - Fractional scaling for spell windows in now available making spell experience better for
-  large display monitors.
+  large display monitors(probably working but still broken for input events).
+- Better error management by replacing `unwrap` with `unwrap_or_else` on necessary places.
 
 Changes(spell-cli):
 
