@@ -128,31 +128,37 @@ impl SpellWin {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
 
-        // TODO: Clean up code & try to remove unwraps
         let target_output = if let Some(monitor_name) = &window_conf.monitor_name {
-            // Create a temporary queue and state to discover outputs logic
-            let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).unwrap();
-            // TODO: try & use main queue
-            let temp_qh = temp_queue.handle();
-            let output_state = OutputState::new(&temp_globals, &temp_qh);
-            let mut temp_state = TempState { output_state };
+            let result = (|| -> Option<wl_output::WlOutput> {
+                // Create a temporary queue & state to discover outputs logic
+                let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).ok()?;
+                let temp_qh = temp_queue.handle();
+                let output_state = OutputState::new(&temp_globals, &temp_qh);
+                let mut temp_state = TempState { output_state };
 
-            // Roundtrip to process initial events (output names)
-            temp_queue.roundtrip(&mut temp_state).unwrap();
+                // Roundtrip to process initial events (output names)
+                temp_queue.roundtrip(&mut temp_state).ok()?;
 
-            let mut found = None;
-            for output in temp_state.output_state.outputs() {
-                if let Some(info) = temp_state.output_state.info(&output) {
-                    if info.name.as_deref() == Some(monitor_name) {
-                        found = Some(output);
-                        break;
-                    }
-                }
+                temp_state
+                    .output_state
+                    .outputs()
+                    .into_iter()
+                    .find(|output| {
+                        temp_state
+                            .output_state
+                            .info(output)
+                            .and_then(|info| info.name)
+                            == Some(monitor_name.to_string())
+                    })
+            })();
+
+            if result.is_none() {
+                warn!(
+                    "Could not find monitor, using default monitor: {}",
+                    monitor_name
+                );
             }
-            if found.is_none() {
-                warn!("Could not find monitor: {}", monitor_name);
-            }
-            found
+            result
         } else {
             None
         };
@@ -1311,6 +1317,6 @@ impl
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &smithay_client_toolkit::reexports::client::QueueHandle<Self>,
     ) {
-        // We don't care about updates during specific discovery roundtrip
+        // We don't care about updates during temporary discovery roundtrip
     }
 }
