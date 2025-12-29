@@ -66,7 +66,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{Level, info, span, trace};
+use tracing::{Level, info, span, trace, warn};
 
 mod fractional_scaling;
 mod lock_impl;
@@ -138,13 +138,12 @@ impl SpellWin {
 
         let target_output = if let Some(monitor_name) = &window_conf.monitor_name {
             let result = (|| -> Option<wl_output::WlOutput> {
-                // Create a temporary queue & state to discover outputs logic
+                // Create a temporary (blocking) queue & state to discover available monitors
                 let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).ok()?;
                 let temp_qh = temp_queue.handle();
                 let output_state = OutputState::new(&temp_globals, &temp_qh);
                 let mut temp_state = TempState { output_state };
 
-                // Roundtrip to process initial events (output names)
                 temp_queue.roundtrip(&mut temp_state).ok()?;
 
                 temp_state
