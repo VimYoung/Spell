@@ -261,8 +261,6 @@ pub trait SpellAssociated {
 // TODO set logging values in Option so that only a single value reads or writes.
 // TODO it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
-// TODO The project should have a live preview feature. It can be made by leveraging
-// slint's preview and moving the output of debug to spell_cli.
 // TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
 // from CPU to GPU and vice versa.
 // TODO needs to have multi monitor support.
@@ -272,7 +270,6 @@ pub trait SpellAssociated {
 // present. To check causes for errors as well as before implenenting muliple layers in same
 // window.
 // TODO lock screen behaviour in a multi-monitor setup needs to be tested.
-// TODO merge cast_Spell with run_lock after implementing calloop in normal windows.
 // TODO t add tracing in following functions:
 // 1. secondary and primary services
 // TODO implement logiing for SpellLock.
@@ -287,5 +284,6 @@ pub trait SpellAssociated {
 // 3. exclusive_zone: true or false or with specified value.
 // 4. it should have the option to take a window_conf or directly the window configurations
 // into the macro, removing the need to define it previously.
+// 5. monitor: Specify the monitor to show the widget in.
 //
 // Also, a procedural macro to mimic the functionalities of ForeignController.

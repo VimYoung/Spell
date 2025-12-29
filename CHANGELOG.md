@@ -2,13 +2,19 @@
 
 Changes:
 
+- Ported live preview from slint. This feature now enables live preview of widgets
+  as they are modified without the need for recompilation every time.
 - Added touch input event in Lockscreens.
 - Bridged `debug!` messages in slint to show in logs directly in lockscreen like for `SpellWin`.
 - Fractional scaling for spell windows in now available making spell experience better for
-  large display monitors.
+  large display monitors(probably working but still broken for input events).
+- Better error management by replacing `unwrap` with `unwrap_or_else` on necessary places.
 
 Changes(spell-cli):
 
+- The cli has been renamed to `sp`, still the crate is called `spell-cli`(therefore the
+  command to download it remains same, i.e. `cargo install spell-cli`). Renaming the cli
+  was necessary for a shorter call sign (which is also cooler that writing spell-cli).
 - Added a subcommand to create spell project directly with dependencies added and a minimal
   example present.
 

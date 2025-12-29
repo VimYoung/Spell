@@ -2,10 +2,6 @@
 resolver = "2"
 members = ["spell-framework", "spell-cli"]
 
-# [package.metadata.docs.rs]
-# no-default-features = true
-# features = ["docs-only"]
-#
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }

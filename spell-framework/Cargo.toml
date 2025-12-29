@@ -1,6 +1,6 @@
 [package]
 name = "spell-framework"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "Make desktop widgets by the Mystic Arts of Spell"
 license = "GPL-3.0-or-later"
@@ -25,9 +25,9 @@ slint = { version = "1.14.1", features = [
 ] }
 smithay-client-toolkit = "0.20.0"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
-tracing = { version = "0.1.41", features = ["max_level_trace"] }
+tracing = { version = "0.1.44", features = ["max_level_trace"] }
 tracing-subscriber = { version = "0.3.19", features = ["std", "env-filter"] }
-tracing-rfc-5424 = "0.1.4"
+tracing-rfc-5424 = "0.2.0"
 zbus = "5.10.0"
 nonstick = "0.1.1"
 tracing-appender = "0.2.3"

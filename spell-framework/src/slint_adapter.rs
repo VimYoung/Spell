@@ -293,6 +293,7 @@ impl Platform for SpellLockShell {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct SlintEventProxy(Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>);
 
 impl EventLoopProxy for SlintEventProxy {

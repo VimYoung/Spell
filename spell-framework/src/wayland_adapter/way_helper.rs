@@ -1,7 +1,13 @@
-use crate::layer_properties::WindowConf;
+use crate::{configure::HomeHandle, layer_properties::WindowConf, wayland_adapter::SpellWin};
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
-    reexports::client::protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
+    reexports::{
+        calloop::{
+            EventLoop,
+            timer::{TimeoutAction, Timer},
+        },
+        client::protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
+    },
     seat::{
         keyboard::{KeyEvent, Keysym},
         pointer::{PointerData, cursor_shape::CursorShapeManager},
@@ -11,6 +17,13 @@ use smithay_client_toolkit::{
         wlr_layer::{/*Anchor,*/ LayerSurface},
     },
 };
+use std::{
+    fs,
+    io::{BufReader, prelude::*},
+    time::Duration,
+};
+use tracing::warn;
+use tracing_subscriber::EnvFilter;
 
 pub(super) fn set_config(
     window_conf: &WindowConf,
@@ -161,4 +174,118 @@ pub(crate) struct PointerState {
 #[derive(Debug)]
 pub(crate) struct KeyboardState {
     pub board: Option<wl_keyboard::WlKeyboard>,
+}
+
+pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handle: HomeHandle) {
+    // let backspace_event = event_loop
+    //     .handle()
+    //     .insert_source(
+    //         Timer::from_duration(Duration::from_millis(1500)),
+    //         |_, _, data| {
+    //             data.adapter
+    //                 .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
+    //                     text: Key::Backspace.into(),
+    //                 })
+    //                 .unwrap();
+    //             TimeoutAction::ToDuration(Duration::from_millis(1500))
+    //         },
+    //     )
+    //     .unwrap();
+    // event_loop.handle().disable(&backspace_event).unwrap();
+
+    // // Inserting tracing source
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
+    let logging_dir = runtime_dir + "/spell/";
+    let socket_cli_dir = logging_dir.clone() + "/spell_cli";
+
+    // let _ = fs::create_dir(Path::new(&logging_dir));
+    // let _ = fs::remove_file(&socket_cli_dir);
+
+    // This is currently redundent source as it is not working in any way
+    event_loop
+        .handle()
+        .insert_source(
+            Timer::from_duration(Duration::from_secs(2)),
+            move |_, _, _| {
+                let file = fs::File::open(&socket_cli_dir)
+                    .unwrap_or_else(|_| fs::File::create_new(&socket_cli_dir).unwrap());
+                let buf = BufReader::new(file);
+                let file_contents: Vec<String> = buf
+                    .lines()
+                    .map(|l| l.expect("Could not parse line"))
+                    .collect();
+                if !file_contents.is_empty() {
+                    match file_contents[0].as_str() {
+                        "slint_log" => {
+                            handle
+                                .modify(|layer| {
+                                    *layer.filter_mut() =
+                                        EnvFilter::new("spell_framework::slint_adapter=info,warn");
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                });
+                        }
+                        "debug" => {
+                            handle
+                                .modify(|layer| {
+                                    *layer.filter_mut() =
+                                        EnvFilter::new("spell_framework=info,warn"); //*layer;
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                });
+                        }
+                        "dump" => {
+                            handle
+                                .modify(|layer| {
+                                    *layer.filter_mut() =
+                                        EnvFilter::new("spell_framework=trace,info"); //*layer;
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                });
+                        }
+                        "dev" => {
+                            println!("ENtered the dev mode");
+                            handle
+                                .modify(|layer| {
+                                    *layer.filter_mut() =
+                                        EnvFilter::new("spell_framework=trace,warn"); //*layer;
+                                })
+                                .unwrap_or_else(|error| {
+                                    warn!("Error when setting slint_log: {}", error);
+                                });
+                        }
+                        val => {
+                            warn!("Something else came: {}", val);
+                        }
+                    }
+                }
+                TimeoutAction::ToDuration(Duration::from_secs(2))
+            },
+        )
+        .unwrap();
+
+    event_loop
+        .handle()
+        .insert_source(
+            Timer::from_duration(Duration::from_millis(1000)),
+            |_, _, data| {
+                let slint_event_proxy = data.adapter.slint_event_proxy.clone();
+                if let Ok(mut list_of_events) = slint_event_proxy.try_lock()
+                    && !(*list_of_events).is_empty()
+                {
+                    let original_len = (*list_of_events).len();
+                    let mut x = 0;
+                    while x < original_len {
+                        let event = (*list_of_events).pop().unwrap();
+                        event();
+                        x += 1;
+                    }
+                }
+                TimeoutAction::ToDuration(Duration::from_millis(1000))
+            },
+        )
+        .unwrap();
 }

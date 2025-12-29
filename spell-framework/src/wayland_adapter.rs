@@ -6,9 +6,13 @@ use crate::{
     SpellAssociated, State,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
-    helper_fn_for_deploy,
+    delegate_fractional_scale, delegate_viewporter, helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
-    wayland_adapter::way_helper::{KeyboardState, PointerState, set_config},
+    wayland_adapter::{
+        fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
+        viewporter::{Viewport, ViewporterState},
+        way_helper::{KeyboardState, PointerState, set_config, set_event_sources},
+    },
 };
 pub use lock_impl::SpellSlintLock;
 use nonstick::{
@@ -17,12 +21,19 @@ use nonstick::{
 use slint::{PhysicalSize, platform::Key};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
-    delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_session_lock, delegate_shm,
+    delegate_compositor,
+    delegate_keyboard,
+    delegate_layer,
+    delegate_output,
+    delegate_pointer,
+    delegate_registry,
+    delegate_seat,
+    delegate_session_lock,
+    delegate_shm, // delegate_touch,
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
-            self, EventLoop, LoopHandle, RegistrationToken,
+            EventLoop, LoopHandle, RegistrationToken,
             channel::Event,
             timer::{TimeoutAction, Timer},
         },
@@ -50,19 +61,16 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
-    // os::unix::net::{UnixListener, UnixStream},
-    // path::Path,
-    fs,
-    io::{BufReader, prelude::*},
     process::Command,
     rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tracing::{Level, info, level_filters::LevelFilter, span, trace, warn};
-use tracing_subscriber::EnvFilter;
+use tracing::{Level, info, span, trace};
 
+mod fractional_scaling;
 mod lock_impl;
+mod viewporter;
 mod way_helper;
 mod win_impl;
 
@@ -74,6 +82,7 @@ pub(crate) struct States {
     pub(crate) pointer_state: PointerState,
     pub(crate) keyboard_state: KeyboardState,
     pub(crate) shm: Shm,
+    pub(crate) viewporter: Viewport,
 }
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
@@ -90,7 +99,6 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     pub(crate) loop_handle: LoopHandle<'static, SpellWin>,
     pub(crate) queue: QueueHandle<SpellWin>,
-    pub(crate) size: PhysicalSize,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: LayerSurface,
@@ -102,8 +110,8 @@ pub struct SpellWin {
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     pub(crate) span: span::Span,
-    #[allow(dead_code)]
-    pub(crate) backspace: calloop::RegistrationToken,
+    // #[allow(dead_code)]
+    // pub(crate) backspace: calloop::RegistrationToken,
 }
 
 impl std::fmt::Debug for SpellWin {
@@ -176,6 +184,8 @@ impl SpellWin {
         input_region.add(0, 0, window_conf.width as i32, window_conf.height as i32);
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
+        let fractional_scale_state: FractionalScaleState =
+            FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let stride = window_conf.width as i32 * 4;
         let surface = compositor.create_surface(&qh);
         let layer = layer_shell.create_layer_surface(
@@ -185,6 +195,10 @@ impl SpellWin {
             Some(layer_name.clone()),
             target_output.as_ref(),
         );
+        let fractional_scale = fractional_scale_state.get_scale(layer.wl_surface(), &qh);
+        let viewporter_state =
+            ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
+        let viewporter = viewporter_state.get_viewport(layer.wl_surface(), &qh, fractional_scale);
         set_config(
             &window_conf,
             &layer,
@@ -215,6 +229,7 @@ impl SpellWin {
             // board_data: None,
         };
 
+        #[allow(clippy::type_complexity)]
         let slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>> =
             Arc::new(Mutex::new(Vec::new()));
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
@@ -231,129 +246,12 @@ impl SpellWin {
                 adapter_value.clone(),
             )));
         }
-
-        let backspace_event = event_loop
-            .handle()
-            .insert_source(
-                Timer::from_duration(Duration::from_millis(1500)),
-                |_, _, data| {
-                    data.adapter
-                        .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
-                            text: Key::Backspace.into(),
-                        })
-                        .unwrap();
-                    TimeoutAction::ToDuration(Duration::from_millis(1500))
-                },
-            )
-            .unwrap();
-        event_loop.handle().disable(&backspace_event).unwrap();
-
-        // // Inserting tracing source
-        let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
-        let logging_dir = runtime_dir + "/spell/";
-        let socket_cli_dir = logging_dir.clone() + "/spell_cli";
-
-        // let _ = fs::create_dir(Path::new(&logging_dir));
-        // let _ = fs::remove_file(&socket_cli_dir);
-
-        event_loop
-            .handle()
-            .insert_source(
-                Timer::from_duration(Duration::from_secs(2)),
-                move |_, _, _| {
-                    // let mut buf = [0u8; 4096];
-
-                    let file = fs::File::open(&socket_cli_dir).unwrap();
-                    let buf = BufReader::new(file);
-                    let file_contents: Vec<String> = buf
-                        .lines()
-                        .map(|l| l.expect("Could not parse line"))
-                        .collect();
-                    if file_contents.len() > 1 {
-                        match file_contents[0].as_str() {
-                            "slint_log" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "debug" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "dump" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-                            "dev" => handle
-                                .modify(|layer| {
-                                    *layer = EnvFilter::from_default_env().add_directive(
-                                        "[slint-log]=info,warn"
-                                            .parse()
-                                            .unwrap_or(LevelFilter::INFO.into()),
-                                    );
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                }),
-
-                            _ => {}
-                        }
-                    }
-                    TimeoutAction::ToDuration(Duration::from_secs(2))
-                },
-            )
-            .unwrap();
-
-        event_loop
-            .handle()
-            .insert_source(
-                Timer::from_duration(Duration::from_millis(1000)),
-                |_, _, data| {
-                    let slint_event_proxy = data.adapter.slint_event_proxy.clone();
-                    if let Ok(mut list_of_events) = slint_event_proxy.try_lock()
-                        && !(*list_of_events).is_empty()
-                    {
-                        let original_len = (*list_of_events).len();
-                        let mut x = 0;
-                        while x < original_len {
-                            let event = (*list_of_events).pop().unwrap();
-                            event();
-                            x += 1;
-                        }
-                    }
-                    TimeoutAction::ToDuration(Duration::from_millis(1000))
-                },
-            )
-            .unwrap();
+        set_event_sources(&event_loop, handle);
 
         let win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
             queue: qh.clone(),
-            size: PhysicalSize {
-                width: window_conf.width,
-                height: window_conf.height,
-            },
             buffer: way_pri_buffer,
             states: States {
                 registry_state: RegistryState::new(&globals),
@@ -362,6 +260,7 @@ impl SpellWin {
                 pointer_state,
                 keyboard_state,
                 shm,
+                viewporter,
             },
             layer,
             first_configure: true,
@@ -372,7 +271,7 @@ impl SpellWin {
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
             span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
-            backspace: backspace_event,
+            //backspace: backspace_event,
         };
 
         info!("Win: {} layer created successfully.", layer_name);
@@ -496,7 +395,6 @@ impl SpellWin {
     }
 
     fn set_config_internal(&self) {
-        // if self.exclusive_zone.get() == 0 {
         set_config(
             &self.config,
             &self.layer,
@@ -504,15 +402,12 @@ impl SpellWin {
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
         );
-        // } else {
-        //
-        // }
     }
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
         slint::platform::update_timers_and_animations();
-        let width: u32 = self.size.width;
-        let height: u32 = self.size.height;
+        let width: u32 = self.adapter.size.get().width;
+        let height: u32 = self.adapter.size.get().height;
         let window_adapter = self.adapter.clone();
 
         // Rendering from Skia
@@ -656,7 +551,10 @@ delegate_shm!(SpellWin);
 delegate_seat!(SpellWin);
 delegate_keyboard!(SpellWin);
 delegate_pointer!(SpellWin);
+// delegate_touch!(SpellWin);
 delegate_layer!(SpellWin);
+delegate_fractional_scale!(SpellWin);
+delegate_viewporter!(SpellWin);
 
 impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
@@ -700,12 +598,12 @@ impl OutputHandler for SpellWin {
 impl CompositorHandler for SpellWin {
     fn scale_factor_changed(
         &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_factor: i32,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: i32,
     ) {
-        trace!("Scale factor changed");
+        info!("Scale factor changed, compositor msg");
     }
 
     fn transform_changed(
@@ -746,6 +644,43 @@ impl CompositorHandler for SpellWin {
         _output: &wl_output::WlOutput,
     ) {
         trace!("Surface left");
+    }
+}
+
+impl FractionalScaleHandler for SpellWin {
+    fn preferred_scale(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        scale: u32,
+    ) {
+        info!("Scale factor changed, invoked from custom trait. {}", scale);
+
+        self.layer.wl_surface().damage_buffer(
+            0,
+            0,
+            self.adapter.size.get().width as i32,
+            self.adapter.size.get().height as i32,
+        );
+        // floor((273 * scale + 60) / 120)
+        let scale_factor: f32 = scale as f32 / 120.0;
+        let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
+        let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
+        self.adapter.scale_factor.set(scale_factor);
+        self.states
+            .viewporter
+            .set_destination(width as i32, height as i32);
+        self.states.viewporter.set_source(
+            0.,
+            0.,
+            self.adapter.size.get().width.into(),
+            self.adapter.size.get().height.into(),
+        );
+        // self.adapter
+        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+        //     .unwrap();
+        self.layer.commit();
     }
 }
 
@@ -1198,7 +1133,7 @@ impl SpellAssociated for SpellLock {
     }
 
     fn get_span(&self) -> tracing::span::Span {
-        span!(Level::INFO, "widget")
+        span!(Level::INFO, "lock-screen")
     }
 }
 

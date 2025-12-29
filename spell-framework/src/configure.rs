@@ -1,17 +1,15 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
-use tracing::{level_filters::LevelFilter, warn};
+use tracing::warn;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     EnvFilter, Layer as TracingTraitLayer,
-    fmt::{
-        self, Layer as TracingLayer,
-        format::{DefaultFields, Format, Full},
-    },
+    filter::Filtered,
+    fmt::{self, format::DefaultFields},
     layer::{Layered, SubscriberExt},
     registry::Registry,
-    reload::{Handle, Layer as LoadLayer},
+    reload::Layer as LoadLayer,
 };
 
 /// Unused Internal struct representation of a pixel, it is similar to slint's
@@ -127,17 +125,196 @@ impl WindowConf {
     }
 }
 
-pub(crate) type HomeHandle =
-    Handle<EnvFilter, Layered<TracingLayer<Registry, DefaultFields, Format<Full, ()>>, Registry>>;
+pub(crate) type HomeHandle = tracing_subscriber::reload::Handle<
+    Filtered<
+        tracing_subscriber::fmt::Layer<
+            Layered<
+                Filtered<
+                    tracing_subscriber::fmt::Layer<
+                        Layered<
+                            Filtered<
+                                tracing_subscriber::fmt::Layer<
+                                    Registry,
+                                    DefaultFields,
+                                    tracing_subscriber::fmt::format::Format<
+                                        tracing_subscriber::fmt::format::Full,
+                                        (),
+                                    >,
+                                >,
+                                EnvFilter,
+                                Registry,
+                            >,
+                            Registry,
+                        >,
+                        DefaultFields,
+                        tracing_subscriber::fmt::format::Format<
+                            tracing_subscriber::fmt::format::Full,
+                            (),
+                        >,
+                        RollingFileAppender,
+                    >,
+                    EnvFilter,
+                    Layered<
+                        Filtered<
+                            tracing_subscriber::fmt::Layer<
+                                Registry,
+                                DefaultFields,
+                                tracing_subscriber::fmt::format::Format<
+                                    tracing_subscriber::fmt::format::Full,
+                                    (),
+                                >,
+                            >,
+                            EnvFilter,
+                            Registry,
+                        >,
+                        Registry,
+                    >,
+                >,
+                Layered<
+                    Filtered<
+                        tracing_subscriber::fmt::Layer<
+                            Registry,
+                            DefaultFields,
+                            tracing_subscriber::fmt::format::Format<
+                                tracing_subscriber::fmt::format::Full,
+                                (),
+                            >,
+                        >,
+                        EnvFilter,
+                        Registry,
+                    >,
+                    Registry,
+                >,
+            >,
+            DefaultFields,
+            tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Full, ()>,
+            std::sync::Mutex<SocketWriter>,
+        >,
+        EnvFilter,
+        Layered<
+            Filtered<
+                tracing_subscriber::fmt::Layer<
+                    Layered<
+                        Filtered<
+                            tracing_subscriber::fmt::Layer<
+                                Registry,
+                                DefaultFields,
+                                tracing_subscriber::fmt::format::Format<
+                                    tracing_subscriber::fmt::format::Full,
+                                    (),
+                                >,
+                            >,
+                            EnvFilter,
+                            Registry,
+                        >,
+                        Registry,
+                    >,
+                    DefaultFields,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Full,
+                        (),
+                    >,
+                    RollingFileAppender,
+                >,
+                EnvFilter,
+                Layered<
+                    Filtered<
+                        tracing_subscriber::fmt::Layer<
+                            Registry,
+                            DefaultFields,
+                            tracing_subscriber::fmt::format::Format<
+                                tracing_subscriber::fmt::format::Full,
+                                (),
+                            >,
+                        >,
+                        EnvFilter,
+                        Registry,
+                    >,
+                    Registry,
+                >,
+            >,
+            Layered<
+                Filtered<
+                    tracing_subscriber::fmt::Layer<
+                        Registry,
+                        DefaultFields,
+                        tracing_subscriber::fmt::format::Format<
+                            tracing_subscriber::fmt::format::Full,
+                            (),
+                        >,
+                    >,
+                    EnvFilter,
+                    Registry,
+                >,
+                Registry,
+            >,
+        >,
+    >,
+    Layered<
+        Filtered<
+            tracing_subscriber::fmt::Layer<
+                Layered<
+                    Filtered<
+                        tracing_subscriber::fmt::Layer<
+                            Registry,
+                            DefaultFields,
+                            tracing_subscriber::fmt::format::Format<
+                                tracing_subscriber::fmt::format::Full,
+                                (),
+                            >,
+                        >,
+                        EnvFilter,
+                        Registry,
+                    >,
+                    Registry,
+                >,
+                DefaultFields,
+                tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Full, ()>,
+                RollingFileAppender,
+            >,
+            EnvFilter,
+            Layered<
+                Filtered<
+                    tracing_subscriber::fmt::Layer<
+                        Registry,
+                        DefaultFields,
+                        tracing_subscriber::fmt::format::Format<
+                            tracing_subscriber::fmt::format::Full,
+                            (),
+                        >,
+                    >,
+                    EnvFilter,
+                    Registry,
+                >,
+                Registry,
+            >,
+        >,
+        Layered<
+            Filtered<
+                tracing_subscriber::fmt::Layer<
+                    Registry,
+                    DefaultFields,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Full,
+                        (),
+                    >,
+                >,
+                EnvFilter,
+                Registry,
+            >,
+            Registry,
+        >,
+    >,
+>;
 pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
     let logging_dir = runtime_dir + "/spell/";
     let socket_dir = logging_dir.clone() + "/spell.sock";
-    let socket_cli_dir = logging_dir.clone() + "/spell_cli";
+    // let socket_cli_dir = logging_dir.clone() + "/spell_cli";
 
     let _ = fs::create_dir(Path::new(&logging_dir));
     let _ = fs::remove_file(&socket_dir);
-    let _ = fs::File::create(&socket_cli_dir);
+    // let _ = fs::File::create(&socket_cli_dir);
 
     let stream = UnixDatagram::unbound().unwrap();
     stream
@@ -151,32 +328,33 @@ pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
         .build(&logging_dir) // try to build an appender that stores log files in `/var/log`
         .expect("initializing rolling file appender failed");
 
+    // Logs to be stored in case of debugging.
     let layer_writer = fmt::layer()
         .without_time()
         .with_target(false)
         .with_writer(writer)
         .with_filter(EnvFilter::new("spell_framework=trace,info"));
 
-    // if let Ok(val) = std::env::var("RUST_LOG") {
-    //     println!("Rust log value: {}", val);
-    // } else {
-    //     println!("Val not set");
-    // }
+    // Logs on socket read by cli.
+    let layer_socket = fmt::Layer::default()
+        .without_time()
+        .with_target(false)
+        .with_writer(Mutex::new(SocketWriter::new(stream)))
+        .with_filter(EnvFilter::new("spell_framework=info, warn"));
 
-    let (layer_env, handle) = LoadLayer::new(
-        EnvFilter::from_default_env().add_directive(
-            "spell-framework=info,warn"
-                .parse()
-                .unwrap_or(LevelFilter::INFO.into()),
-        ),
-    );
-    let layer_socket = fmt::layer().with_writer(Mutex::new(SocketWriter::new(stream)));
+    let (layer_env, handle) = LoadLayer::new(layer_socket);
     let subs = tracing_subscriber::registry()
-        .with(fmt::layer().without_time().with_target(false))
-        .with(layer_env)
-        .with(layer_socket)
-        .with(layer_writer);
-    // .with(layer_std);
+        // Logs shown in stdout when program runs.
+        .with(
+            fmt::layer()
+                .without_time()
+                .with_target(false)
+                .with_filter(EnvFilter::new("spell_framework=info, warn")),
+        )
+        // Logs for file.
+        .with(layer_writer)
+        // Logs for cli
+        .with(layer_env);
     let _ = tracing::subscriber::set_global_default(subs);
     handle
 }

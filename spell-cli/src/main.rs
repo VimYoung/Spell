@@ -232,8 +232,9 @@ fn get_tracing_debug(log_type: LogType, _layer_name: String) -> Result<(), Spell
     // stream.connect(&socket_dir).unwrap();
     // TODO have to return error here in the match sttement to avoid unwrap.
     let mut file = OpenOptions::new()
-        .append(true) // open in append mode
         .create(true) // create the file if it doesn’t exist
+        .write(true)
+        .truncate(true)
         .open(&socket_cli_dir)
         .unwrap();
     match log_type {

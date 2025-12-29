@@ -24,7 +24,7 @@ use smithay_client_toolkit::{
     },
     shm::{Shm, ShmHandler, slot::Buffer},
 };
-use tracing::{info /*warn*/, trace};
+use tracing::{info, trace, warn};
 
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
@@ -189,16 +189,16 @@ impl KeyboardHandler for SpellLock {
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         let string_val: SharedString = get_string(event);
-        info!("Key pressed with value : {:?}", string_val);
         // if string_val == <slint::platform::Key as Into<SharedString>>::into(Key::Backspace) {
         //     self.loop_handle.enable(&self.backspace.unwrap()).unwrap();
         //     self.slint_part.as_ref().unwrap().adapters[0]
         //         .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
         //         .unwrap();
         // } else {
+        info!("Key pressed with value : {:?}", string_val);
         self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap();
+            .unwrap_or_else(|err| warn!("Key press event failed with error: {:?}", err));
         //}
     }
 
@@ -208,7 +208,7 @@ impl KeyboardHandler for SpellLock {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
-        /*mut*/ event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
         info!("Key is released");
         // if let Err(err) = self.loop_handle.disable(&self.backspace.unwrap()) {
@@ -219,7 +219,7 @@ impl KeyboardHandler for SpellLock {
         let string_val: SharedString = get_string(event);
         self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
-            .unwrap();
+            .unwrap_or_else(|err| warn!("Key release event failed with error: {:?}", err));
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.
@@ -233,6 +233,7 @@ impl KeyboardHandler for SpellLock {
         _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
         _layout: u32,
     ) {
+        trace!("Updated modifiers");
     }
 
     fn repeat_key(
@@ -243,7 +244,7 @@ impl KeyboardHandler for SpellLock {
         _serial: u32,
         _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        info!("Repeated key entered");
+        trace!("Repeated key entered");
     }
     // TODO This method needs to be implemented after the looping mecha is changed to calloop.
     fn update_repeat_info(
@@ -253,6 +254,7 @@ impl KeyboardHandler for SpellLock {
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
     ) {
+        trace!("Repeat info updation called");
     }
 }
 
@@ -343,14 +345,15 @@ impl PointerHandler for SpellLock {
                             .cursor_shape
                             .get_shape_device(pointer, qh)
                             .set_shape(no, Shape::Pointer);
-                        // self.layer.commit();
                     }
                 }
                 Leave { .. } => {
                     info!("Pointer left: {:?}", event.position);
                     self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerExited)
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer left event failed with error: {:?}", err)
+                        });
                 }
                 Motion { .. } => {
                     // debug!("Pointer entered @{:?}", event.position);
@@ -361,7 +364,9 @@ impl PointerHandler for SpellLock {
                                 y: event.position.1 as f32,
                             },
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer move event failed with error: {:?}", err)
+                        });
                 }
                 Press { button, .. } => {
                     trace!("Press {:x} @ {:?}", button, event.position);
@@ -373,7 +378,9 @@ impl PointerHandler for SpellLock {
                             },
                             button: PointerEventButton::Left,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer press event failed with error: {:?}", err)
+                        });
                 }
                 Release { button, .. } => {
                     trace!("Release {:x} @ {:?}", button, event.position);
@@ -385,7 +392,9 @@ impl PointerHandler for SpellLock {
                             },
                             button: PointerEventButton::Left,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer release event failed with error: {:?}", err)
+                        });
                 }
                 Axis {
                     horizontal,
@@ -402,7 +411,9 @@ impl PointerHandler for SpellLock {
                             delta_x: horizontal.absolute as f32,
                             delta_y: vertical.absolute as f32,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer scroll event failed with error: {:?}", err)
+                        });
                 }
             }
         }
