@@ -16,10 +16,20 @@
   <br />
 </p>
 
+![rust with crates.io](https://img.shields.io/badge/RUST-CRATES.IO-RED?style=for-the-badge&logo=Rust&logoSize=auto&color=%23fdacac&link=https%3A%2F%2Fcrates.io%2Fcrates%2Fspell-framework)
+![docs.rs (with version)](https://img.shields.io/docsrs/spell-framework/latest?style=for-the-badge&logo=docsdotrs&logoSize=auto&label=docs.rs&color=CBF3BB&link=https%3A%2F%2Fdocs.rs%2Fspell-framework%2Flatest%2Fspell_framework%2F)
+![GitHub Repo stars](https://img.shields.io/github/stars/VimYoung/Spell?style=for-the-badge&logo=Github&logoSize=auto&color=6AECE1&link=github.com%2FVimYoung%2FSpell)
+
 **Don't forget to star the project if you liked it 🌟🌟**
+
+<https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77>
+
+> This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
 
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like hyprland) using Slint UI.
+
+> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell) is a tutorial for new comers to get a hang of spell.
 
 Rather then leveraging Gtk for widget creation, Slint declarative language provides
 a very easy but comprehensive way to make aesthetic interfaces. It, supports rust
@@ -67,12 +77,21 @@ is hard to find.
 
 ## Minimal Example :sparkles:
 
-I am creating my own shell from spell, which is currently private and will soon be shown
-on display as spell becomes more mature. As for producing a minimal example, you can clone
-[slint-rust-template](https://github.com/slint-ui/slint-rust-template/blob/main/src/main.rs) and change the name to your preferred name ( don't forget to modify `Cargo.toml`).Then add spell in dependencies
-from this github link along with the following patches in the bottom.
+> [!NOTE]
+> If you don't want to go through the husttle and simply want to
+> analyse the code, a ready-made starter spell project can be made
+> with command `sp new project-name`.
+
+Create a new project with `cargo new project_name`. Let's start by adding Slint and Spell as dependencies in your project's `Cargo.toml`.
 
 ```toml
+[dependencies]
+slint = { version = "1.13.1", features = ["renderer-software"] }
+spell = "1.0.0"
+
+[build-dependencies]
+slint-build = "1.13.1"
+
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }
 slint-build = { git = "https://github.com/slint-ui/slint" }
@@ -80,19 +99,56 @@ i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
 ```
 
-and then replace `main.rs` with following contents:
+Since, spell uses some of the private APIs of Slint, it is necessary to provide the above mentioned patches. Build deps are required by slint during compilation process. Moving on, add the `ui` directory (which will store your `.slint` files) in your project root (via command `mkdir ui`). Also add `build.rs` in project root with the following contents for building slint files.
 
 ```rust
-use std::{ env, error::Error};
+fn main() {
+    slint_build::compile("ui/app-window.slint").expect("Slint build failed");
+}
+```
+
+Now the main juice, let's create a counter widget with a button to increment a count which starts from, say 42.
+
+```slint
+// In path and file name `ui/app-window.slint`
+export component AppWindow inherits Window {
+    in-out property <int> counter: 42;
+    callback request-increase-value();
+    VerticalBox {
+        Text {
+            text: "Counter: \{root.counter}";
+        }
+
+        Button {
+            text: "Increase value";
+            clicked => {
+                root.request-increase-value();
+            }
+        }
+    }
+}
+```
+
+Now, to increment the data and specify the dimensions of widget add the following to your `src/main.rs` file.
+
+```rust
+use std::{
+    error::Error,
+    sync::mpsc,
+    sync::{Arc, RwLock},
+};
+
 use slint::ComponentHandle;
-use spell_framework::{
+use spell::{
     cast_spell,
-    layer_properties::{BoardType, LayerAnchor, LayerType, WindowConf},
+    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf, BoardType},
     wayland_adapter::SpellWin,
+    Handle,
 };
 slint::include_modules!();
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Necessary configurations for the widget like dimensions, layer etc.
     let window_conf = WindowConf::new(
         376,
         576,
@@ -100,11 +156,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         (5, 0, 0, 10),
         LayerType::Top,
         BoardType::None,
-        None,
+        false,
     );
 
+    // Getting the window and its event_queue given the properties and a window name.
     let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
+
+    // Slint specific code. Like initialising the window.
     let ui = AppWindow::new().unwrap();
+
+    // Setting the callback closure value which will be called on when the button is clicked.
     ui.on_request_increase_value({
         let ui_handle = ui.as_weak();
         move || {
@@ -112,9 +173,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui.set_counter(ui.get_counter() + 1);
         }
     });
+
+    // Calling the event loop function for running the window
     cast_spell(waywindow, None, None)
 }
 ```
+
+Running this code with cargo will display a widget in your wayland compositor. It is important to
+mention that if you have defined width and height in both your window and in the rust
+code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
+The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## Batteries :battery:
 

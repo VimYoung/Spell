@@ -45,65 +45,9 @@ use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 #[cfg(docsrs)]
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
-
-/// This was the previous struct used internally for rendering, its use is stopped in favour of
-/// [SpellSkiaWinAdapter] which provides faster and more reliable rendering. It implements slint's
-/// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
-pub struct SpellWinAdapter {
-    pub window: Window,
-    pub rendered: SoftwareRenderer,
-    pub size: PhysicalSize,
-    pub needs_redraw: Cell<bool>,
-}
-
-// TODO this dead code needs to be either removed or imporoved.
-#[allow(dead_code)]
-impl SpellWinAdapter {
-    fn new(width: u32, height: u32) -> Rc<Self> {
-        Rc::<SpellWinAdapter>::new_cyclic(|adapter| SpellWinAdapter {
-            window: Window::new(adapter.clone()),
-            rendered: SoftwareRenderer::new_with_repaint_buffer_type(
-                RepaintBufferType::ReusedBuffer,
-            ),
-            size: PhysicalSize { width, height },
-            needs_redraw: Default::default(),
-        })
-    }
-
-    fn draw_if_needed(&self, render_callback: impl FnOnce(&SoftwareRenderer)) -> bool {
-        if self.needs_redraw.replace(false) {
-            render_callback(&self.rendered);
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl WindowAdapter for SpellWinAdapter {
-    fn window(&self) -> &Window {
-        &self.window
-    }
-
-    fn size(&self) -> PhysicalSize {
-        // This value have to be made dynamic by using `xandr`
-        PhysicalSize {
-            width: self.size.width,
-            height: self.size.height,
-        }
-    }
-
-    fn renderer(&self) -> &dyn slint::platform::Renderer {
-        &self.rendered
-    }
-
-    fn request_redraw(&self) {
-        self.needs_redraw.set(true);
-    }
-}
-
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
+
 pub struct SpellLayerShell {
     /// An instance of [SpellSkiaWinAdapter].
     pub window_adapter: Rc<SpellSkiaWinAdapter>,
@@ -217,9 +161,8 @@ impl SpellMultiWinHandler {
                 false,
                 handle.clone(),
             );
-            let adapter = window.adapter.clone();
+            new_adapters.push(window.adapter.clone());
             windows_spell.push(window);
-            new_adapters.push(adapter);
         });
         let windows_handler = Rc::new(RefCell::new(SpellMultiWinHandler {
             windows: new_windows,
