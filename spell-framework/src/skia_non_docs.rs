@@ -28,30 +28,10 @@ pub struct SkiaSoftwareBufferReal {
     pub last_dirty_region: RefCell<Option<DirtyRegion>>,
 }
 
-// impl SkiaSoftwareBufferReal {
-//     pub(crate) fn refresh_buffer(&self, width: u32, height: u32) -> Buffer {
-//         let (wayland_buffer, _) = self
-//             .pool
-//             .borrow_mut()
-//             .create_buffer(
-//                 width as i32,
-//                 height as i32,
-//                 (width * 4) as i32,
-//                 wl_shm::Format::Argb8888,
-//             )
-//             .expect("Creating Buffer");
-//         // TODO this was previously set, if rendering causes issues, uncomment this.
-//         // self.set_config_internal();
-//         *self.primary_slot.borrow_mut() = wayland_buffer.slot();
-//         wayland_buffer
-//     }
-// }
-
-#[allow(unused_variables)]
 impl RenderBuffer for SkiaSoftwareBufferReal {
     fn with_buffer(
         &self,
-        window: &Window,
+        _: &Window,
         size: PhysicalSize,
         render_callback: &mut dyn for<'a> FnMut(
             std::num::NonZero<u32>,
@@ -115,7 +95,8 @@ use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::S
 /// It is used internally by [SpellMultiWinHandler] and previously by [SpellLayerShell]. This
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 pub struct SpellSkiaWinAdapterReal {
-    pub(crate) window: Window, // TODO size is no longer required to be in cell as it is never modified
+    pub(crate) window: Window,
+    // TODO size is no longer required to be in cell as it is never modified
     // and scaling is handled on the end of wayland only.
     pub(crate) size: Cell<PhysicalSize>,
     pub(crate) renderer: SkiaRenderer,

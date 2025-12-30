@@ -39,6 +39,7 @@ use std::{
     time::Duration,
 };
 
+pub use paste;
 use tracing::{Level, error, info, instrument, span, trace, warn};
 use wayland_adapter::SpellWin;
 use zbus::Error as BusError;
@@ -256,6 +257,31 @@ pub trait SpellAssociated {
     ) -> Result<(), Box<dyn Error>>;
 
     fn get_span(&self) -> span::Span;
+}
+
+#[macro_export]
+macro_rules! invoke_spell {
+    ($slint_win:ty, $name:expr, $window_conf:ident) => {{
+        $crate::paste::paste! {
+        struct [<$slint_win Spell>] {
+            ui: $slint_win ,
+            way: SpellWin
+        }
+        impl std::fmt::Debug for [<$slint_win Spell>] {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct("Spell")
+                .field("wayland_side:", &self.way) // Add fields by name
+                .finish() // Finalize the struct formatting
+            }
+        }
+
+        [<$slint_win Spell>] {
+            ui: $slint_win::new().unwrap(),
+            way: SpellWin::invoke_spell($name, $window_conf)
+        }
+
+        }
+    }};
 }
 
 // TODO set logging values in Option so that only a single value reads or writes.

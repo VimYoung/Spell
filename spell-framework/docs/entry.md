@@ -113,15 +113,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Calling the event loop function for running the window
-    cast_spell(Box::new(waywindow), None, None)
+    cast_spell(waywindow, None, None)
 }
 ```
 
 Running this code with cargo will display a widget in your wayland compositor. It is important to
-mention at this point that if you have defined width and height in both your window and in the rust
-code,then the renderer will manage the more or less dimensions accordingly, which may lead to certain
-undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-For code examples , tips and common functionalities like timed re-running of code, callbacks etc, head over to the book on Spell which contain these guides.
+mention that if you have defined width and height in both your window and in the rust
+code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
 The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## Spell CLI
