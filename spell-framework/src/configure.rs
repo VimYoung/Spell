@@ -96,6 +96,7 @@ pub struct WindowConf {
     /// set as exclusive zone as i32.
     pub exclusive_zone: Option<i32>,
     /// Defines the monitor name on which to spawn the window.
+    /// When no monitor is provided, the window is spawned on the default monitor.
     pub monitor_name: Option<String>,
 }
 
@@ -120,7 +121,7 @@ impl WindowConf {
             layer_type,
             board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
-            monitor_name
+            monitor_name,
         }
     }
 }

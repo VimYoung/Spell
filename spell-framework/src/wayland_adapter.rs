@@ -155,13 +155,13 @@ impl SpellWin {
                             .output_state
                             .info(output)
                             .and_then(|info| info.name)
-                            == Some(monitor_name.to_string())
+                            == Some(monitor_name.clone())
                     })
             })();
 
             if result.is_none() {
                 warn!(
-                    "Could not find monitor, using default monitor: {}",
+                    "Monitor '{}' not found, falling back to default monitor",
                     monitor_name
                 );
             }
