@@ -61,12 +61,14 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     process::Command,
     rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock, RwLock},
     time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
+use zbus::conn;
 
 mod fractional_scaling;
 mod lock_impl;
@@ -125,6 +127,8 @@ impl std::fmt::Debug for SpellWin {
     }
 }
 
+static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
+
 impl SpellWin {
     pub(crate) fn create_window(
         conn: &Connection,
@@ -136,39 +140,22 @@ impl SpellWin {
         let (globals, event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
 
-        let target_output = if let Some(monitor_name) = &window_conf.monitor_name {
-            let result = (|| -> Option<wl_output::WlOutput> {
-                // Create a temporary (blocking) queue & state to discover available monitors
-                let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).ok()?;
-                let temp_qh = temp_queue.handle();
-                let output_state = OutputState::new(&temp_globals, &temp_qh);
-                let mut temp_state = TempState { output_state };
-
-                temp_queue.roundtrip(&mut temp_state).ok()?;
-
-                temp_state
-                    .output_state
-                    .outputs()
-                    .into_iter()
-                    .find(|output| {
-                        temp_state
-                            .output_state
-                            .info(output)
-                            .and_then(|info| info.name)
-                            == Some(monitor_name.clone())
-                    })
-            })();
-
-            if result.is_none() {
-                warn!(
-                    "Monitor '{}' not found, falling back to default monitor",
-                    monitor_name
-                );
+        if AVAILABLE_MONITORS.get().is_none() {
+            match SpellWin::get_available_monitors(conn) {
+                Some(monitors) => {
+                    let _ = AVAILABLE_MONITORS.get_or_init(|| monitors.into());
+                }
+                None => warn!("Failed to get available monitors"),
             }
-            result
-        } else {
-            None
-        };
+        }
+
+        let target_output: Option<wl_output::WlOutput> =
+            window_conf.monitor_name.as_ref().and_then(|name| {
+                AVAILABLE_MONITORS
+                    .get()
+                    .and_then(|monitors| monitors.read().ok())
+                    .and_then(|monitors| monitors.get(name).cloned())
+            });
 
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
@@ -279,6 +266,37 @@ impl SpellWin {
             .insert(win.loop_handle.clone())
             .unwrap();
         win
+    }
+
+    /// Fetches the available monitors from the Wayland registry.
+    ///
+    /// # Returns
+    ///
+    /// A map of the available monitors where the key is the name of the monitor and the value is the
+    /// [`wl_output::WlOutput`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `None` if the registry queue could not be initialized.
+    fn get_available_monitors(conn: &Connection) -> Option<HashMap<String, wl_output::WlOutput>> {
+        let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).ok()?;
+        let temp_queue_handle = temp_queue.handle();
+        let output_state = OutputState::new(&temp_globals, &temp_queue_handle);
+        let mut temp_state = TempState { output_state };
+
+        temp_queue.roundtrip(&mut temp_state).ok()?;
+
+        Some(
+            temp_state
+                .output_state
+                .outputs()
+                .into_iter()
+                .map(|output| {
+                    let info = temp_state.output_state.info(&output).unwrap();
+                    (info.name.unwrap(), output)
+                })
+                .collect(),
+        )
     }
 
     /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
