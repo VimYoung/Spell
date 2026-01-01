@@ -39,7 +39,7 @@ use smithay_client_toolkit::{
         },
         calloop_wayland_source::WaylandSource,
         client::{
-            Connection, QueueHandle,
+            Connection, EventQueue, QueueHandle,
             globals::registry_queue_init,
             protocol::{wl_output, wl_shm, wl_surface},
         },
@@ -68,7 +68,6 @@ use std::{
     time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
-use zbus::conn;
 
 mod fractional_scaling;
 mod lock_impl;
@@ -84,7 +83,7 @@ pub(crate) struct States {
     pub(crate) pointer_state: PointerState,
     pub(crate) keyboard_state: KeyboardState,
     pub(crate) shm: Shm,
-    pub(crate) viewporter: Viewport,
+    pub(crate) viewporter: Option<Viewport>,
 }
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
@@ -103,7 +102,7 @@ pub struct SpellWin {
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
-    pub(crate) layer: LayerSurface,
+    pub(crate) layer: Option<LayerSurface>,
     pub(crate) first_configure: bool,
     pub(crate) is_hidden: Cell<bool>,
     pub(crate) layer_name: String,
@@ -137,25 +136,8 @@ impl SpellWin {
         if_single: bool,
         handle: HomeHandle,
     ) -> Self {
-        let (globals, event_queue) = registry_queue_init(conn).unwrap();
+        let (globals, mut event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
-
-        if AVAILABLE_MONITORS.get().is_none() {
-            match SpellWin::get_available_monitors(conn) {
-                Some(monitors) => {
-                    let _ = AVAILABLE_MONITORS.get_or_init(|| monitors.into());
-                }
-                None => warn!("Failed to get available monitors"),
-            }
-        }
-
-        let target_output: Option<wl_output::WlOutput> =
-            window_conf.monitor_name.as_ref().and_then(|name| {
-                AVAILABLE_MONITORS
-                    .get()
-                    .and_then(|monitors| monitors.read().ok())
-                    .and_then(|monitors| monitors.get(name).cloned())
-            });
 
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
@@ -173,26 +155,11 @@ impl SpellWin {
         let fractional_scale_state: FractionalScaleState =
             FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let stride = window_conf.width as i32 * 4;
+
         let surface = compositor.create_surface(&qh);
-        let layer = layer_shell.create_layer_surface(
-            &qh,
-            surface,
-            window_conf.layer_type,
-            Some(layer_name.clone()),
-            target_output.as_ref(),
-        );
-        let fractional_scale = fractional_scale_state.get_scale(layer.wl_surface(), &qh);
         let viewporter_state =
             ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
-        let viewporter = viewporter_state.get_viewport(layer.wl_surface(), &qh, fractional_scale);
-        set_config(
-            &window_conf,
-            &layer,
-            //true,
-            Some(input_region.wl_region()),
-            None,
-        );
-        layer.commit();
+
         let (way_pri_buffer, _) = pool
             .create_buffer(
                 window_conf.width as i32,
@@ -234,7 +201,7 @@ impl SpellWin {
         }
         set_event_sources(&event_loop, handle);
 
-        let win = SpellWin {
+        let mut win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
             queue: qh.clone(),
@@ -246,19 +213,64 @@ impl SpellWin {
                 pointer_state,
                 keyboard_state,
                 shm,
-                viewporter,
+                viewporter: None,
             },
-            layer,
+            layer: None,
             first_configure: true,
             is_hidden: Cell::new(false),
             layer_name: layer_name.clone(),
-            config: window_conf,
+            config: window_conf.clone(),
             input_region,
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
             span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
-            //backspace: backspace_event,
         };
+
+        if AVAILABLE_MONITORS.get().is_none() {
+            match SpellWin::get_available_monitors(&mut event_queue, &mut win) {
+                Some(monitors) => {
+                    let _ = AVAILABLE_MONITORS.get_or_init(|| RwLock::new(monitors));
+                }
+                None => warn!("Failed to get available monitors"),
+            }
+        }
+
+        let target_output: Option<wl_output::WlOutput> =
+            if let Some(name) = &window_conf.monitor_name {
+                let output = AVAILABLE_MONITORS
+                    .get()
+                    .and_then(|monitors| monitors.read().ok())
+                    .and_then(|monitors| monitors.get(name).cloned());
+                if output.is_none() {
+                    warn!("Monitor '{}' not found, using default monitor", name);
+                }
+                output
+            } else {
+                None
+            };
+
+        let layer = layer_shell.create_layer_surface(
+            &qh,
+            surface,
+            window_conf.layer_type,
+            Some(layer_name.clone()),
+            target_output.as_ref(),
+        );
+        let fractional_scale = fractional_scale_state.get_scale(layer.wl_surface(), &qh);
+
+        let viewporter = viewporter_state.get_viewport(layer.wl_surface(), &qh, fractional_scale);
+
+        set_config(
+            &win.config,
+            &layer,
+            //true,
+            Some(win.input_region.wl_region()),
+            None,
+        );
+        layer.commit();
+
+        win.layer = Some(layer);
+        win.states.viewporter = Some(viewporter);
 
         info!("Win: {} layer created successfully.", layer_name);
 
@@ -270,30 +282,28 @@ impl SpellWin {
 
     /// Fetches the available monitors from the Wayland registry.
     ///
-    /// # Returns
-    ///
-    /// A map of the available monitors where the key is the name of the monitor and the value is the
-    /// [`wl_output::WlOutput`].
+    /// This function fetches the available monitors from the Wayland registry and returns a map of
+    /// the available monitors where the key is the name of the monitor and the value is the
+    /// [`wl_output::WlOutput`]. It uses an already registered event queue & spell window.
     ///
     /// # Errors
     ///
     /// Returns `None` if the registry queue could not be initialized.
-    fn get_available_monitors(conn: &Connection) -> Option<HashMap<String, wl_output::WlOutput>> {
-        let (temp_globals, mut temp_queue) = registry_queue_init::<TempState>(conn).ok()?;
-        let temp_queue_handle = temp_queue.handle();
-        let output_state = OutputState::new(&temp_globals, &temp_queue_handle);
-        let mut temp_state = TempState { output_state };
-
-        temp_queue.roundtrip(&mut temp_state).ok()?;
+    fn get_available_monitors(
+        event_queue: &mut EventQueue<SpellWin>,
+        win: &mut SpellWin,
+    ) -> Option<HashMap<String, wl_output::WlOutput>> {
+        // roundtrip to get all available monitors from Wayland
+        event_queue.roundtrip(win).ok()?;
 
         Some(
-            temp_state
+            win.states
                 .output_state
                 .outputs()
                 .into_iter()
-                .map(|output| {
-                    let info = temp_state.output_state.info(&output).unwrap();
-                    (info.name.unwrap(), output)
+                .filter_map(|output| {
+                    let info = win.states.output_state.info(&output)?;
+                    Some((info.name?, output))
                 })
                 .collect(),
         )
@@ -322,7 +332,7 @@ impl SpellWin {
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
-            self.layer.wl_surface().attach(None, 0, 0);
+            self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
         }
     }
 
@@ -365,7 +375,7 @@ impl SpellWin {
         );
         self.input_region.add(x, y, width, height);
         self.set_config_internal();
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// This function subtracts specific rectangular regions of your complete layer from receiving
@@ -379,7 +389,7 @@ impl SpellWin {
         );
         self.input_region.subtract(x, y, width, height);
         self.set_config_internal();
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// This function marks specific rectangular regions of your complete layer as opaque.
@@ -394,7 +404,7 @@ impl SpellWin {
         );
         self.opaque_region.add(x, y, width, height);
         self.set_config_internal();
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// This function removes specific rectangular regions of your complete layer from being opaque.
@@ -408,13 +418,13 @@ impl SpellWin {
         );
         self.opaque_region.subtract(x, y, width, height);
         self.set_config_internal();
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     fn set_config_internal(&self) {
         set_config(
             &self.config,
-            &self.layer,
+            self.layer.as_ref().unwrap(),
             //self.first_configure,
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
@@ -440,9 +450,12 @@ impl SpellWin {
             if self.first_configure || redraw_val {
                 // if self.first_configure {
                 self.first_configure = false;
-                self.layer
-                    .wl_surface()
-                    .damage_buffer(0, 0, width as i32, height as i32);
+                self.layer.as_ref().unwrap().wl_surface().damage_buffer(
+                    0,
+                    0,
+                    width as i32,
+                    height as i32,
+                );
                 // } else {
                 //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
                 //         // println!(
@@ -461,6 +474,8 @@ impl SpellWin {
                 // }
                 // Request our next frame
                 self.layer
+                    .as_ref()
+                    .unwrap()
                     .wl_surface()
                     .attach(Some(buffer.wl_buffer()), 0, 0);
             }
@@ -469,9 +484,11 @@ impl SpellWin {
         }
 
         self.layer
+            .as_ref()
+            .unwrap()
             .wl_surface()
-            .frame(qh, self.layer.wl_surface().clone());
-        self.layer.commit();
+            .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// Grabs the focus of keyboard. Can be used in combination with other functions
@@ -481,8 +498,10 @@ impl SpellWin {
             .board_interactivity
             .set(KeyboardInteractivity::Exclusive);
         self.layer
+            .as_ref()
+            .unwrap()
             .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// Removes the focus of keyboard from window if it currently has it.
@@ -491,8 +510,10 @@ impl SpellWin {
             .board_interactivity
             .set(KeyboardInteractivity::None);
         self.layer
+            .as_ref()
+            .unwrap()
             .set_keyboard_interactivity(KeyboardInteractivity::None);
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 
     /// This method is used to set exclusive zone. Generally, useful when
@@ -500,8 +521,8 @@ impl SpellWin {
     pub fn set_exclusive_zone(&mut self, val: i32) {
         // self.set_config_internal();
         self.config.exclusive_zone = Some(val);
-        self.layer.set_exclusive_zone(val);
-        self.layer.commit();
+        self.layer.as_ref().unwrap().set_exclusive_zone(val);
+        self.layer.as_ref().unwrap().commit();
     }
 }
 
@@ -674,7 +695,7 @@ impl FractionalScaleHandler for SpellWin {
     ) {
         info!("Scale factor changed, invoked from custom trait. {}", scale);
 
-        self.layer.wl_surface().damage_buffer(
+        self.layer.as_ref().unwrap().wl_surface().damage_buffer(
             0,
             0,
             self.adapter.size.get().width as i32,
@@ -687,8 +708,10 @@ impl FractionalScaleHandler for SpellWin {
         self.adapter.scale_factor.set(scale_factor);
         self.states
             .viewporter
+            .as_ref()
+            .unwrap()
             .set_destination(width as i32, height as i32);
-        self.states.viewporter.set_source(
+        self.states.viewporter.as_ref().unwrap().set_source(
             0.,
             0.,
             self.adapter.size.get().width.into(),
@@ -697,7 +720,7 @@ impl FractionalScaleHandler for SpellWin {
         // self.adapter
         //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
         //     .unwrap();
-        self.layer.commit();
+        self.layer.as_ref().unwrap().commit();
     }
 }
 
@@ -1221,54 +1244,3 @@ impl ConversationAdapter for UsernamePassConvo {
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;
-
-struct TempState {
-    output_state: OutputState,
-}
-
-delegate_output!(TempState);
-
-impl OutputHandler for TempState {
-    fn output_state(&mut self) -> &mut OutputState {
-        &mut self.output_state
-    }
-    fn new_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-    fn update_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-    fn output_destroyed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-}
-
-impl
-    smithay_client_toolkit::reexports::client::Dispatch<
-        smithay_client_toolkit::reexports::client::protocol::wl_registry::WlRegistry,
-        smithay_client_toolkit::reexports::client::globals::GlobalListContents,
-    > for TempState
-{
-    fn event(
-        _state: &mut Self,
-        _proxy: &smithay_client_toolkit::reexports::client::protocol::wl_registry::WlRegistry,
-        _event: smithay_client_toolkit::reexports::client::protocol::wl_registry::Event,
-        _data: &smithay_client_toolkit::reexports::client::globals::GlobalListContents,
-        _conn: &smithay_client_toolkit::reexports::client::Connection,
-        _qh: &smithay_client_toolkit::reexports::client::QueueHandle<Self>,
-    ) {
-        // We don't care about updates during temporary discovery roundtrip
-    }
-}
