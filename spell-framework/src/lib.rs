@@ -31,6 +31,7 @@ pub mod layer_properties {
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
 use dbus_window_state::{DataType, InternalHandle, deploy_zbus_service};
+pub use paste;
 use smithay_client_toolkit::reexports::calloop::channel::{Channel, Event, channel};
 use std::{
     any::Any,
@@ -38,8 +39,7 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
-
-pub use paste;
+pub use tracing;
 use tracing::{Level, error, info, instrument, span, trace, warn};
 use wayland_adapter::SpellWin;
 use zbus::Error as BusError;
@@ -86,7 +86,7 @@ pub trait ForeignController: Send + Sync + std::fmt::Debug {
     fn as_any(&self) -> &dyn Any;
 }
 
-type State = Arc<RwLock<dyn ForeignController>>;
+pub type State = Arc<RwLock<dyn ForeignController>>;
 type States = Vec<Option<Box<dyn FnMut(State)>>>;
 /// This is the event loop which is to be called when initialising multiple windows through
 /// a single `main` file. It is important to remember that Each value of these vectors corresponds
@@ -256,17 +256,21 @@ pub trait SpellAssociated {
         span_log: tracing::span::Span,
     ) -> Result<(), Box<dyn Error>>;
 
-    fn get_span(&self) -> span::Span;
+    fn get_span(&self) -> span::Span {
+        span!(Level::INFO, "unnamed-widget")
+    }
 }
 
 #[macro_export]
 macro_rules! invoke_spell {
     ($slint_win:ty, $name:expr, $window_conf:ident) => {{
+        use $crate::wayland_adapter::WinHandle;
         $crate::paste::paste! {
         struct [<$slint_win Spell>] {
             ui: $slint_win ,
-            way: SpellWin
+            way: SpellWin,
         }
+
         impl std::fmt::Debug for [<$slint_win Spell>] {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.debug_struct("Spell")
@@ -275,11 +279,89 @@ macro_rules! invoke_spell {
             }
         }
 
-        [<$slint_win Spell>] {
-            ui: $slint_win::new().unwrap(),
-            way: SpellWin::invoke_spell($name, $window_conf)
+        impl [<$slint_win Spell>] {
+            /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
+            pub fn hide(&self) {
+                self.way.hide();
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::show_again`]
+            pub fn show_again(&mut self) {
+                self.way.show_again();
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::toggle`]
+            pub fn toggle(&mut self) {
+                self.way.toggle();
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::grab_focus`]
+            pub fn grab_focus(&self) {
+                self.way.grab_focus();
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::remove_focus`]
+            pub fn remove_focus(&self) {
+                self.way.remove_focus();
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::add_input_region`]
+            pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+                self.way.add_input_region(x, y, width, height);
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_input_region`]
+            pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+                self.way.subtract_input_region(x, y, width, height);
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::add_opaque_region`]
+            pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+                self.way.add_opaque_region(x, y, width, height);
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_opaque_region`]
+            pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
+                self.way.subtract_opaque_region(x, y, width, height);
+            }
+
+            /// Internally calls [`crate::wayland_adapter::SpellWin::set_exclusive_zone`]
+            pub fn set_exclusive_zone(&mut self, val: i32) {
+                self.way.set_exclusive_zone(val);
+            }
+            /// Returns a handle of [`crate::wayland_adapter::WinHandle`] to invoke wayland specific features.
+            pub fn get_handler(&self) -> WinHandle {
+                WinHandle(self.way.loop_handle.clone())
+            }
         }
 
+        impl $crate::SpellAssociated for [<$slint_win Spell>] {
+            fn on_call(
+                &mut self,
+                state: Option<$crate::State>,
+                set_callback: Option<Box<dyn FnMut($crate::State)>>,
+                span_log: $crate::tracing::span::Span,
+            ) -> Result<(), Box<dyn std::error::Error>> {
+                    self.way.on_call(state, set_callback, span_log)
+            }
+
+            fn get_span(&self) -> tracing::span::Span {
+                self.way.span.clone()
+            }
+        }
+
+        impl std::ops::Deref for [<$slint_win Spell>] {
+            type Target = [<$slint_win>];
+            fn deref(&self) -> &Self::Target {
+                &self.ui
+            }
+        }
+        let way_win = SpellWin::invoke_spell($name, $window_conf);
+
+        [<$slint_win Spell>] {
+            ui: $slint_win::new().unwrap(),
+            way: way_win
+        }
         }
     }};
 }

@@ -6,19 +6,10 @@ use crate::{
     configure::{LayerConf, WindowConf, set_up_tracing},
     wayland_adapter::SpellWin,
 };
-use slint::{
-    PhysicalSize, Window,
-    platform::{
-        EventLoopProxy, Platform, WindowAdapter,
-        software_renderer::{
-            RepaintBufferType::{self},
-            SoftwareRenderer,
-        },
-    },
-};
+use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use smithay_client_toolkit::reexports::client::Connection;
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     rc::Rc,
     sync::{Arc, Mutex},
 };

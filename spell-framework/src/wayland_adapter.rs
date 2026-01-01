@@ -97,7 +97,8 @@ pub(crate) struct States {
 /// slint files and adding [WindowConf]s in [SpellMultiWinHandler].
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
-    pub(crate) loop_handle: LoopHandle<'static, SpellWin>,
+    /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
+    pub loop_handle: LoopHandle<'static, SpellWin>,
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
@@ -109,7 +110,7 @@ pub struct SpellWin {
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
-    pub(crate) span: span::Span,
+    pub span: span::Span,
     // #[allow(dead_code)]
     // pub(crate) backspace: calloop::RegistrationToken,
 }
@@ -247,7 +248,7 @@ impl SpellWin {
     }
 
     /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
-    pub fn get_handler(&mut self) -> WinHandle {
+    pub fn get_handler(&self) -> WinHandle {
         info!("Win: Handle provided.");
         WinHandle(self.loop_handle.clone())
     }
@@ -682,7 +683,7 @@ impl LayerShellHandler for SpellWin {
 /// for calling wayland specific features of `SpellWin`. It can be accessed from
 /// [`crate::wayland_adapter::SpellWin::get_handler`].
 #[derive(Clone, Debug)]
-pub struct WinHandle(pub(crate) LoopHandle<'static, SpellWin>);
+pub struct WinHandle(pub LoopHandle<'static, SpellWin>);
 
 impl WinHandle {
     /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
@@ -732,6 +733,11 @@ impl WinHandle {
     pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.0
             .insert_idle(move |win| win.subtract_opaque_region(x, y, width, height));
+    }
+
+    /// Internally calls [`crate::wayland_adapter::SpellWin::set_exclusive_zone`]
+    pub fn set_exclusive_zone(&self, val: i32) {
+        self.0.insert_idle(move |win| win.set_exclusive_zone(val));
     }
 }
 
@@ -1094,10 +1100,6 @@ impl SpellAssociated for SpellLock {
                 .unwrap();
         }
         Ok(())
-    }
-
-    fn get_span(&self) -> tracing::span::Span {
-        span!(Level::INFO, "lock-screen")
     }
 }
 
