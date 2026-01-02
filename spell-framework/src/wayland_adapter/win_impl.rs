@@ -264,7 +264,7 @@ impl PointerHandler for SpellWin {
         use PointerEventKind::*;
         for event in events {
             // Ignore events for other surfaces
-            if &event.surface != self.layer.wl_surface() {
+            if &event.surface != self.layer.as_ref().unwrap().wl_surface() {
                 continue;
             }
             match event.kind {
