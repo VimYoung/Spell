@@ -1,10 +1,15 @@
 // use i_slint_core::item_rendering::DirtyRegion;
-use i_slint_core::partial_renderer::DirtyRegion;
+use i_slint_core::InternalToken;
+use i_slint_core::window::WindowAdapterInternal;
+use i_slint_core::{items::MouseCursor, partial_renderer::DirtyRegion, platform::WindowAdapter};
+
 #[cfg(not(docsrs))]
-use slint::{PhysicalSize, Window, platform::WindowAdapter};
+use slint::{PhysicalSize, Window};
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::shm::slot::{Slot, SlotPool};
+use std::borrow::Borrow;
+use std::cell::Ref;
 use std::{
     cell::Cell,
     cell::RefCell,
@@ -106,6 +111,7 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) scale_factor: Cell<f32>,
     #[allow(clippy::type_complexity)]
     pub(crate) slint_event_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
+    pub(crate) current_cursor: Cell<MouseCursor>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -114,6 +120,12 @@ impl Debug for SpellSkiaWinAdapterReal {
             .field("size", &self.size)
             .field("redraw", &self.needs_redraw)
             .finish()
+    }
+}
+
+impl WindowAdapterInternal for SpellSkiaWinAdapterReal {
+    fn set_mouse_cursor(&self, cursor: MouseCursor) {
+        self.current_cursor.set(cursor);
     }
 }
 
@@ -141,6 +153,10 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
 
     fn request_redraw(&self) {
         self.needs_redraw.set(true);
+    }
+
+    fn internal(&self, _: i_slint_core::InternalToken) -> Option<&dyn WindowAdapterInternal> {
+        Some(self)
     }
 }
 
@@ -170,6 +186,7 @@ impl SpellSkiaWinAdapterReal {
             needs_redraw: Cell::new(true),
             scale_factor: Cell::new(1.),
             slint_event_proxy: slint_proxy,
+            current_cursor: Cell::new(MouseCursor::Default),
         })
     }
 
