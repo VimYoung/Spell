@@ -75,6 +75,8 @@ mod viewporter;
 mod way_helper;
 mod win_impl;
 
+static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
+
 #[derive(Debug)]
 pub(crate) struct States {
     pub(crate) registry_state: RegistryState,
@@ -105,12 +107,14 @@ pub struct SpellWin {
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
     pub(crate) first_configure: bool,
+    pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
     pub(crate) layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
+    /// Span required for proper logging.
     pub span: span::Span,
     // #[allow(dead_code)]
     // pub(crate) backspace: calloop::RegistrationToken,
@@ -126,8 +130,6 @@ impl std::fmt::Debug for SpellWin {
             .finish()
     }
 }
-
-static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
 
 impl SpellWin {
     pub(crate) fn create_window(
@@ -218,6 +220,7 @@ impl SpellWin {
             },
             layer: None,
             first_configure: true,
+            natural_scroll: window_conf.natural_scroll,
             is_hidden: Cell::new(false),
             layer_name: layer_name.clone(),
             config: window_conf.clone(),
@@ -819,12 +822,6 @@ impl WinHandle {
 
 /// SpellLock is a struct which represents a window lock. It can be run and initialised
 /// on a custom lockscreen implementation with slint.
-/// <div class="warning">
-/// Remember, with great power comes great responsibility. The struct doen't implement
-/// pointer events so you would need to make sure that your lock screen has a text input field
-/// and it is in focus on startup. Also spell doesn't add any
-/// restrictions on what you can have in your lockscreen so that is a bonus
-/// </div>
 /// Know limitations include the abscence to verify from fingerprints and unideal issues on
 /// multi-monitor setup. You can add the path of binary of your lock in your compositor config and idle
 /// manager config to use the program. It will be linked to spell-cli directly in coming releases.
@@ -895,6 +892,8 @@ impl std::fmt::Debug for SpellLock {
     }
 }
 impl SpellLock {
+    /// This function creates an instance of SpellLock which can be combined with
+    /// slint windows to create a lockscreen.
     pub fn invoke_lock_spell() -> Self {
         let conn = Connection::connect_to_env().unwrap();
 
@@ -1156,6 +1155,9 @@ impl SpellLock {
         Ok(())
     }
 
+    /// Provides a lockscreen handler used to invoke the unlock
+    /// callback with the user entered password.For more details
+    /// view [`LockHandle`].
     pub fn get_handler(&self) -> LockHandle {
         LockHandle(self.loop_handle.clone())
     }
@@ -1179,14 +1181,15 @@ impl SpellAssociated for SpellLock {
     }
 }
 
-/// Struct to handle unlocking of a SpellLock instance.
+/// Struct to handle unlocking of a SpellLock instance. It can be captured from
+/// [`SpellLock::get_handler`].
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
     /// Call this method to unlock Spelllock. It also takes two callbacks which
-    /// are invoked when the password parsed is wrong and when the lock is
-    /// opened respectively. It can be used to invoke UI specific changes for
-    /// your slint frontend.
+    /// are invoked when the password parsed is wrong or right (i.e. resulting
+    /// in an screen unlock) respectively. Callbacks can be used to invoke UI
+    /// specific changes for your slint frontend.
     pub fn unlock(
         &self,
         username: Option<String>,

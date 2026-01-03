@@ -1,4 +1,17 @@
-# 1.0.1 & 1.0.1 CLI (Due date)
+# 1.0.2 & 1.0.2 CLI (Due Date)
+
+Changes:
+
+- WindowConf creation is replaced by a builder method for cleaner creation of configuration.
+  Following new configurations are added.
+  - `monitor_name`: specify the monitor to display the widget.
+  - `natural_scroll`: Whether to enable natural scrolling. (Default: false)
+- Experimental macro addition (not ready for usage) to combine wayland and slint
+  UIs into a single variable. This removes the need to manage two separate variables
+  (for wayland and slint separately) for same widget.
+- Addition of Notification manager for accessing and creating notification centers.
+
+# 1.0.1 & 1.0.1 CLI (25-12-27)
 
 Changes:
 

@@ -98,11 +98,15 @@ pub struct WindowConf {
     /// Defines the monitor name on which to spawn the window.
     /// When no monitor is provided, the window is spawned on the default monitor.
     pub monitor_name: Option<String>,
+    pub natural_scroll: bool,
 }
 
 impl WindowConf {
     /// constructor method for initialising an instance of WindowConf.
-    #[allow(clippy::too_many_arguments)]
+    #[deprecated(
+        since = "1.0.2",
+        note = "Use the builder method to access all the configuration."
+    )]
     pub fn new(
         max_width: u32,
         max_height: u32,
@@ -111,7 +115,6 @@ impl WindowConf {
         layer_type: Layer,
         board_interactivity: KeyboardInteractivity,
         exclusive_zone: Option<i32>,
-        monitor_name: Option<String>,
     ) -> Self {
         WindowConf {
             width: max_width,
@@ -121,8 +124,93 @@ impl WindowConf {
             layer_type,
             board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
-            monitor_name,
+            monitor_name: None,
+            natural_scroll: false,
         }
+    }
+
+    pub fn builder() -> WindowConfBuilder {
+        WindowConfBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct WindowConfBuilder {
+    max_width: u32,
+    max_height: u32,
+    anchor: (Option<Anchor>, Option<Anchor>),
+    margin: (i32, i32, i32, i32),
+    layer_type: Option<Layer>,
+    board_interactivity: KeyboardInteractivity,
+    exclusive_zone: Option<i32>,
+    monitor_name: Option<String>,
+    natural_scroll: bool,
+}
+
+impl WindowConfBuilder {
+    pub fn width<I: Into<u32>>(&mut self, width: I) {
+        self.max_width = width.into();
+    }
+
+    pub fn height<I: Into<u32>>(&mut self, height: I) {
+        self.max_width = height.into();
+    }
+
+    pub fn anchor_1(&mut self, anchor: Anchor) {
+        self.anchor.0 = Some(anchor);
+    }
+
+    pub fn anchor_2(&mut self, anchor: Anchor) {
+        self.anchor.1 = Some(anchor);
+    }
+
+    pub fn margins(&mut self, top: i32, right: i32, bottom: i32, left: i32) {
+        self.margin = (top, right, bottom, left)
+    }
+
+    pub fn layer_type(&mut self, layer: Layer) {
+        self.layer_type = Some(layer);
+    }
+
+    pub fn board_interactivity(&mut self, board: KeyboardInteractivity) {
+        self.board_interactivity = board;
+    }
+
+    pub fn exclusive_zone(&mut self, dimention: i32) {
+        self.exclusive_zone = Some(dimention);
+    }
+
+    pub fn monitor(&mut self, name: String) {
+        self.monitor_name = Some(name)
+    }
+
+    pub fn natural_scroll(&mut self, scroll: bool) {
+        self.natural_scroll = scroll;
+    }
+
+    pub fn build(&self) -> Result<WindowConf, Box<dyn std::error::Error>> {
+        Ok(WindowConf {
+            width: if self.max_width != 0 {
+                self.max_width
+            } else {
+                return Err("width is either not defined or set to zero".into());
+            },
+            height: if self.max_width != 0 {
+                self.max_height
+            } else {
+                return Err("height is either not defined or set to zero".into());
+            },
+            anchor: self.anchor,
+            margin: self.margin,
+            layer_type: match self.layer_type {
+                None => Layer::Top,
+                Some(val) => val,
+            },
+            board_interactivity: Cell::new(self.board_interactivity),
+            exclusive_zone: self.exclusive_zone,
+            monitor_name: self.monitor_name.clone(),
+            natural_scroll: self.natural_scroll,
+        })
     }
 }
 

@@ -374,9 +374,6 @@ macro_rules! invoke_spell {
 // TODO needs to have multi monitor support.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
-// TODO to check what will happen to my dbus network if windows with same layer name will be
-// present. To check causes for errors as well as before implenenting muliple layers in same
-// window.
 // TODO lock screen behaviour in a multi-monitor setup needs to be tested.
 // TODO t add tracing in following functions:
 // 1. secondary and primary services
@@ -393,5 +390,6 @@ macro_rules! invoke_spell {
 // 4. it should have the option to take a window_conf or directly the window configurations
 // into the macro, removing the need to define it previously.
 // 5. monitor: Specify the monitor to show the widget in.
-//
 // Also, a procedural macro to mimic the functionalities of ForeignController.
+// Build a consistent error type to deal with CLI, dbus and window creation errors
+// (including window conf) more gracefully.
