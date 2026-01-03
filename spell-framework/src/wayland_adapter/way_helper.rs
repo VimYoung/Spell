@@ -179,17 +179,31 @@ pub(crate) struct PointerState {
 }
 
 impl PointerState {
+    /// Updates the cursor shape
+    ///
+    /// If the cursor is [MouseCursor::None], the cursor will be hidden
+    ///
+    /// If the cursor is not [MouseCursor::None], the cursor will be set to the shape corresponding to the cursor
+    ///
+    /// The cursor is only updated when it doesn't match the current cursor
     pub fn update_cursor(&mut self, mouse_cursor: MouseCursor, queue: &QueueHandle<SpellWin>) {
         if self.last_cursor_enter_serial.is_some()
             && self.pointer.is_some()
             && mouse_cursor != self.current_wayland_cursor
         {
-            self.cursor_shape
-                .get_shape_device(self.pointer.as_ref().unwrap(), queue)
-                .set_shape(
-                    self.last_cursor_enter_serial.unwrap(),
-                    slint_to_wl_cursor_mapping::mouse_cursor_to_shape(mouse_cursor),
-                );
+            let pointer = self.pointer.as_ref().unwrap();
+            let serial = self.last_cursor_enter_serial.unwrap();
+
+            if mouse_cursor == MouseCursor::None {
+                pointer.set_cursor(serial, None, 0, 0);
+            } else {
+                self.cursor_shape
+                    .get_shape_device(pointer, queue)
+                    .set_shape(
+                        serial,
+                        slint_to_wl_cursor_mapping::mouse_cursor_to_shape(mouse_cursor),
+                    );
+            }
             self.current_wayland_cursor = mouse_cursor;
         }
     }
