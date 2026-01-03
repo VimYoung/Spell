@@ -129,7 +129,6 @@ slint::slint! {
                     CursorTile { label: "NESW-Resize"; cursor-type: nesw-resize; }
                 }
 
-                // Row 8: Last cursor + exit
                 HorizontalBox {
                     spacing: 8px;
                     alignment: center;

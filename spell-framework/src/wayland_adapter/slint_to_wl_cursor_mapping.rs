@@ -1,10 +1,12 @@
 use i_slint_core::items::MouseCursor;
 use smithay_client_toolkit::reexports::protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape;
 
+/// Maps the slint cursor enum to the wayland cursor shape enum
+///
+/// [MouseCursor::None] is handled internally by the program because there is no wayland cursor shape for it
 pub fn mouse_cursor_to_shape(cursor: MouseCursor) -> Shape {
     match cursor {
         MouseCursor::Default => Shape::Default,
-        MouseCursor::None => Shape::Default, // TODO: there is a way to hide the cursor via wayland
         MouseCursor::Help => Shape::Help,
         MouseCursor::Pointer => Shape::Pointer,
         MouseCursor::Progress => Shape::Progress,
