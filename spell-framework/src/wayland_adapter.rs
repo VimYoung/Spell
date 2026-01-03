@@ -454,8 +454,6 @@ impl SpellWin {
                 .pointer_state
                 .update_cursor(self.adapter.current_cursor.get(), &qh);
 
-            // self.layer.as_ref().unwrap().
-
             let buffer = &self.buffer;
             if self.first_configure || redraw_val {
                 // if self.first_configure {

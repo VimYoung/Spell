@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let waywindow = SpellWin::invoke_spell("cursor-test", window_conf);
-    let ui = CursorTest::new().unwrap();
+    let _ui = CursorTest::new().unwrap();
 
     println!("Cursor Test Started!");
     println!("Hover over each tile to test the Wayland cursor implementation.");
