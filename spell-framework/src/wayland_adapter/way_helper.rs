@@ -1,4 +1,9 @@
-use crate::{configure::HomeHandle, layer_properties::WindowConf, wayland_adapter::SpellWin};
+use crate::{
+    configure::HomeHandle,
+    layer_properties::WindowConf,
+    wayland_adapter::{SpellWin, slint_to_wl_cursor_mapping},
+};
+use i_slint_core::items::MouseCursor;
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::{
@@ -6,16 +11,16 @@ use smithay_client_toolkit::{
             EventLoop,
             timer::{TimeoutAction, Timer},
         },
-        client::protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
+        client::{
+            QueueHandle,
+            protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
+        },
     },
     seat::{
         keyboard::{KeyEvent, Keysym},
         pointer::{PointerData, cursor_shape::CursorShapeManager},
     },
-    shell::{
-        WaylandSurface,
-        wlr_layer::{/*Anchor,*/ LayerSurface},
-    },
+    shell::{WaylandSurface, wlr_layer::LayerSurface},
 };
 use std::{
     fs,
@@ -169,6 +174,39 @@ pub(crate) struct PointerState {
     pub pointer: Option<wl_pointer::WlPointer>,
     pub pointer_data: Option<PointerData>,
     pub cursor_shape: CursorShapeManager,
+    pub current_wayland_cursor: MouseCursor,
+    pub last_cursor_enter_serial: Option<u32>,
+}
+
+impl PointerState {
+    /// Updates the cursor shape
+    ///
+    /// If the cursor is [MouseCursor::None], the cursor will be hidden
+    ///
+    /// If the cursor is not [MouseCursor::None], the cursor will be set to the shape corresponding to the cursor
+    ///
+    /// The cursor is only updated when it doesn't match the current cursor
+    pub fn update_cursor(&mut self, mouse_cursor: MouseCursor, queue: &QueueHandle<SpellWin>) {
+        if self.last_cursor_enter_serial.is_some()
+            && self.pointer.is_some()
+            && mouse_cursor != self.current_wayland_cursor
+        {
+            let pointer = self.pointer.as_ref().unwrap();
+            let serial = self.last_cursor_enter_serial.unwrap();
+
+            if mouse_cursor == MouseCursor::None {
+                pointer.set_cursor(serial, None, 0, 0);
+            } else {
+                self.cursor_shape
+                    .get_shape_device(pointer, queue)
+                    .set_shape(
+                        serial,
+                        slint_to_wl_cursor_mapping::mouse_cursor_to_shape(mouse_cursor),
+                    );
+            }
+            self.current_wayland_cursor = mouse_cursor;
+        }
+    }
 }
 
 #[derive(Debug)]
