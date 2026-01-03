@@ -1,5 +1,4 @@
 // use i_slint_core::item_rendering::DirtyRegion;
-use i_slint_core::InternalToken;
 use i_slint_core::window::WindowAdapterInternal;
 use i_slint_core::{items::MouseCursor, partial_renderer::DirtyRegion, platform::WindowAdapter};
 
@@ -8,8 +7,6 @@ use slint::{PhysicalSize, Window};
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::shm::slot::{Slot, SlotPool};
-use std::borrow::Borrow;
-use std::cell::Ref;
 use std::{
     cell::Cell,
     cell::RefCell,
@@ -124,6 +121,10 @@ impl Debug for SpellSkiaWinAdapterReal {
 }
 
 impl WindowAdapterInternal for SpellSkiaWinAdapterReal {
+    ///? Current approach uses an internal (normally private) api.
+    ///? According to the slint docs, they are planning on making it public
+    ///? Both this trait impl & the MouseCursor enum are currently private, but still accessible
+    ///? through the slint internal crate.
     fn set_mouse_cursor(&self, cursor: MouseCursor) {
         self.current_cursor.set(cursor);
     }
