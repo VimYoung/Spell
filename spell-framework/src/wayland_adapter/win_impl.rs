@@ -344,18 +344,33 @@ impl PointerHandler for SpellWin {
                     ..
                 } => {
                     trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
-                    self.adapter
-                        .try_dispatch_event(WindowEvent::PointerScrolled {
-                            position: slint::LogicalPosition {
-                                x: event.position.0 as f32,
-                                y: event.position.1 as f32,
-                            },
-                            delta_x: horizontal.absolute as f32,
-                            delta_y: vertical.absolute as f32,
-                        })
-                        .unwrap_or_else(|err| {
-                            warn!("Pointer scroll event failed with error: {:?}", err)
-                        });
+                    if !self.natural_scroll {
+                        self.adapter
+                            .try_dispatch_event(WindowEvent::PointerScrolled {
+                                position: slint::LogicalPosition {
+                                    x: event.position.0 as f32,
+                                    y: event.position.1 as f32,
+                                },
+                                delta_x: horizontal.absolute as f32,
+                                delta_y: vertical.absolute as f32,
+                            })
+                            .unwrap_or_else(|err| {
+                                warn!("Pointer scroll event failed with error: {:?}", err)
+                            });
+                    } else {
+                        self.adapter
+                            .try_dispatch_event(WindowEvent::PointerScrolled {
+                                position: slint::LogicalPosition {
+                                    x: event.position.0 as f32,
+                                    y: event.position.1 as f32,
+                                },
+                                delta_x: -horizontal.absolute as f32,
+                                delta_y: -vertical.absolute as f32,
+                            })
+                            .unwrap_or_else(|err| {
+                                warn!("Pointer scroll event failed with error: {:?}", err)
+                            });
+                    }
                 }
             }
         }

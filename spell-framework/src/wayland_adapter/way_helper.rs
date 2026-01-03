@@ -247,7 +247,6 @@ pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handl
                                 });
                         }
                         "dev" => {
-                            println!("ENtered the dev mode");
                             handle
                                 .modify(|layer| {
                                     *layer.filter_mut() =
