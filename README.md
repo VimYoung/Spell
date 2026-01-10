@@ -5,6 +5,10 @@
 <h3 align="left">Make desktop widgets by the mystic arts of Spell  !!</h3>
 <hr>
 
+![rust with crates.io](https://img.shields.io/badge/RUST-CRATES.IO-RED?style=for-the-badge&logo=Rust&logoSize=auto&color=%23fdacac&link=https%3A%2F%2Fcrates.io%2Fcrates%2Fspell-framework)
+![docs.rs (with version)](https://img.shields.io/docsrs/spell-framework/latest?style=for-the-badge&logo=docsdotrs&logoSize=auto&label=docs.rs&color=CBF3BB&link=https%3A%2F%2Fdocs.rs%2Fspell-framework%2Flatest%2Fspell_framework%2F)
+![GitHub Repo stars](https://img.shields.io/github/stars/VimYoung/Spell?style=for-the-badge&logo=Github&logoSize=auto&color=6AECE1&link=github.com%2FVimYoung%2FSpell)
+
 <p align="left">
   <br />
   <a href="https://github.com/VimYoung/Spell/issues">Report Bug</a>
@@ -15,10 +19,6 @@
   <br />
   <br />
 </p>
-
-![rust with crates.io](https://img.shields.io/badge/RUST-CRATES.IO-RED?style=for-the-badge&logo=Rust&logoSize=auto&color=%23fdacac&link=https%3A%2F%2Fcrates.io%2Fcrates%2Fspell-framework)
-![docs.rs (with version)](https://img.shields.io/docsrs/spell-framework/latest?style=for-the-badge&logo=docsdotrs&logoSize=auto&label=docs.rs&color=CBF3BB&link=https%3A%2F%2Fdocs.rs%2Fspell-framework%2Flatest%2Fspell_framework%2F)
-![GitHub Repo stars](https://img.shields.io/github/stars/VimYoung/Spell?style=for-the-badge&logo=Github&logoSize=auto&color=6AECE1&link=github.com%2FVimYoung%2FSpell)
 
 **Don't forget to star the project if you liked it 🌟🌟**
 
@@ -40,47 +40,34 @@ rust.
 > [!IMPORTANT]
 > Please provide your inputs to improve Spell.
 
-## When can we expect a stable release?
+## Features 🖊️
 
-I remember adding this section a few months age, now I can say that the first stable version is out!!.
-Add `spell-framework` in your project and give it a shot.
+1. **Simple frontend with fast backend:** Spell leverages slint for creating widgets,
+   which is extremely customisable while being easy to use. Backed by rust, the code remains
+   lightweight, memory safe and predictable.
+1. **Hot Reload:** Once the size of widget is set. Changes in slint code is reflected
+   as is in the widget. Leading to faster iterations on code.
+1. **Remote Accessibility:** Spell also ships a CLI to which state of widget can be made accessible,
+   enabling integration in compositor settings.
+1. **Prebuilt Material Components:** Spell's CLI can port slint's [material components](https://material.slint.dev/)
+   to your project, Just add `--material` when creating a starter project with `sp`.
+1. **Services:** (WIP) Spell also provides a vault with common functionalities like
+   app launcher backend, notification backend, MPRIS etc.
 
-## Inspiration :bulb:
-
-The project started as a personal repo for my own use. There is lack of widget
-creating tools in rust. Secondly, I had a question:
-
-> How the heck wayland works?
-
-So, to understand wayland and side-by-side create a client gave birth to Spell.
-I know a lot more about functioning of wayland than I did. Also, a framework
-developed that could be delivered in some time for others to use and create widgets
-in rust.
-
-## Installation and Usage :computer:
-
-> [!WARNING]
-> The crate is under active development and breaking changes are expected. Though both single widget
-> and multiple widgets event loops works fine, multi-widget gets unstable due to some changes in slint.
-> Multiwidget event loops are slow in niri than in hyprland, hide and show features of widgets work
-> flawlessly in niri but hangs in hyprland due to an underlying bug.
-
-Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
-to add appropriate patches and dependencies to use spell with slint.
-
-## Why Slint? :thinking:
-
-Slint because it is a simple yet powerful declarative lang that is extremely
-easy to learn (you can even get a sense in just few mins [here](https://docs.slint.dev/latest/docs/slint/guide/language/concepts/slint-language/)). Secondly, unlike
-other good UI kits, it just has awesome integration for rust. A compatibility that
-is hard to find.
-
-## Minimal Example :sparkles:
+## Minimal Example ✨
 
 > [!NOTE]
-> If you don't want to go through the husttle and simply want to
+> If you don't want to go through the hassle and simply want to jump over to
 > analyse the code, a ready-made starter spell project can be made
-> with command `sp new project-name`.
+> with command. Make sure spell-cli is installed.
+
+```
+# To install CLI
+cargo install spell-cli
+
+# To create a starter project
+sp new project-name
+```
 
 Create a new project with `cargo new project_name`. Let's start by adding Slint and Spell as dependencies in your project's `Cargo.toml`.
 
@@ -184,7 +171,47 @@ mention that if you have defined width and height in both your window and in the
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
 The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
-## Batteries :battery:
+## When can we expect a stable release?
+
+I remember adding this section a few months age, now I can say that the first stable version is out!!.
+Add `spell-framework` in your project and give it a shot.
+
+> [!WARNING]
+> There will be some heavy breaking changes for making management of CLI access to
+> variables easier. `ForeignController` will essentially be replaced by a macro.
+> Leading to a much lighter window.
+
+## Inspiration 💡
+
+The project started as a personal repo for my own use. There is lack of widget
+creating tools in rust. Secondly, I had a question:
+
+> How the heck wayland works?
+
+So, to understand wayland and side-by-side create a client gave birth to Spell.
+I know a lot more about functioning of wayland than I did. Also, a framework
+developed that could be delivered in some time for others to use and create widgets
+in rust.
+
+## Installation and Usage 🖥️
+
+> [!WARNING]
+> The crate is under active development and breaking changes are expected. Though both single widget
+> and multiple widgets event loops works fine, multi-widget gets unstable due to some changes in slint.
+> Multiwidget event loops are slow in niri than in hyprland, hide and show features of widgets work
+> flawlessly in niri but hangs in hyprland due to an underlying bug.
+
+Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
+to add appropriate patches and dependencies to use spell with slint.
+
+## Why Slint? 🤔
+
+Slint because it is a simple yet powerful declarative lang that is extremely
+easy to learn (you can even get a sense in just few mins [here](https://docs.slint.dev/latest/docs/slint/guide/language/concepts/slint-language/)). Secondly, unlike
+other UI toolkits, it has awesome integration for rust. A compatibility that
+is hard to find.
+
+## Batteries 🔋
 
 Not a lot of batteries included for now, future implementations of common functionalities will occur
 in `vault` module of this crate. For now it has a AppSelector, which can be used to retrieve app information
@@ -196,9 +223,9 @@ that I haven't used them extensively myself (for now). For roadmap, view [here](
 2. [rusty-network-manger](https://crates.io/crates/rusty_network_manager): For network management.
 3. [bluer](https://docs.rs/bluer/latest/bluer/): For bluetooth management.
 
-## Contributing :raised_hands:
+## Contributing 🙌
 
-The library is still in an early stage. Yet I will encourage you try it out, feel free to open issues and even better, PRs for issues. Feature requests can be posted in the issues section itself, but since a lot of things are planned already, they will take a lower priority.
+The library is still in an early stage. Yet I will encourage you to try it out, feel free to open issues and even better, PRs for issues. Feature requests can be posted in the issues section itself, but since a lot of things are planned already, they will take a lower priority.
 
 ---
 
