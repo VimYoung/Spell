@@ -173,13 +173,25 @@ The same frontend code for this example can also be found in [slint-rust-templat
 
 ## When can we expect a stable release?
 
-I remember adding this section a few months age, now I can say that the first stable version is out!!.
-Add `spell-framework` in your project and give it a shot.
+I remember adding this section a few months ago, now I can say that the first stable version is out!!.
+Create a spell project and give it a shot.
 
 > [!WARNING]
 > There will be some heavy breaking changes for making management of CLI access to
 > variables easier. `ForeignController` will essentially be replaced by a macro.
 > Leading to a much lighter window.
+
+## Caution
+
+> [!WARNING]
+> The crate is under active development and breaking changes are expected.
+
+1. Multi-widget gets unstable sometimes due to changes in slint.
+2. Multiwidget event loops are slow in niri than in hyprland
+3. Hide and show features of widgets work flawlessly in niri but hangs in hyprland due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
+
+Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
+to add appropriate patches and dependencies to use spell with slint.
 
 ## Inspiration 💡
 
@@ -192,17 +204,6 @@ So, to understand wayland and side-by-side create a client gave birth to Spell.
 I know a lot more about functioning of wayland than I did. Also, a framework
 developed that could be delivered in some time for others to use and create widgets
 in rust.
-
-## Installation and Usage 🖥️
-
-> [!WARNING]
-> The crate is under active development and breaking changes are expected. Though both single widget
-> and multiple widgets event loops works fine, multi-widget gets unstable due to some changes in slint.
-> Multiwidget event loops are slow in niri than in hyprland, hide and show features of widgets work
-> flawlessly in niri but hangs in hyprland due to an underlying bug.
-
-Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
-to add appropriate patches and dependencies to use spell with slint.
 
 ## Why Slint? 🤔
 
