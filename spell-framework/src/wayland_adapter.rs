@@ -14,6 +14,7 @@ use crate::{
         way_helper::{KeyboardState, PointerState, set_config, set_event_sources},
     },
 };
+use i_slint_core::items::MouseCursor;
 pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
@@ -71,6 +72,7 @@ use tracing::{Level, info, span, trace, warn};
 
 mod fractional_scaling;
 mod lock_impl;
+mod slint_to_wl_cursor_mapping;
 mod viewporter;
 mod way_helper;
 mod win_impl;
@@ -178,6 +180,8 @@ impl SpellWin {
             pointer: None,
             pointer_data: None,
             cursor_shape: cursor_manager,
+            current_wayland_cursor: MouseCursor::Default,
+            last_cursor_enter_serial: None,
         };
 
         let keyboard_state = KeyboardState {
@@ -449,6 +453,10 @@ impl SpellWin {
             if elasped_time != 0 {
                 // debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
             }
+
+            self.states
+                .pointer_state
+                .update_cursor(self.adapter.current_cursor.get(), &qh);
 
             let buffer = &self.buffer;
             if self.first_configure || redraw_val {
@@ -920,6 +928,8 @@ impl SpellLock {
             pointer: None,
             pointer_data: None,
             cursor_shape: cursor_manager,
+            last_cursor_enter_serial: None,
+            current_wayland_cursor: MouseCursor::Default,
         };
         let mut spell_lock = SpellLock {
             loop_handle: event_loop.handle().clone(),

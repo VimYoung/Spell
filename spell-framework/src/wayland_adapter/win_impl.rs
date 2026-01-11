@@ -6,12 +6,9 @@ use slint::{
 };
 use smithay_client_toolkit::{
     output::OutputState,
-    reexports::{
-        client::{
-            Connection, QueueHandle,
-            protocol::{wl_pointer, wl_seat},
-        },
-        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+    reexports::client::{
+        Connection, QueueHandle,
+        protocol::{wl_pointer, wl_seat},
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -268,26 +265,13 @@ impl PointerHandler for SpellWin {
                 continue;
             }
             match event.kind {
-                Enter { .. } => {
-                    info!("Pointer entered: {:?}", event.position);
+                Enter { serial } => {
+                    trace!(
+                        "Pointer entered with serial {:?} at: {:?}",
+                        serial, event.position
+                    );
 
-                    // TODO this code is redundent, as it doesn't set the cursor shape.
-                    let pointer = &self.states.pointer_state.pointer.as_ref().unwrap();
-                    let serial_no: Option<u32> = self
-                        .states
-                        .pointer_state
-                        .pointer_data
-                        .as_ref()
-                        .unwrap()
-                        .latest_enter_serial();
-                    if let Some(no) = serial_no {
-                        self.states
-                            .pointer_state
-                            .cursor_shape
-                            .get_shape_device(pointer, qh)
-                            .set_shape(no, Shape::Pointer);
-                        // self.layer.commit();
-                    }
+                    self.states.pointer_state.last_cursor_enter_serial = Some(serial);
                 }
                 Leave { .. } => {
                     info!("Pointer left: {:?}", event.position);
