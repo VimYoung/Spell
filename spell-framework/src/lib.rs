@@ -32,6 +32,7 @@ pub mod layer_properties {
 }
 use dbus_window_state::{DataType, InternalHandle, deploy_zbus_service};
 pub use paste;
+pub use smithay_client_toolkit;
 use smithay_client_toolkit::reexports::calloop::channel::{Channel, Event, channel};
 use std::{
     any::Any,
@@ -261,6 +262,7 @@ pub trait SpellAssociated {
     }
 }
 
+/// Experimental code not ready for end use
 #[macro_export]
 macro_rules! invoke_spell {
     ($slint_win:ty, $name:expr, $window_conf:ident) => {{
@@ -345,7 +347,7 @@ macro_rules! invoke_spell {
                     self.way.on_call(state, set_callback, span_log)
             }
 
-            fn get_span(&self) -> tracing::span::Span {
+            fn get_span(&self) -> $crate::tracing::span::Span {
                 self.way.span.clone()
             }
         }
@@ -363,6 +365,54 @@ macro_rules! invoke_spell {
             way: way_win
         }
         }
+    }};
+}
+
+#[macro_export]
+macro_rules! cast_spell {
+    (
+    $waywindow:expr
+    // $(, $state:expr)?
+    // $(, $set_callback:expr)?
+    $(, callbacks: {
+            $(
+                fn $name:ident ( $( $arg:ident : $ty:ty ),* $(,)? );
+            )*
+        })?
+    $(, Notification:$noti_state:expr)?
+    $(,)?
+    ) => {{
+        $(
+            use $crate::smithay_client_toolkit::{
+                reexports::{
+                    calloop::{
+                        self,
+                        generic::Generic,
+        PostAction
+                        EventLoop,
+                        timer::{TimeoutAction, Timer},
+                    }
+                }
+            };
+            use std::os::unix::{net::UnixListener, io::AsRawFd};
+            let ui_weak = $waywindow.ui.as_weak();
+            let socket_path = "/tmp/calloop_test.sock";
+            let _ = std::fs::remove_file(socket_path); // Cleanup old socket
+            let listener = UnixListener::bind(socket_path)?;
+            listener.set_nonblocking(true)?;
+
+            $waywindow.way.loop_handle.insert_source(
+                Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+                |event_msg, _, data| {
+                    $(
+                        println!("{}", stringify!($name));
+                    );*
+                    // TimeoutAction::ToDuration(std::time::Duration::from_millis(1000))
+                    PostAction::Continue
+                },
+            );
+        )?
+        cast_spell($waywindow, None, None)
     }};
 }
 
@@ -386,10 +436,7 @@ macro_rules! invoke_spell {
 // 1. Disable log: should disable setting subscriber, generally for the project to use or for
 // someone to set their own.
 // 2. forge: provide a forge instance to run independently.
-// 3. exclusive_zone: true or false or with specified value.
-// 4. it should have the option to take a window_conf or directly the window configurations
-// into the macro, removing the need to define it previously.
-// 5. monitor: Specify the monitor to show the widget in.
 // Also, a procedural macro to mimic the functionalities of ForeignController.
 // Build a consistent error type to deal with CLI, dbus and window creation errors
 // (including window conf) more gracefully.
+// Provide natural scrolling option in SpellLock also.
