@@ -11,7 +11,9 @@ use crate::{
     wayland_adapter::{
         fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
         viewporter::{Viewport, ViewporterState},
-        way_helper::{KeyboardState, PointerState, set_config, set_event_sources},
+        way_helper::{
+            KeyboardState, PointerState, UsernamePassConvo, set_config, set_event_sources,
+        },
     },
 };
 pub use lock_impl::SpellSlintLock;
@@ -304,7 +306,6 @@ impl SpellWin {
             win.states
                 .output_state
                 .outputs()
-                .into_iter()
                 .filter_map(|output| {
                     let info = win.states.output_state.info(&output)?;
                     Some((info.name?, output))
@@ -1216,36 +1217,6 @@ delegate_registry!(SpellLock);
 delegate_pointer!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
-// TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
-
-/// A basic Conversation that assumes that any "regular" prompt is for
-/// the username, and that any "masked" prompt is for the password.
-///
-/// A typical Conversation will provide the user with an interface
-/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
-struct UsernamePassConvo {
-    username: String,
-    password: String,
-}
-
-// ConversationAdapter is a convenience wrapper for the common case
-// of only handling one request at a time.
-impl ConversationAdapter for UsernamePassConvo {
-    fn prompt(&self, _request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
-        Ok(std::ffi::OsString::from(&self.username))
-    }
-
-    fn masked_prompt(
-        &self,
-        _request: impl AsRef<std::ffi::OsStr>,
-    ) -> PamResult<std::ffi::OsString> {
-        Ok(std::ffi::OsString::from(&self.password))
-    }
-
-    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
-
-    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
-}
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

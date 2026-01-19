@@ -1,4 +1,5 @@
 use crate::{configure::HomeHandle, layer_properties::WindowConf, wayland_adapter::SpellWin};
+use nonstick::{ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder};
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::{
@@ -287,4 +288,35 @@ pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handl
             },
         )
         .unwrap();
+}
+
+// TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
+
+/// A basic Conversation that assumes that any "regular" prompt is for
+/// the username, and that any "masked" prompt is for the password.
+///
+/// A typical Conversation will provide the user with an interface
+/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
+pub(crate) struct UsernamePassConvo {
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+// ConversationAdapter is a convenience wrapper for the common case
+// of only handling one request at a time.
+impl ConversationAdapter for UsernamePassConvo {
+    fn prompt(&self, _request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        Ok(std::ffi::OsString::from(&self.username))
+    }
+
+    fn masked_prompt(
+        &self,
+        _request: impl AsRef<std::ffi::OsStr>,
+    ) -> PamResult<std::ffi::OsString> {
+        Ok(std::ffi::OsString::from(&self.password))
+    }
+
+    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
+
+    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
 }
