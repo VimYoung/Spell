@@ -710,18 +710,19 @@ impl FractionalScaleHandler for SpellWin {
         let scale_factor: f32 = scale as f32 / 120.0;
         let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
         let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
-        self.adapter.scale_factor.set(scale_factor);
-        self.states
-            .viewporter
-            .as_ref()
-            .unwrap()
-            .set_destination(width as i32, height as i32);
+        info!("Physical Size: width: {}, height: {}", width, height);
+        // self.adapter.scale_factor.set(scale_factor);
         self.states.viewporter.as_ref().unwrap().set_source(
             0.,
             0.,
             self.adapter.size.get().width.into(),
             self.adapter.size.get().height.into(),
         );
+        self.states
+            .viewporter
+            .as_ref()
+            .unwrap()
+            .set_destination(width as i32, height as i32);
         // self.adapter
         //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
         //     .unwrap();
