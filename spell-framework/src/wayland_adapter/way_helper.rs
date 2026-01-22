@@ -1,5 +1,5 @@
 use crate::{configure::HomeHandle, layer_properties::WindowConf, wayland_adapter::SpellWin};
-use nonstick::{ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder};
+use nonstick::{ConversationAdapter, Result as PamResult};
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::{

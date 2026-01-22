@@ -1,8 +1,10 @@
 pub mod constantvals;
 use constantvals::{
-    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, LOGS_HELP, MAIN_FILE, MAIN_HELP,
+    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_FILE,
+    MAIN_HELP,
 };
 use core::panic;
+use futures_util::stream::StreamExt;
 use std::{
     env::{self, Args},
     fs::{self, OpenOptions},
@@ -11,7 +13,39 @@ use std::{
     path::Path,
     process::Command,
 };
-use zbus::{Connection, Result as BusResult, proxy};
+use zbus::{Connection, Result as BusResult, proxy, zvariant::OwnedObjectPath};
+
+#[proxy(
+    default_path = "/net/reactivated/Fprint/Manager",
+    default_service = "net.reactivated.Fprint",
+    interface = "net.reactivated.Manager"
+)]
+trait FprintdManagerClient {
+    fn get_default_device(&self) -> Result<OwnedObjectPath, SpellError>;
+    fn get_devices(&self) -> Result<Vec<OwnedObjectPath>, SpellError>;
+}
+
+#[proxy(
+    default_path = "/net/reactivated/Fprint/Device/0",
+    default_service = "net.reactivated.Fprint",
+    interface = "net.reactivated.Fprint.Device"
+)]
+trait FprintdClient {
+    #[zbus(signal)]
+    fn enroll_status(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn verify_status(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn verify_finger_selected(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn name(&self) -> zbus::Result<String>;
+    fn claim(&self, username: &str) -> Result<(), SpellError>;
+    fn enroll_start(&self, finger_name: &str) -> Result<(), SpellError>;
+    fn enroll_stop(&self) -> Result<(), SpellError>;
+    fn verify_start(&self, finger_name: &str) -> Result<(), SpellError>;
+    fn verify_stop(&self) -> Result<(), SpellError>;
+    fn list_enrolled_fingers(&self, username: &str) -> Result<Vec<String>, SpellError>;
+}
 
 #[proxy(
     default_path = "/org/VimYoung/VarHandler",
@@ -92,6 +126,18 @@ async fn main() -> Result<(), SpellError> {
             // List the running instancs of windows and subwindows.
             "list" => Ok(()),
             "--help" | "-h" => show_help(None),
+            "fprint" => {
+                match values.next() {
+                Some(fprint_sub) => match fprint_sub.trim() {
+                    "--help" => show_help(Some("fprint")),
+                    "list" => fingerprint(Fprint::List).await,
+                    "enroll" => fingerprint(Fprint::Enroll).await,
+                    "verify" =>fingerprint(Fprint::Verify).await,
+                    sub => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub}\" doesn't exist, use `spell --help` to view available commands"))))
+                }
+                None => fingerprint(Fprint::List).await
+                }
+            },
             _ => {
                 if sub_command.starts_with('-') || sub_command.starts_with("--") {
                     Err(SpellError::CLI(Cli::BadSubCommand(format!(
@@ -127,6 +173,9 @@ async fn main() -> Result<(), SpellError> {
                                 "Value is not supported" => eprintln!(
                                     "[Parse Error]: Given Value for key couldn't be parsed."
                                 ),
+                                "Sender is not authorized to send message" => eprintln!(
+                                    "List couldn't currently display devices and fingerprints. Use `fprintd-list` instead if installed"
+                                ),
                                 _ => eprintln!(
                                     "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes. {value}"
                                 ),
@@ -154,6 +203,96 @@ async fn main() -> Result<(), SpellError> {
     } else {
         let _ = show_help(None);
     }
+    Ok(())
+}
+
+async fn fingerprint(fprint: Fprint) -> Result<(), SpellError> {
+    let conn_system = Connection::system().await?;
+    let proxy = FprintdClientProxy::new(&conn_system).await?;
+    match fprint {
+        Fprint::Enroll => enroll_fingerprint(&proxy).await?,
+        Fprint::Verify => verify_fingerprint(&proxy).await?,
+        Fprint::List => {
+            // TODO this functionality doesn't work currently, fix it.
+            let manager_proxy = FprintdManagerClientProxy::new(&conn_system).await?;
+            list_devices_and_fingerprints(&conn_system, &manager_proxy).await?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn list_devices_and_fingerprints(
+    conn_system: &Connection,
+    manager_proxy: &FprintdManagerClientProxy<'_>,
+) -> Result<(), SpellError> {
+    let devices = manager_proxy.get_devices().await?;
+    println!("swenvferjkdvff");
+    for (manager_index, device) in devices.iter().enumerate() {
+        println!("{:?}", device);
+        let proxy = FprintdClientProxy::builder(conn_system)
+            .path(device)?
+            .build()
+            .await?;
+        println!("Device {}: {}", manager_index, proxy.name().await?);
+        let fingerprints = proxy.list_enrolled_fingers("").await?;
+        for (index, fingerprint) in fingerprints.iter().enumerate() {
+            println!("    Fingerprint {}: {}", index, fingerprint);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn verify_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result<(), SpellError> {
+    proxy.claim("").await?;
+    let fingerprints = proxy.list_enrolled_fingers("").await?;
+    for finger in fingerprints {
+        proxy.verify_start(&finger).await?;
+        while let Some(msg) = proxy.receive_verify_status().await?.next().await {
+            // struct `JobNewArgs` is generated from `job_new` signal function arguments
+            let args: VerifyStatusArgs<'_> = msg.args().expect("Error parsing message");
+            println!("Result={}", args.result);
+            if args.done {
+                break;
+            }
+        }
+        proxy.verify_stop().await?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result<(), SpellError> {
+    let mut finger_str = String::from("");
+    println!("Make sure that a polkit agent is up and running!!");
+    print!(
+        r#"Enter Fingerprint type (Available options):
+            Value               : Meaning
+            left-thumb          : Left thumb
+            left-index-finger   : Left index finger
+            left-middle-finger  : Left middle finger
+            left-ring-finger    : Left ring finger
+            left-little-finger  : Left little finger
+            right-thumb         : Right thumb
+            right-index-finger  : Right index finger
+            right-middle-finger : Right middle finger
+            right-ring-finger   : Right ring finger
+            right-little-finger : Right little finger 
+            :"#
+    );
+    io::stdin()
+        .read_line(&mut finger_str)
+        .expect("unable to read finger type");
+    proxy.claim("").await?;
+    proxy.enroll_start(finger_str.trim()).await?;
+    while let Some(msg) = proxy.receive_enroll_status().await?.next().await {
+        // struct `JobNewArgs` is generated from `job_new` signal function arguments
+        let args: EnrollStatusArgs<'_> = msg.args().expect("Error parsing message");
+
+        println!("Result={}", args.result);
+        if args.done {
+            break;
+        }
+    }
+    proxy.enroll_stop().await?;
     Ok(())
 }
 
@@ -264,6 +403,7 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
             match sub_comm {
                 "log" => println!("{LOGS_HELP}"),
                 "enable" => println!("{ENABLE_HELP}"),
+                "fprint" => println!("{FPRINT_HELP}"),
                 _ => {}
             }
             Ok(())
@@ -310,14 +450,6 @@ async fn update_value(
         Ok(())
     }
 }
-
-enum LogType {
-    Slint,
-    Debug,
-    Dump,
-    Dev,
-}
-
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
 // Currently Buserror is not being used. THis requires type implementations
@@ -347,6 +479,19 @@ impl From<zbus::Error> for SpellError {
     fn from(value: zbus::Error) -> Self {
         SpellError::Buserror(value)
     }
+}
+
+enum Fprint {
+    Enroll,
+    List,
+    Verify,
+}
+
+enum LogType {
+    Slint,
+    Debug,
+    Dump,
+    Dev,
 }
 
 // TODO write man docs for the command line tool and its Config if expanded further.

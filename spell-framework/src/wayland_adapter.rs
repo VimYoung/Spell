@@ -1184,6 +1184,7 @@ impl SpellAssociated for SpellLock {
 
 /// Struct to handle unlocking of a SpellLock instance. It can be captured from
 /// [`SpellLock::get_handler`].
+#[derive(Debug, Clone)]
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
@@ -1207,8 +1208,41 @@ impl LockHandle {
             }
         });
     }
-}
 
+    pub fn verify_fingerprint<Vfc: FnOnce(String) + Send + Sync + 'static>(
+        &self,
+        verify_fail: Vfc,
+    ) {
+        // verify_start();
+        let handle = Arc::new(RwLock::new(self.clone()));
+        std::thread::spawn(move || {
+            let output = Command::new("sp").arg("fprint").arg("verify").output();
+            match output {
+                Ok(val) => {
+                    let verify_output = String::from_utf8(val.stdout).unwrap();
+                    if &verify_output == "Result=verify-match" {
+                    match handle.try_read() {
+                            Ok(val) => {
+                                val.0.insert_idle(move |app_data| {
+                                    if app_data
+                                        .unlock(username.as_deref(), &password, on_unlock_callback)
+                                        .is_err()
+                                    {
+                                        on_err_callback();
+                                    }
+                                });
+                            }
+                            Err(err) => warn!("Fingerprint verified but couldn't unlock. Err: {err}", );
+                        }
+                    } else {
+                        verify_fail(verify_output);
+                    }
+                }
+                Err(err) => warn!("Error running verification. Error: {}", err),
+            }
+        });
+    }
+}
 delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
