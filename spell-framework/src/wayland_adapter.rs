@@ -21,7 +21,10 @@ pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
-use slint::{PhysicalSize, platform::Key};
+use slint::{
+    PhysicalSize,
+    platform::{Key, WindowAdapter},
+};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor,
@@ -712,21 +715,27 @@ impl FractionalScaleHandler for SpellWin {
         let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
         let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
         info!("Physical Size: width: {}, height: {}", width, height);
-        // self.adapter.scale_factor.set(scale_factor);
-        self.states.viewporter.as_ref().unwrap().set_source(
-            0.,
-            0.,
-            self.adapter.size.get().width.into(),
-            self.adapter.size.get().height.into(),
-        );
-        self.states
-            .viewporter
-            .as_ref()
-            .unwrap()
-            .set_destination(width as i32, height as i32);
-        // self.adapter
-        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
-        //     .unwrap();
+
+        self.adapter.scale_factor.set(scale_factor);
+        // TODO I can't get the viewporter to work properly. Currently spell
+        // relies on the scaling by the compositor itself. Technically all crap of
+        // related to scaling can be removed.
+        // self.states.viewporter.as_ref().unwrap().set_source(
+        //     0.,
+        //     0.,
+        //     self.adapter.size.get().width.into(),
+        //     self.adapter.size.get().height.into(),
+        // );
+        //
+        // self.states
+        //     .viewporter
+        //     .as_ref()
+        //     .unwrap()
+        //     .set_destination(width as i32, height as i32);
+        self.adapter
+            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+            .unwrap();
+        self.adapter.request_redraw();
         self.layer.as_ref().unwrap().commit();
     }
 }
@@ -744,19 +753,6 @@ impl LayerShellHandler for SpellWin {
         _configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        // THis error TODO find if it is necessary.
-        // self.adapter.size.width = NonZeroU32::new(configure.new_size.0).map_or(256, NonZeroU32::get);
-        // self.adapter.size.height =
-        //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
-
-        // Initiate the first draw.
-        // println!("Config event is called");
-        if !self.first_configure {
-            // debug!("[{}]: First draw called", self.layer_name);
-            self.first_configure = true;
-        } else {
-            // debug!("[{}]: First draw called", self.layer_name);
-        }
         self.converter(qh);
     }
 }
