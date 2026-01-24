@@ -147,3 +147,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     cast_spell(waywindow, None, None)
 }
 "#;
+
+pub const SPELL_PAM_FPRINT: &str = r#"Make sure that a polkit agent is up and running!!
+Also `login` file in `/etc/pam.d/` should have following line in top below comments:
+auth      sufficient pam_fprintd.so
+"#;

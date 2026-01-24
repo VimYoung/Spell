@@ -1,7 +1,7 @@
 pub mod constantvals;
 use constantvals::{
     APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_FILE,
-    MAIN_HELP,
+    MAIN_HELP, SPELL_PAM_FPRINT,
 };
 use core::panic;
 use futures_util::stream::StreamExt;
@@ -156,15 +156,10 @@ async fn main() -> Result<(), SpellError> {
             // TODO below code can be avoided by implementing Debug manually for the erum
             match recieved_error {
                 SpellError::CLI(cli) => match cli {
-                    Cli::BadSubCommand(err) => {
-                        eprintln!("[Bad Sub-command]: {err}");
-                    }
-                    Cli::UndefinedArg(err) => {
-                        eprintln!("[Undefined Arg]: {err}");
-                    }
-                    Cli::UnknownVal(err) => {
-                        eprintln!("[Unknown Value] {err}");
-                    }
+                    Cli::BadSubCommand(err) => eprintln!("[Bad Sub-command]: {err}"),
+                    Cli::UndefinedArg(err) => eprintln!("[Undefined Arg]: {err}"),
+                    Cli::UnknownVal(err) => eprintln!("[Unknown Value] {err}"),
+                    Cli::UndeclaredVal(err) => eprintln!("[Undeclared Content]: {err}"),
                 },
                 SpellError::Buserror(bus_error) => match bus_error {
                     zbus::Error::MethodError(rare_err_1, err_val, rare_err_2) => {
@@ -261,8 +256,8 @@ pub(crate) async fn verify_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result
 }
 
 pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result<(), SpellError> {
+    println!("{}", SPELL_PAM_FPRINT);
     let mut finger_str = String::from("");
-    println!("Make sure that a polkit agent is up and running!!");
     print!(
         r#"Enter Fingerprint type (Available options):
             Value               : Meaning
@@ -467,6 +462,7 @@ pub enum Cli {
     BadSubCommand(String),
     UndefinedArg(String),
     UnknownVal(String),
+    UndeclaredVal(String),
 }
 
 impl From<std::io::Error> for SpellError {
