@@ -21,10 +21,10 @@ Sub-commands:
     list: Lists the running instances of windows created by spell-framework.
 
 Arguments:
-    --layer | -l :  Specifies the name of layer (aka window) to be used for specific commands. Use
+    --layer | -l:   Specifies the name of layer (aka window) to be used for specific commands. Use
                     unique names of layers to avoid undefined behaviour. Required by
                     update, look, show and hide sub commands.
-    --help | -h :   Shows this help message.
+    --help | -h:    Shows this help message.
     --version | -v: Displays the version of spell-cli.
 ";
 
@@ -48,6 +48,21 @@ Arguments:
                     logs can't be specified on the basis of layer_name.
     --help | -h :   Shows this help message.
 ";
+
+pub const FPRINT_HELP: &str = "
+Usage: spell-cli fprint [<argument>] [sub-command]
+
+`fprint` subcommand is used to enroll, verify and list fingerprints.
+
+Sub-commands:
+    enroll: Specify the finger and register its fingerprint. Make Sure that a polkit
+            agent and fprintd service are up and running.
+    verify: Opens the sensor for verification for a fingerprint.
+    list:   (WIP) Lists available fingerprint sensors along with enrolled fingerprints.
+Argument:
+    --help | -h :   Shows this help message.
+";
+
 pub const ENABLE_HELP: &str = "
 Usage: spell-cli enable [<argument>] [sub-command] ...
 
@@ -131,4 +146,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
     cast_spell(waywindow, None, None)
 }
+"#;
+
+pub const SPELL_PAM_FPRINT: &str = r#"Make sure that a polkit agent is up and running!!
+Also `login` file in `/etc/pam.d/` should have following line in top below comments:
+auth      sufficient pam_fprintd.so
 "#;

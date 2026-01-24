@@ -1,5 +1,5 @@
 use crate::{configure::HomeHandle, layer_properties::WindowConf, wayland_adapter::SpellWin};
-use nonstick::{ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder};
+use nonstick::{ConversationAdapter, Result as PamResult};
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::{
@@ -23,7 +23,7 @@ use std::{
     io::{BufReader, prelude::*},
     time::Duration,
 };
-use tracing::warn;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 pub(super) fn set_config(
@@ -305,18 +305,43 @@ pub(crate) struct UsernamePassConvo {
 // ConversationAdapter is a convenience wrapper for the common case
 // of only handling one request at a time.
 impl ConversationAdapter for UsernamePassConvo {
-    fn prompt(&self, _request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+    fn prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        info!("Request: {:?}", request.as_ref());
         Ok(std::ffi::OsString::from(&self.username))
     }
 
-    fn masked_prompt(
-        &self,
-        _request: impl AsRef<std::ffi::OsStr>,
-    ) -> PamResult<std::ffi::OsString> {
+    fn masked_prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        info!("Masked Request: {:?}", request.as_ref());
         Ok(std::ffi::OsString::from(&self.password))
     }
 
-    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
+    fn error_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        warn!("Ignored Error Message: {:?}", message.as_ref());
+    }
 
-    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
+    fn info_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        warn!("Ignored Info Message: {:?}", message.as_ref());
+    }
+}
+
+pub(crate) struct FingerprintInfo;
+
+impl ConversationAdapter for FingerprintInfo {
+    fn prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        warn!("Ignored Prompt: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(""))
+    }
+
+    fn masked_prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        warn!("Ignored masked prompt: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(""))
+    }
+
+    fn info_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        info!("Info Message: {:?}", message.as_ref());
+    }
+
+    fn error_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        info!("Error Message: {:?}", message.as_ref());
+    }
 }

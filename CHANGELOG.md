@@ -6,10 +6,16 @@ Changes:
   Following new configurations are added.
   - `monitor_name`: specify the monitor to display the widget.
   - `natural_scroll`: Whether to enable natural scrolling. (Default: false)
+- Added fingerprint support in SpellLock. Now, You can make your lockscreens open by fingerprint.
 - Experimental macro addition (not ready for usage) to combine wayland and slint
   UIs into a single variable. This removes the need to manage two separate variables
   (for wayland and slint separately) for same widget.
 - Addition of Notification manager for accessing and creating notification centers.
+
+Changes(spell-cli):
+
+- Addition of `fprint` subcommand to add enroll, verify and list fingerprints for the
+  purpose of being used in SpellLock.
 
 # 1.0.1 & 1.0.1 CLI (25-12-27)
 

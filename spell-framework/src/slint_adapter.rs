@@ -38,7 +38,6 @@ use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
-
 pub struct SpellLayerShell {
     /// An instance of [SpellSkiaWinAdapter].
     pub window_adapter: Rc<SpellSkiaWinAdapter>,

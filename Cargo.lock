@@ -4590,6 +4590,7 @@ dependencies = [
 name = "spell-cli"
 version = "1.0.1"
 dependencies = [
+ "futures-util",
  "slint-build",
  "spell-framework 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",

@@ -12,7 +12,8 @@ use crate::{
         fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
         viewporter::{Viewport, ViewporterState},
         way_helper::{
-            KeyboardState, PointerState, UsernamePassConvo, set_config, set_event_sources,
+            FingerprintInfo, KeyboardState, PointerState, UsernamePassConvo, set_config,
+            set_event_sources,
         },
     },
 };
@@ -898,7 +899,7 @@ impl SpellLock {
     /// slint windows to create a lockscreen.
     pub fn invoke_lock_spell() -> Self {
         let conn = Connection::connect_to_env().unwrap();
-
+        let _ = set_up_tracing("SpellLock");
         let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
         let qh: QueueHandle<SpellLock> = event_queue.handle();
         let registry_state = RegistryState::new(&globals);
@@ -1114,6 +1115,35 @@ impl SpellLock {
         // of the canvas.
     }
 
+    fn unlock_finger(&mut self) -> PamResult<()> {
+        let finger = FingerprintInfo;
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+            .output()
+            .expect("Couldn't retrive username");
+
+        let val = String::from_utf8_lossy(&output.stdout);
+        let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+        let user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
+
+        let mut txn = TransactionBuilder::new_with_service("login")
+            .username(user_name)
+            .build(finger.into_conversation())?;
+        // If authentication fails, this will return an error.
+        // We immediately give up rather than re-prompting the user.
+        txn.authenticate(AuthnFlags::empty())?;
+        txn.account_management(AuthnFlags::empty())?;
+        if let Some(locked_val) = self.session_lock.take() {
+            locked_val.unlock();
+        } else {
+            warn!("Authentication verified but couldn't unlock");
+        }
+        self.is_locked = false;
+        self.conn.roundtrip().unwrap();
+        Ok(())
+    }
+
     fn unlock(
         &mut self,
         username: Option<&str>,
@@ -1151,6 +1181,8 @@ impl SpellLock {
         on_unlock_callback();
         if let Some(locked_val) = self.session_lock.take() {
             locked_val.unlock();
+        } else {
+            warn!("Authentication verified but couldn't unlock");
         }
         self.is_locked = false;
         self.conn.roundtrip().unwrap();
@@ -1185,6 +1217,7 @@ impl SpellAssociated for SpellLock {
 
 /// Struct to handle unlocking of a SpellLock instance. It can be captured from
 /// [`SpellLock::get_handler`].
+#[derive(Debug, Clone)]
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
@@ -1208,8 +1241,18 @@ impl LockHandle {
             }
         });
     }
-}
 
+    pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce()>) {
+        self.0.insert_idle(move |app_data| {
+            if let Err(err) = app_data.unlock_finger() {
+                println!("{:?}", err);
+                error_callback();
+            } else {
+                println!("Passed");
+            }
+        });
+    }
+}
 delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
