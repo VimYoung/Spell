@@ -21,9 +21,9 @@ Sub-commands:
     list: Lists the running instances of windows created by spell-framework.
 
 Arguments:
-    --layer | -l:   Specifies the name of layer (aka window) to be used for specific commands. Use
-                    unique names of layers to avoid undefined behaviour. Required by
-                    update, look, show and hide sub commands.
+    --layer | -l:   Specifies the name of layer (aka window) to be used for specific
+                    commands. Use unique names of layers to avoid undefined behaviour.
+                    Required by update, look, show and hide sub commands.
     --help | -h:    Shows this help message.
     --version | -v: Displays the version of spell-cli.
 ";

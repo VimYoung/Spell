@@ -32,6 +32,7 @@ pub mod layer_properties {
 }
 use dbus_window_state::{DataType, InternalHandle, deploy_zbus_service};
 pub use paste;
+pub use smithay_client_toolkit;
 use smithay_client_toolkit::reexports::calloop::channel::{Channel, Event, channel};
 use std::{
     any::Any,
@@ -84,6 +85,15 @@ pub trait ForeignController: Send + Sync + std::fmt::Debug {
     /// It is a type needed internally, it's implementation should return `self` to
     /// avoid undefined behaviour.
     fn as_any(&self) -> &dyn Any;
+}
+
+pub trait IpcController {
+    /// On calling `spell-cli -l layer_name look
+    /// var_name`, the cli calls `get_type` method of the trait with `var_name` as input.
+    fn get_type(&self, key: &str) -> DataType;
+    /// It is called on `spell-cli -l layer_name update key value`. `as_any` is for syncing the changes
+    /// internally for now and need not be implemented by the end user.
+    fn change_val(&mut self, key: &str, val: DataType);
 }
 
 pub type State = Arc<RwLock<dyn ForeignController>>;
@@ -368,6 +378,97 @@ macro_rules! generate_widgets {
             )?
         }
     };
+}
+
+#[macro_export]
+macro_rules! cast_spell {
+    (
+    $waywindow:expr
+    // $(, $state:expr)?
+    // $(, $set_callback:expr)?
+    $(, callbacks: {
+            $(
+                fn $name:ident ( /*$arg:ident : */$ty:ty );
+            )*
+        })?
+    $(, Notification:$noti_state:expr)?
+    $(,)?
+    ) => {{
+        $(
+            use $crate::smithay_client_toolkit::{
+                reexports::{
+                    calloop::{
+                        self,
+                        generic::Generic, PostAction,
+                        EventLoop,
+                        timer::{TimeoutAction, Timer},
+                    }
+                }
+            };
+            use $crate::tracing;
+            use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
+            let ui_weak = $waywindow.ui.as_weak();
+            let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
+            let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
+            let listener = UnixListener::bind(&socket_path)?;
+            listener.set_nonblocking(true)?;
+            let handle_weak = $waywindow.ui.as_weak().clone();
+            $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
+            // {
+            //     impl IpcController for  {
+            //         // add code here
+            //     }
+            // }
+            $waywindow.way.loop_handle.clone().insert_source(
+                Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+                move |_, meta, data| {
+                    println!("{:?}", meta);
+                    loop {
+                        // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
+                        match meta.accept() {
+                            Ok((mut stream, _addr)) => {
+                                let mut request = String::new();
+                                // tracing::info!("new connection");
+                                if let Err(err) = stream.read_to_string(&mut request) {
+                                    // tracing::warn!("Couldn't read CLI stream");
+                                }
+                                let (operation, command_args) = request.split_once(" ").unwrap();
+                                let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
+                                println!("Operation:{}, Command {}, args: {}",operation, command, args);
+                                match operation {
+                                    "hide" => data.hide(),
+                                    "show" => data.show_again(),
+                                    // "update" => match format!("set_{}",command).as_str() {
+                                    //     $(
+                                    //         stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                                    //     );*
+                                    //     _=> {}
+                                    // },
+                                    "update" =>
+                                    "look"=> {},
+                                    _=> {}
+                                }
+                            }
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                break; // drained all pending connections
+                            }
+                            Err(e) => {
+                                // tracing::warn!("Error Reading Socket: {e}");
+                                break;
+                            }
+                        }
+                    }
+
+                    $(
+                        // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                        println!("dcfv {}", stringify!($name));
+                    );*
+                    Ok(PostAction::Continue)
+                },
+            );
+        )?
+        cast_spell($waywindow, None, None)
+    }};
 }
 
 // TODO set logging values in Option so that only a single value reads or writes.

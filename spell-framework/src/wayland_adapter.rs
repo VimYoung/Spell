@@ -3,7 +3,7 @@
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
 use crate::{
-    SpellAssociated, State,
+    IpcController, SpellAssociated, State,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
     delegate_fractional_scale, delegate_viewporter, helper_fn_for_deploy,
@@ -108,14 +108,15 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
+    pub ipc_controller: Option<Box<dyn IpcController>>,
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
-    pub(crate) first_configure: bool,
+    pub(crate) first_configure: Cell<bool>,
     pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
-    pub(crate) layer_name: String,
+    pub layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
@@ -212,6 +213,7 @@ impl SpellWin {
 
         let mut win = SpellWin {
             adapter: adapter_value,
+            ipc_controller: None,
             loop_handle: event_loop.handle(),
             queue: qh.clone(),
             buffer: way_pri_buffer,
@@ -225,7 +227,7 @@ impl SpellWin {
                 viewporter: None,
             },
             layer: None,
-            first_configure: true,
+            first_configure: Cell::new(true),
             natural_scroll: window_conf.natural_scroll,
             is_hidden: Cell::new(false),
             layer_name: layer_name.clone(),
@@ -346,7 +348,7 @@ impl SpellWin {
     }
 
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
-    pub fn show_again(&mut self) {
+    pub fn show_again(&self) {
         if self.is_hidden.replace(false) {
             info!("Win: Showing window again");
             let qh = self.queue.clone();
@@ -440,7 +442,7 @@ impl SpellWin {
         );
     }
 
-    fn converter(&mut self, qh: &QueueHandle<Self>) {
+    fn converter(&self, qh: &QueueHandle<Self>) {
         slint::platform::update_timers_and_animations();
         let width: u32 = self.adapter.size.get().width;
         let height: u32 = self.adapter.size.get().height;
@@ -456,9 +458,9 @@ impl SpellWin {
             }
 
             let buffer = &self.buffer;
-            if self.first_configure || redraw_val {
+            if self.first_configure.get() || redraw_val {
                 // if self.first_configure {
-                self.first_configure = false;
+                self.first_configure.set(false);
                 self.layer.as_ref().unwrap().wl_surface().damage_buffer(
                     0,
                     0,
