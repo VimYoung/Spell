@@ -108,7 +108,6 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
-    pub ipc_controller: Option<Box<dyn IpcController>>,
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
@@ -213,7 +212,6 @@ impl SpellWin {
 
         let mut win = SpellWin {
             adapter: adapter_value,
-            ipc_controller: None,
             loop_handle: event_loop.handle(),
             queue: qh.clone(),
             buffer: way_pri_buffer,

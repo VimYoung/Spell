@@ -90,10 +90,40 @@ pub trait ForeignController: Send + Sync + std::fmt::Debug {
 pub trait IpcController {
     /// On calling `spell-cli -l layer_name look
     /// var_name`, the cli calls `get_type` method of the trait with `var_name` as input.
-    fn get_type(&self, key: &str) -> DataType;
+    fn get_type(&self, key: &str) -> String;
     /// It is called on `spell-cli -l layer_name update key value`. `as_any` is for syncing the changes
     /// internally for now and need not be implemented by the end user.
-    fn change_val(&mut self, key: &str, val: DataType);
+    fn change_val(&mut self, key: &str, val: &str);
+}
+
+pub trait IpcDispatcher {
+    fn get_type(&self, key: &str) -> String;
+    fn change_val(&mut self, key: &str, val: &str);
+}
+
+trait IpcDispatchImpl {
+    fn get_type_impl(&self, key: &str) -> String;
+    fn change_val_impl(&mut self, key: &str, val: &str);
+}
+
+impl<T> IpcDispatchImpl for T {
+    fn get_type_impl(&self, _key: &str) {
+        // default: do nothing
+    }
+
+    fn change_val_impl(&mut self, _key: &str, _val: &str) {
+        // default: do nothing
+    }
+}
+
+impl<U: IpcController> IpcDispatchImpl for U {
+    fn get_type_impl(&self, key: &str) -> String {
+        self.get_type(key)
+    }
+
+    fn change_val_impl(&mut self, key: &str, val: &str) {
+        self.change_val(key, val)
+    }
 }
 
 pub type State = Arc<RwLock<dyn ForeignController>>;
@@ -276,6 +306,8 @@ macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
         use $crate::wayland_adapter::WinHandle;
         use $crate::tracing;
+        // use $crate::{IpcController, IpcDispatcher};
+
         $crate::paste::paste! {
             $(
                 struct [<$slint_win Spell>] {
@@ -288,6 +320,16 @@ macro_rules! generate_widgets {
                         f.debug_struct("Spell")
                         .field("wayland_side:", &self.way) // Add fields by name
                         .finish() // Finalize the struct formatting
+                    }
+                }
+
+                impl IpcDispatcher for [<$slint_win Spell>] {
+                    fn get_type(&self, key: &str) {
+                        self.get_type_impl(key)
+                    }
+
+                    fn change_val(&mut self, key: &str, val: &str) {
+                        self.change_val_impl(key, val)
                     }
                 }
 
@@ -352,6 +394,11 @@ macro_rules! generate_widgets {
                     pub fn get_handler(&self) -> WinHandle {
                         WinHandle(self.way.loop_handle.clone())
                     }
+
+                    pub fn parts(self) -> ($slint_win, SpellWin) {
+                        let [<$slint_win Spell>] { ui, way } = self;
+                        (ui, way)
+                    }
                 }
 
                 impl $crate::SpellAssociated for [<$slint_win Spell>] {
@@ -386,15 +433,15 @@ macro_rules! cast_spell {
     $waywindow:expr
     // $(, $state:expr)?
     // $(, $set_callback:expr)?
-    $(, callbacks: {
-            $(
-                fn $name:ident ( /*$arg:ident : */$ty:ty );
-            )*
-        })?
+    // $(, callbacks: {
+    //         $(
+    //             fn $name:ident ( /*$arg:ident : */$ty:ty );
+    //         )*
+    //     })?
     $(, Notification:$noti_state:expr)?
     $(,)?
     ) => {{
-        $(
+        //$(
             use $crate::smithay_client_toolkit::{
                 reexports::{
                     calloop::{
@@ -407,19 +454,14 @@ macro_rules! cast_spell {
             };
             use $crate::tracing;
             use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
-            let ui_weak = $waywindow.ui.as_weak();
             let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
             let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
             let listener = UnixListener::bind(&socket_path)?;
             listener.set_nonblocking(true)?;
-            let handle_weak = $waywindow.ui.as_weak().clone();
-            $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
-            // {
-            //     impl IpcController for  {
-            //         // add code here
-            //     }
-            // }
-            $waywindow.way.loop_handle.clone().insert_source(
+            // let handle_weak = $waywindow.ui.as_weak().clone();
+            // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
+            let (ui, way) = $waywindow.parts();
+            way.loop_handle.clone().insert_source(
                 Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
                 move |_, meta, data| {
                     println!("{:?}", meta);
@@ -444,8 +486,12 @@ macro_rules! cast_spell {
                                     //     );*
                                     //     _=> {}
                                     // },
-                                    "update" =>
-                                    "look"=> {},
+                                    "update" => {
+                                        IpcDispatcher::get_type(&ui,command);
+                                    }
+                                    "look"=> IpcDispatcher::change_val(&mut ui, command, args),
+                                    // TODO provide mechanism for custom calls from the below
+                                    // matching.
                                     _=> {}
                                 }
                             }
@@ -459,14 +505,14 @@ macro_rules! cast_spell {
                         }
                     }
 
-                    $(
-                        // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                        println!("dcfv {}", stringify!($name));
-                    );*
+                    // $(
+                    //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                    //     println!("dcfv {}", stringify!($name));
+                    // );*
                     Ok(PostAction::Continue)
                 },
             );
-        )?
+        //)?
         cast_spell($waywindow, None, None)
     }};
 }
