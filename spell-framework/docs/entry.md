@@ -24,11 +24,11 @@ Create a new project with `cargo new project_name`. Let's start by adding Slint 
 
 ```toml
 [dependencies]
-slint = { version = "1.13.1", features = ["renderer-software"] }
-spell = "1.0.0"
+slint = { version = "1.14.1", features = ["renderer-software"] }
+spell = "1.0.1"
 
 [build-dependencies]
-slint-build = "1.13.1"
+slint-build = "1.14.1"
 
 [patch.crates-io]
 slint = { git = "https://github.com/slint-ui/slint" }
@@ -94,14 +94,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         (5, 0, 0, 10),
         LayerType::Top,
         BoardType::None,
-        false,
+        None,
     );
 
     // Getting the window and its event_queue given the properties and a window name.
     let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
 
     // Slint specific code. Like initialising the window.
-    let ui = AppWindow::new().unwrap();
+    let ui = AppWindow::new()?;
 
     // Setting the callback closure value which will be called on when the button is clicked.
     ui.on_request_increase_value({
