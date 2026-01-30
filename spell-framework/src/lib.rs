@@ -96,36 +96,6 @@ pub trait IpcController {
     fn change_val(&mut self, key: &str, val: &str);
 }
 
-pub trait IpcDispatcher {
-    fn get_type(&self, key: &str) -> String;
-    fn change_val(&mut self, key: &str, val: &str);
-}
-
-trait IpcDispatchImpl {
-    fn get_type_impl(&self, key: &str) -> String;
-    fn change_val_impl(&mut self, key: &str, val: &str);
-}
-
-impl<T> IpcDispatchImpl for T {
-    fn get_type_impl(&self, _key: &str) {
-        // default: do nothing
-    }
-
-    fn change_val_impl(&mut self, _key: &str, _val: &str) {
-        // default: do nothing
-    }
-}
-
-impl<U: IpcController> IpcDispatchImpl for U {
-    fn get_type_impl(&self, key: &str) -> String {
-        self.get_type(key)
-    }
-
-    fn change_val_impl(&mut self, key: &str, val: &str) {
-        self.change_val(key, val)
-    }
-}
-
 pub type State = Arc<RwLock<dyn ForeignController>>;
 type States = Vec<Option<Box<dyn FnMut(State)>>>;
 /// This is the event loop which is to be called when initialising multiple windows through
@@ -306,7 +276,6 @@ macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
         use $crate::wayland_adapter::WinHandle;
         use $crate::tracing;
-        // use $crate::{IpcController, IpcDispatcher};
 
         $crate::paste::paste! {
             $(
@@ -320,16 +289,6 @@ macro_rules! generate_widgets {
                         f.debug_struct("Spell")
                         .field("wayland_side:", &self.way) // Add fields by name
                         .finish() // Finalize the struct formatting
-                    }
-                }
-
-                impl IpcDispatcher for [<$slint_win Spell>] {
-                    fn get_type(&self, key: &str) {
-                        self.get_type_impl(key)
-                    }
-
-                    fn change_val(&mut self, key: &str, val: &str) {
-                        self.change_val_impl(key, val)
                     }
                 }
 
@@ -401,20 +360,20 @@ macro_rules! generate_widgets {
                     }
                 }
 
-                impl $crate::SpellAssociated for [<$slint_win Spell>] {
-                    fn on_call(
-                        &mut self,
-                        state: Option<$crate::State>,
-                        set_callback: Option<Box<dyn FnMut($crate::State)>>,
-                        span_log: $crate::tracing::span::Span,
-                    ) -> Result<(), Box<dyn std::error::Error>> {
-                            self.way.on_call(state, set_callback, span_log)
-                    }
-
-                    fn get_span(&self) -> tracing::span::Span {
-                        self.way.span.clone()
-                    }
-                }
+                // impl $crate::SpellAssociated for [<$slint_win Spell>] {
+                //     fn on_call(
+                //         &mut self,
+                //         state: Option<$crate::State>,
+                //         set_callback: Option<Box<dyn FnMut($crate::State)>>,
+                //         span_log: $crate::tracing::span::Span,
+                //     ) -> Result<(), Box<dyn std::error::Error>> {
+                //             self.way.on_call(state, set_callback, span_log)
+                //     }
+                //
+                //     fn get_span(&self) -> tracing::span::Span {
+                //         self.way.span.clone()
+                //     }
+                // }
 
                 impl std::ops::Deref for [<$slint_win Spell>] {
                     type Target = [<$slint_win>];
@@ -429,91 +388,192 @@ macro_rules! generate_widgets {
 
 #[macro_export]
 macro_rules! cast_spell {
+    // Single window (non-IPC)
     (
-    $waywindow:expr
-    // $(, $state:expr)?
-    // $(, $set_callback:expr)?
-    // $(, callbacks: {
-    //         $(
-    //             fn $name:ident ( /*$arg:ident : */$ty:ty );
-    //         )*
-    //     })?
-    $(, Notification:$noti_state:expr)?
-    $(,)?
+        $win:expr
+        $(, Notification: $noti:expr)?
+        $(,)?
     ) => {{
-        //$(
-            use $crate::smithay_client_toolkit::{
-                reexports::{
-                    calloop::{
-                        self,
-                        generic::Generic, PostAction,
-                        EventLoop,
-                        timer::{TimeoutAction, Timer},
-                    }
+        $(
+            $crate::cast_spell!(@notification $noti);
+        )?
+        $crate::cast_spell!(@expand entry: $win)
+    }};
+    // Single window (IPC)
+    (
+        ($win:expr, ipc)
+        $(, Notification: $noti:expr)?
+        $(,)?
+    ) => {{
+        $(
+            $crate::cast_spell!(@notification $noti);
+        )?
+        $crate::cast_spell!(@expand entry: ($win, ipc))
+    }};
+    // Multiple windows (mixed IPC / non-IPC)
+    (
+        windows: [ $($entry:tt),+ $(,)? ]
+        $(, Notification: $noti:expr)?
+        $(,)?
+    ) => {{
+        $(
+            $crate::cast_spell!(@notification $noti);
+        )?
+        $(
+            $crate::cast_spell!(@expand entry: $entry);
+        )+
+    }};
+    // INTERNAL EXPANSION RULES
+    // ==================================================
+
+    // IPC-enabled window
+    (
+        @expand
+        entry: ($waywindow:expr, ipc)
+    ) => {{
+        use $crate::smithay_client_toolkit::{
+            reexports::{
+                calloop::{
+                    self,
+                    generic::Generic, PostAction,
+                    EventLoop,
+                    timer::{TimeoutAction, Timer},
                 }
-            };
-            use $crate::tracing;
-            use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
-            let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
-            let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
-            let listener = UnixListener::bind(&socket_path)?;
-            listener.set_nonblocking(true)?;
-            // let handle_weak = $waywindow.ui.as_weak().clone();
-            // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
-            let (ui, way) = $waywindow.parts();
-            way.loop_handle.clone().insert_source(
-                Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
-                move |_, meta, data| {
-                    println!("{:?}", meta);
-                    loop {
-                        // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
-                        match meta.accept() {
-                            Ok((mut stream, _addr)) => {
-                                let mut request = String::new();
-                                // tracing::info!("new connection");
-                                if let Err(err) = stream.read_to_string(&mut request) {
-                                    // tracing::warn!("Couldn't read CLI stream");
-                                }
-                                let (operation, command_args) = request.split_once(" ").unwrap();
-                                let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
-                                println!("Operation:{}, Command {}, args: {}",operation, command, args);
-                                match operation {
-                                    "hide" => data.hide(),
-                                    "show" => data.show_again(),
-                                    // "update" => match format!("set_{}",command).as_str() {
-                                    //     $(
-                                    //         stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                                    //     );*
-                                    //     _=> {}
-                                    // },
-                                    "update" => {
-                                        IpcDispatcher::get_type(&ui,command);
-                                    }
-                                    "look"=> IpcDispatcher::change_val(&mut ui, command, args),
-                                    // TODO provide mechanism for custom calls from the below
-                                    // matching.
-                                    _=> {}
-                                }
+            }
+        };
+        use $crate::tracing;
+        use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
+        let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
+        let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
+        let listener = UnixListener::bind(&socket_path)?;
+        listener.set_nonblocking(true)?;
+        // let handle_weak = $waywindow.ui.as_weak().clone();
+        // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
+        let (ui, way) = $waywindow.parts();
+        way.loop_handle.clone().insert_source(
+            Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+            move |_, meta, data| {
+                println!("{:?}", meta);
+                loop {
+                    // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
+                    match meta.accept() {
+                        Ok((mut stream, _addr)) => {
+                            let mut request = String::new();
+                            // tracing::info!("new connection");
+                            if let Err(err) = stream.read_to_string(&mut request) {
+                                // tracing::warn!("Couldn't read CLI stream");
                             }
-                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                                break; // drained all pending connections
-                            }
-                            Err(e) => {
-                                // tracing::warn!("Error Reading Socket: {e}");
-                                break;
+                            let (operation, command_args) = request.split_once(" ").unwrap();
+                            let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
+                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
+                            match operation {
+                                "hide" => data.hide(),
+                                "show" => data.show_again(),
+                                // "update" => match format!("set_{}",command).as_str() {
+                                //     $(
+                                //         stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                                //     );*
+                                //     _=> {}
+                                // },
+                                "update" => {
+                                    IpcController::get_type(&ui,command);
+                                }
+                                "look"=> IpcController::change_val(&mut ui, command, args),
+                                // TODO provide mechanism for custom calls from the below
+                                // matching.
+                                _=> {}
                             }
                         }
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            break; // drained all pending connections
+                        }
+                        Err(e) => {
+                            // tracing::warn!("Error Reading Socket: {e}");
+                            break;
+                        }
                     }
+                }
 
-                    // $(
-                    //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                    //     println!("dcfv {}", stringify!($name));
-                    // );*
-                    Ok(PostAction::Continue)
-                },
-            );
-        //)?
-        cast_spell($waywindow, None, None)
+                // $(
+                //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                //     println!("dcfv {}", stringify!($name));
+                // );*
+                Ok(PostAction::Continue)
+            },
+        );
+        cast_spell(way, None, None)
+    }};
+    // Non-IPC window
+    (
+        @expand
+        entry: $waywindow:expr
+    ) => {{
+        use $crate::smithay_client_toolkit::{
+            reexports::{
+                calloop::{
+                    self,
+                    generic::Generic, PostAction,
+                    EventLoop,
+                    timer::{TimeoutAction, Timer},
+                }
+            }
+        };
+        use $crate::tracing;
+        use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
+        let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
+        let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
+        let listener = UnixListener::bind(&socket_path)?;
+        listener.set_nonblocking(true)?;
+        // let handle_weak = $waywindow.ui.as_weak().clone();
+        // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
+        let (ui, way) = $waywindow.parts();
+        way.loop_handle.clone().insert_source(
+            Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+            move |_, meta, data| {
+                println!("{:?}", meta);
+                loop {
+                    // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
+                    match meta.accept() {
+                        Ok((mut stream, _addr)) => {
+                            let mut request = String::new();
+                            // tracing::info!("new connection");
+                            if let Err(err) = stream.read_to_string(&mut request) {
+                                // tracing::warn!("Couldn't read CLI stream");
+                            }
+                            let (operation, command_args) = request.split_once(" ").unwrap();
+                            let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
+                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
+                            match operation {
+                                "hide" => data.hide(),
+                                "show" => data.show_again(),
+                                "update" => {}
+                                "look"=> {}
+                                _=> {}
+                            }
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            break; // drained all pending connections;
+                        }
+                        Err(e) => {
+                            break;
+                        }
+                    }
+                }
+
+                // $(
+                //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
+                //     println!("dcfv {}", stringify!($name));
+                // );*
+                Ok(PostAction::Continue)
+            },
+        );
+        cast_spell(way, None, None)
+    }};
+
+    // Notification Logic
+    (@notification $noti:expr) => {{
+        // runs ONCE
+        let _notification = &$noti;
     }};
 }
 
