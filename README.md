@@ -1,8 +1,5 @@
 # Spell
 
-
-
-
  <img align="right" width="25%" src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.png">
 
 <h3 align="left">Make desktop widgets by the mystic arts of Spell  !!</h3>
@@ -41,7 +38,8 @@ in the framework itself, everything can be brought to life from the dark arts of
 rust.
 
 > [!IMPORTANT]
-> Please provide your inputs to improve Spell.
+> Please provide your inputs to improve Spell. Don't use 1.0.2. It is unstable and contains
+> experimental changes, either wait for 1.0.3 or use 1.0.1 till the new APIs become stable.
 
 ## Features 🖊️
 
