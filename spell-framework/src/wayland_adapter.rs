@@ -119,7 +119,7 @@ pub struct SpellWin {
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
-    pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
+    pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     /// Span required for proper logging.
     pub span: span::Span,
     // #[allow(dead_code)]
@@ -879,6 +879,7 @@ pub struct SpellLock {
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
+    // TODO, check if it need internal mutability?
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
     pub(crate) backspace: Option<RegistrationToken>,
 }

@@ -1,4 +1,4 @@
-# 1.0.2 & 1.0.2 CLI (Due Date)
+# 1.0.2 & 1.0.2 CLI (25-02-02)
 
 Changes:
 
@@ -10,7 +10,6 @@ Changes:
 - Experimental macro addition (not ready for usage) to combine wayland and slint
   UIs into a single variable. This removes the need to manage two separate variables
   (for wayland and slint separately) for same widget.
-- Addition of Notification manager for accessing and creating notification centers.
 
 Changes(spell-cli):
 

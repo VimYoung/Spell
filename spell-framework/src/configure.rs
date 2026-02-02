@@ -109,7 +109,7 @@ impl WindowConf {
     /// constructor method for initialising an instance of WindowConf.
     #[deprecated(
         since = "1.0.2",
-        note = "Use the builder method to access all the configuration."
+        note = "Use the builder method to access all the configuration. It will be removed in release 1.0.3."
     )]
     pub fn new(
         max_width: u32,

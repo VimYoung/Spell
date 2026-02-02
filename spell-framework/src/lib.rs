@@ -75,6 +75,10 @@ use zbus::Error as BusError;
 ///   is-expanded: true,
 /// }
 /// ```
+#[deprecated(
+    since = "1.0.2",
+    note = "Use IpcController instead, which works directly on the window. It will be remoed in release 1.0.3."
+)]
 pub trait ForeignController: Send + Sync + std::fmt::Debug {
     /// On calling `spell-cli -l layer_name look
     /// var_name`, the cli calls `get_type` method of the trait with `var_name` as input.
@@ -96,6 +100,10 @@ pub trait IpcController {
     fn change_val(&mut self, key: &str, val: &str);
 }
 
+#[deprecated(
+    since = "1.0.2",
+    note = "This type is no longer needed and will be removed in release 1.0.3."
+)]
 pub type State = Arc<RwLock<dyn ForeignController>>;
 type States = Vec<Option<Box<dyn FnMut(State)>>>;
 /// This is the event loop which is to be called when initialising multiple windows through
@@ -103,6 +111,7 @@ type States = Vec<Option<Box<dyn FnMut(State)>>>;
 /// to the number on which a widget is initialised. So, this function will panic if the length of
 /// vectors of various types mentioned here are not equal.For more information on checking the
 /// arguments, view [cast_spell].
+#[deprecated(since = "1.0.2", note = "Use cast_spell macro instead.")]
 pub fn enchant_spells(
     mut waywindows: Vec<SpellWin>,
     states: Vec<Option<State>>,
@@ -210,6 +219,10 @@ pub fn enchant_spells(
 /// }
 /// // here `ui_clone` is weak pointer to my slint window for setting back the `state` property.
 /// ```
+#[deprecated(
+    since = "1.0.2",
+    note = "Use macro cast_spell instead. It will be removed in release 1.0.3."
+)]
 pub fn cast_spell<S: SpellAssociated + std::fmt::Debug>(
     mut waywindow: S,
     state: Option<State>,
@@ -220,6 +233,17 @@ pub fn cast_spell<S: SpellAssociated + std::fmt::Debug>(
     span.in_scope(|| {
         trace!("{:?}", &waywindow);
         waywindow.on_call(state, set_callback, s)
+    })
+}
+
+pub fn cast_spell_inner<S: SpellAssociated + std::fmt::Debug>(
+    mut waywindow: S,
+) -> Result<(), Box<dyn Error>> {
+    let span = waywindow.get_span();
+    let s = span.clone();
+    span.in_scope(|| {
+        trace!("{:?}", &waywindow);
+        waywindow.on_call(None, None, s)
     })
 }
 
@@ -268,6 +292,26 @@ pub trait SpellAssociated {
 
     fn get_span(&self) -> span::Span {
         span!(Level::INFO, "unnamed-widget")
+    }
+}
+
+pub trait SpellAssociatedNew {
+    fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
+
+    fn get_span(&self) -> span::Span {
+        span!(Level::INFO, "unnamed-widget")
+    }
+}
+
+pub fn cast_spells_new(
+    mut windows: Vec<Box<dyn SpellAssociatedNew>>,
+) -> Result<(), Box<dyn Error>> {
+    loop {
+        for win in windows.iter_mut() {
+            let span = win.get_span().clone();
+            let _gaurd = span.enter();
+            win.on_call()?;
+        }
     }
 }
 
@@ -360,20 +404,22 @@ macro_rules! generate_widgets {
                     }
                 }
 
-                // impl $crate::SpellAssociated for [<$slint_win Spell>] {
-                //     fn on_call(
-                //         &mut self,
-                //         state: Option<$crate::State>,
-                //         set_callback: Option<Box<dyn FnMut($crate::State)>>,
-                //         span_log: $crate::tracing::span::Span,
-                //     ) -> Result<(), Box<dyn std::error::Error>> {
-                //             self.way.on_call(state, set_callback, span_log)
-                //     }
-                //
-                //     fn get_span(&self) -> tracing::span::Span {
-                //         self.way.span.clone()
-                //     }
-                // }
+                impl $crate::SpellAssociatedNew for [<$slint_win Spell>] {
+                    fn on_call(
+                        &mut self,
+                    ) -> Result<(), Box<dyn std::error::Error>> {
+                        let event_loop = self.way.event_loop.clone();
+                        event_loop
+                            .borrow_mut()
+                            .dispatch(std::time::Duration::from_millis(1), &mut self.way)
+                            .unwrap();
+                        Ok(())
+                    }
+
+                    fn get_span(&self) -> tracing::span::Span {
+                        self.way.span.clone()
+                    }
+                }
 
                 impl std::ops::Deref for [<$slint_win Spell>] {
                     type Target = [<$slint_win>];
@@ -410,7 +456,8 @@ macro_rules! cast_spell {
         )?
         $crate::cast_spell!(@expand entry: ($win, ipc))
     }};
-    // Multiple windows (mixed IPC / non-IPC)
+
+    // Multiple windows (mixed IPC / non-IPC) (Defined individually)
     (
         windows: [ $($entry:tt),+ $(,)? ]
         $(, Notification: $noti:expr)?
@@ -419,10 +466,27 @@ macro_rules! cast_spell {
         $(
             $crate::cast_spell!(@notification $noti);
         )?
+        let mut windows = Vec::new();
         $(
             $crate::cast_spell!(@expand entry: $entry);
+            $crate::cast_spell!(@vector_add windows, $entry);
         )+
+        $crate::cast_spells_new(windows)
     }};
+    //
+    // // Multiple windows (mixed IPC / non-IPC) (Defined as non-ipc vector)
+    // (
+    //     windows: $windows:expr
+    //     $(, windows_ipc: $windows_ipc:expr)?
+    //     $(, Notification: $noti:expr)?
+    //     $(,)?
+    // ) => {{
+    //     $(
+    //         $crate::cast_spell!(@notification $noti);
+    //     )?
+    //     $crate::cast_spells_new(windows)
+    // }};
+    //
     // INTERNAL EXPANSION RULES
     // ==================================================
 
@@ -493,15 +557,10 @@ macro_rules! cast_spell {
                         }
                     }
                 }
-
-                // $(
-                //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                //     println!("dcfv {}", stringify!($name));
-                // );*
                 Ok(PostAction::Continue)
             },
         );
-        cast_spell(way, None, None)
+        $crate::cast_spell!(@run way)
     }};
     // Non-IPC window
     (
@@ -567,14 +626,23 @@ macro_rules! cast_spell {
                 Ok(PostAction::Continue)
             },
         );
-        cast_spell(way, None, None)
+        $crate::cast_spell!(@run way)
     }};
-
+    (@vector_add $wins:expr, ($waywindow:expr, ipc)) => {
+        wins.append(Box::new($waywindow) as Box<dyn $crate::SpellAssociated>)
+    };
+    (@vector_add $wins:expr, $waywindow:expr) => {
+        wins.append(Box::new($waywindow) as Box<dyn $crate::SpellAssociated>)
+    };
     // Notification Logic
-    (@notification $noti:expr) => {{
+    (@notification $noti:expr) => {
         // runs ONCE
         let _notification = &$noti;
-    }};
+    };
+
+    (@run $way:expr) => {
+        $crate::cast_spell_inner($way)
+    }
 }
 
 // TODO set logging values in Option so that only a single value reads or writes.
