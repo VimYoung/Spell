@@ -155,53 +155,73 @@ pub struct WindowConfBuilder {
 
 impl WindowConfBuilder {
     /// Sets [`WindowConf::width`].
-    pub fn width<I: Into<u32>>(&mut self, width: I) {
-        self.max_width = width.into();
+    pub fn width<I: Into<u32>>(&mut self, width: I) -> &mut Self {
+        let new = self;
+        new.max_width = width.into();
+        new
     }
 
     /// Sets [`WindowConf::height`].
-    pub fn height<I: Into<u32>>(&mut self, height: I) {
-        self.max_width = height.into();
+    pub fn height<I: Into<u32>>(&mut self, height: I) -> &mut Self {
+        let x = self;
+        x.max_width = height.into();
+        x
     }
 
     /// Sets first anchor of [`WindowConf::anchor`].
-    pub fn anchor_1(&mut self, anchor: Anchor) {
-        self.anchor.0 = Some(anchor);
+    pub fn anchor_1(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor.0 = Some(anchor);
+        x
     }
 
     /// Sets second anchor of [`WindowConf::anchor`].
-    pub fn anchor_2(&mut self, anchor: Anchor) {
-        self.anchor.1 = Some(anchor);
+    pub fn anchor_2(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor.1 = Some(anchor);
+        x
     }
 
     /// Sets [`WindowConf::margin`].
-    pub fn margins(&mut self, top: i32, right: i32, bottom: i32, left: i32) {
-        self.margin = (top, right, bottom, left)
+    pub fn margins(&mut self, top: i32, right: i32, bottom: i32, left: i32) -> &mut Self {
+        let x = self;
+        x.margin = (top, right, bottom, left);
+        x
     }
 
     /// Sets [`WindowConf::layer_type`].
-    pub fn layer_type(&mut self, layer: Layer) {
-        self.layer_type = Some(layer);
+    pub fn layer_type(&mut self, layer: Layer) -> &mut Self {
+        let x = self;
+        x.layer_type = Some(layer);
+        x
     }
 
     /// Sets [`WindowConf::board_interactivity`].
-    pub fn board_interactivity(&mut self, board: KeyboardInteractivity) {
-        self.board_interactivity = board;
+    pub fn board_interactivity(&mut self, board: KeyboardInteractivity) -> &mut Self {
+        let x = self;
+        x.board_interactivity = board;
+        x
     }
 
     /// Sets [`WindowConf::exclusive_zone`].
-    pub fn exclusive_zone(&mut self, dimention: i32) {
-        self.exclusive_zone = Some(dimention);
+    pub fn exclusive_zone(&mut self, dimention: i32) -> &mut Self {
+        let x = self;
+        x.exclusive_zone = Some(dimention);
+        x
     }
 
     /// Sets [`WindowConf::monitor_name`].
-    pub fn monitor(&mut self, name: String) {
-        self.monitor_name = Some(name)
+    pub fn monitor(&mut self, name: String) -> &mut Self {
+        let x = self;
+        x.monitor_name = Some(name);
+        x
     }
 
     /// Sets [`WindowConf::natural_scroll`].
-    pub fn natural_scroll(&mut self, scroll: bool) {
-        self.natural_scroll = scroll;
+    pub fn natural_scroll(&mut self, scroll: bool) -> &mut Self {
+        let x = self;
+        x.natural_scroll = scroll;
+        x
     }
 
     /// Creates an instnce of [`WindowConf`] with the provided configurations.

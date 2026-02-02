@@ -6,11 +6,13 @@ use crate::{
     IpcController, SpellAssociated, State,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
     dbus_window_state::InternalHandle,
-    delegate_fractional_scale, delegate_viewporter, helper_fn_for_deploy,
+    helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::{
-        fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
-        viewporter::{Viewport, ViewporterState},
+        fractional_scaling::{
+            FractionalScaleHandler, FractionalScaleState, delegate_fractional_scale,
+        },
+        viewporter::{Viewport, ViewporterState, delegate_viewporter},
         way_helper::{
             FingerprintInfo, KeyboardState, PointerState, UsernamePassConvo, set_config,
             set_event_sources,

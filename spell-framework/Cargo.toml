@@ -18,7 +18,7 @@ i-slint-renderer-skia = { version = "1.14.1", features = [
   "wayland",
 ], optional = true }
 rust-fuzzy-search = "0.1.1"
-signal-hook = "0.3.18"
+signal-hook = "0.4.3"
 slint = { version = "1.14.1", features = [
   "raw-window-handle-06",
   "renderer-software",

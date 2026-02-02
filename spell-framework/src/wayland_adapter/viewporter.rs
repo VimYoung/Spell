@@ -109,7 +109,6 @@ where
     }
 }
 
-#[macro_export]
 macro_rules! delegate_viewporter {
     ($(@<$( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+>)? $ty: ty) => {
         smithay_client_toolkit::reexports::client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
@@ -120,3 +119,4 @@ macro_rules! delegate_viewporter {
         ] => $crate::wayland_adapter::viewporter::ViewporterState);
     };
 }
+pub(crate) use delegate_viewporter;

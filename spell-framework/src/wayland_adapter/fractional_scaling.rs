@@ -117,7 +117,6 @@ pub trait FractionalScaleHandler: Sized {
     );
 }
 
-#[macro_export]
 macro_rules! delegate_fractional_scale {
     ($(@<$( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+>)? $ty: ty) => {
             smithay_client_toolkit::reexports::client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
@@ -128,3 +127,4 @@ macro_rules! delegate_fractional_scale {
         ] => $crate::wayland_adapter::fractional_scaling::FractionalScaleState);
     };
 }
+pub(crate) use delegate_fractional_scale;
