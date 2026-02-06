@@ -120,12 +120,6 @@ export component AppWindow inherits Window {
 Now, to increment the data and specify the dimensions of widget add the following to your `src/main.rs` file.
 
 ```rust
-use std::{
-    error::Error,
-    sync::mpsc,
-    sync::{Arc, RwLock},
-};
-
 use slint::ComponentHandle;
 use spell::{
     cast_spell,
@@ -135,7 +129,7 @@ use spell::{
 };
 slint::include_modules!();
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Necessary configurations for the widget like dimensions, layer etc.
     let window_conf = WindowConf::new(
         376,

@@ -3,10 +3,8 @@
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
 use crate::{
-    IpcController, SpellAssociated, State,
+    SpellAssociatedNew,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
-    dbus_window_state::InternalHandle,
-    helper_fn_for_deploy,
     slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
     wayland_adapter::{
         fractional_scaling::{
@@ -42,7 +40,6 @@ use smithay_client_toolkit::{
     reexports::{
         calloop::{
             EventLoop, LoopHandle, RegistrationToken,
-            channel::Event,
             timer::{TimeoutAction, Timer},
         },
         calloop_wayland_source::WaylandSource,
@@ -537,48 +534,9 @@ impl SpellWin {
     }
 }
 
-impl SpellAssociated for SpellWin {
-    fn on_call(
-        &mut self,
-        state: Option<State>,
-        set_callback: Option<Box<dyn FnMut(State)>>,
-        span_log: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let rx = helper_fn_for_deploy(self.layer_name.clone(), &state, span_log);
+impl SpellAssociatedNew for SpellWin {
+    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
-        if let Some(mut callback) = set_callback {
-            self.event_loop
-                .borrow()
-                .handle()
-                .insert_source(rx, move |event_msg, _, state_data| {
-                    trace!("Internal event recieved");
-                    match event_msg {
-                        Event::Msg(int_handle) => match int_handle {
-                            InternalHandle::StateValChange((key, data_type)) => {
-                                trace!("Internal variable change called");
-                                {
-                                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
-                                    state_inst.change_val(&key, data_type);
-                                }
-                                callback(state.as_ref().unwrap().clone());
-                            }
-                            InternalHandle::ShowWinAgain => {
-                                trace!("Internal show Called");
-                                state_data.show_again();
-                            }
-                            InternalHandle::HideWindow => {
-                                trace!("Internal hide called");
-                                state_data.hide();
-                            }
-                        },
-                        // TODO have to handle it properly.
-                        Event::Closed => {
-                            info!("Internal Channel closed");
-                        }
-                    }
-                })
-                .unwrap();
-        }
         info!("Internal reciever set with start of event loop.");
         loop {
             event_loop
@@ -1196,13 +1154,8 @@ impl SpellLock {
     }
 }
 
-impl SpellAssociated for SpellLock {
-    fn on_call(
-        &mut self,
-        _: Option<State>,
-        _: Option<Box<dyn FnMut(State)>>,
-        _: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+impl SpellAssociatedNew for SpellLock {
+    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
         while self.is_locked {
             event_loop

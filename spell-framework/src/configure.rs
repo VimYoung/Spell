@@ -1,7 +1,6 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
-use tracing::warn;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     EnvFilter, Layer as TracingTraitLayer,

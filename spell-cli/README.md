@@ -12,4 +12,4 @@ cargo install spell-cli
 
 ## Documentation
 
-Basic usage and documentation related to the arguments by running the help command `spell-cli --help`.
+Basic usage and documentation related to the arguments by running the help command `sp--help`.
