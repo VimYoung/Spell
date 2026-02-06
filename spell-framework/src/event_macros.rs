@@ -1,10 +1,9 @@
+#[doc = include_str!("../docs/generate_widget.md")]
 #[macro_export]
 macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
         use $crate::wayland_adapter::WinHandle;
-        use $crate::tracing;
-
-        $crate::paste::paste! {
+        $crate::macro_internal::paste! {
             $(
                 struct [<$slint_win Spell>] {
                     ui: $slint_win ,
@@ -99,7 +98,7 @@ macro_rules! generate_widgets {
                         Ok(())
                     }
 
-                    fn get_span(&self) -> tracing::span::Span {
+                    fn get_span(&self) -> $crate::macro_internal::Span {
                         self.way.span.clone()
                     }
                 }
@@ -115,6 +114,7 @@ macro_rules! generate_widgets {
     };
 }
 
+#[doc = include_str!("../docs/cast_spell.md")]
 #[macro_export]
 macro_rules! cast_spell {
     // Single window (non-IPC)
@@ -152,7 +152,7 @@ macro_rules! cast_spell {
         let mut windows = Vec::new();
         $(
             $crate::cast_spell!(@expand entry: $entry);
-            $crate::cast_spell!(@vector_add windows, $entry);
+            $crate::cast_spell!(@vector_add windows, $entry)
         )+
         $crate::cast_spells_new(windows)
     }};
@@ -178,27 +178,16 @@ macro_rules! cast_spell {
         @expand
         entry: ($waywindow:expr, ipc)
     ) => {{
-        use $crate::smithay_client_toolkit::{
-            reexports::{
-                calloop::{
-                    self,
-                    generic::Generic, PostAction,
-                    EventLoop,
-                    timer::{TimeoutAction, Timer},
-                }
-            }
-        };
-        use $crate::tracing;
-        use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
+        // use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
         let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
-        let listener = UnixListener::bind(&socket_path)?;
+        let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         listener.set_nonblocking(true)?;
         // let handle_weak = $waywindow.ui.as_weak().clone();
         // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
         let (ui, way) = $waywindow.parts();
-        way.loop_handle.clone().insert_source(
-            Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+        let _ = way.loop_handle.clone().insert_source(
+            $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, meta, data| {
                 println!("{:?}", meta);
                 loop {
@@ -207,7 +196,7 @@ macro_rules! cast_spell {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
-                            if let Err(err) = stream.read_to_string(&mut request) {
+                            if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 // tracing::warn!("Couldn't read CLI stream");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap();
@@ -240,7 +229,7 @@ macro_rules! cast_spell {
                         }
                     }
                 }
-                Ok(PostAction::Continue)
+                Ok($crate::macro_internal::PostAction::Continue)
             },
         );
         $crate::cast_spell!(@run way)
@@ -250,27 +239,16 @@ macro_rules! cast_spell {
         @expand
         entry: $waywindow:expr
     ) => {{
-        use $crate::smithay_client_toolkit::{
-            reexports::{
-                calloop::{
-                    self,
-                    generic::Generic, PostAction,
-                    EventLoop,
-                    timer::{TimeoutAction, Timer},
-                }
-            }
-        };
-        use $crate::tracing;
-        use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
+        // use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
         let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
-        let listener = UnixListener::bind(&socket_path)?;
+        let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         listener.set_nonblocking(true)?;
         // let handle_weak = $waywindow.ui.as_weak().clone();
         // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
         let (ui, way) = $waywindow.parts();
-        way.loop_handle.clone().insert_source(
-            Generic::new(listener, calloop::Interest::READ, calloop::Mode::Level),
+        let _ = way.loop_handle.clone().insert_source(
+            $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, meta, data| {
                 println!("{:?}", meta);
                 loop {
@@ -279,7 +257,7 @@ macro_rules! cast_spell {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
-                            if let Err(err) = stream.read_to_string(&mut request) {
+                            if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 // tracing::warn!("Couldn't read CLI stream");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap();
@@ -306,7 +284,7 @@ macro_rules! cast_spell {
                 //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
                 //     println!("dcfv {}", stringify!($name));
                 // );*
-                Ok(PostAction::Continue)
+                Ok($crate::macro_internal::PostAction::Continue)
             },
         );
         $crate::cast_spell!(@run way)

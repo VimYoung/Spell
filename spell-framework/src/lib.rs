@@ -27,10 +27,17 @@ pub mod layer_properties {
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
 }
-pub use paste;
-pub use smithay_client_toolkit;
+/// Components of this module are not be used by end user directly. This module contains
+/// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
+/// internally.
+pub mod macro_internal {
+    pub use paste::paste;
+    pub use smithay_client_toolkit::reexports::calloop::{
+        Interest, Mode, PostAction, generic::Generic,
+    };
+    pub use tracing::{info, span::Span, warn};
+}
 use std::error::Error;
-pub use tracing;
 use tracing::{Level, span, trace};
 
 pub trait IpcController {
@@ -42,6 +49,19 @@ pub trait IpcController {
     fn change_val(&mut self, key: &str, val: &str);
 }
 
+/// This is an internal trait implemented by objects generated from [`generate_widgets`].
+/// It helps in running every SpellWidget (like [SpellWin](`wayland_adapter::SpellWin`),
+/// [SpellLock](`wayland_adapter::SpellLock`)) through the same event_loop function.
+pub trait SpellAssociatedNew {
+    fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
+
+    fn get_span(&self) -> span::Span {
+        span!(Level::INFO, "unnamed-widget")
+    }
+}
+
+/// event loop function internally used by [`cast_spell`] for single widget setups.
+/// Not to be used by end user,
 pub fn cast_spell_inner<S: SpellAssociatedNew + std::fmt::Debug>(
     mut waywindow: S,
 ) -> Result<(), Box<dyn Error>> {
@@ -52,14 +72,8 @@ pub fn cast_spell_inner<S: SpellAssociatedNew + std::fmt::Debug>(
     })
 }
 
-pub trait SpellAssociatedNew {
-    fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
-
-    fn get_span(&self) -> span::Span {
-        span!(Level::INFO, "unnamed-widget")
-    }
-}
-
+/// event loop function internally used by [`cast_spell`] for multiple widget setups.
+/// Not to be used by end user.
 pub fn cast_spells_new(
     mut windows: Vec<Box<dyn SpellAssociatedNew>>,
 ) -> Result<(), Box<dyn Error>> {

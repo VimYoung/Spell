@@ -65,7 +65,7 @@ impl std::clone::Clone for Rgba8Pixel {
 ///
 /// ## Panics
 ///
-/// event loops like [cast_spell](crate::cast_spell) and [encahnt_spells](crate::enchant_spells) will panic if 0 is provided as width or height.
+/// event loops like [cast_spell](crate::cast_spell) will panic if 0 is provided as width or height.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
     /// Defines the widget width in pixels. On setting values greater than the provided pixels of

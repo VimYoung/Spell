@@ -95,14 +95,6 @@ pub(crate) struct States {
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
 /// implementation, thus providing various features.
-/// ## Panics
-///
-/// Event loop [enchant_spells](crate::enchant_spells) will
-/// panic if the number of `WindowConf`s provided to  method [conjure_spells](crate::wayland_adapter::SpellMultiWinHandler::conjure_spells) are
-/// not equal to the amount of slint widgets that are
-/// initialised in the scope. The solution to avoid panic is to add more `let _name =
-/// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
-/// slint files and adding [WindowConf]s in [SpellMultiWinHandler].
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).

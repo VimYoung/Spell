@@ -123,7 +123,7 @@ pub struct SpellMultiWinHandler {
 
 impl SpellMultiWinHandler {
     /// This function is finally called to create instances of windows (in a multi
-    /// window scenario). These windows are ultimately passed on to [enchant_spells](`crate::enchant_spells`)
+    /// window scenario). These windows are ultimately passed on to [cast_spell](`crate::cast_spell`)
     /// event loop, multi-window setup is unstable though and is not recommended for end use just
     /// now.
     pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
