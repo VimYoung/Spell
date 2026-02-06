@@ -164,7 +164,7 @@ impl WindowConfBuilder {
     /// Sets [`WindowConf::height`].
     pub fn height<I: Into<u32>>(&mut self, height: I) -> &mut Self {
         let x = self;
-        x.max_width = height.into();
+        x.max_height = height.into();
         x
     }
 
