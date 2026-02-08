@@ -69,7 +69,7 @@ use std::{
     collections::HashMap,
     process::Command,
     rc::Rc,
-    sync::{Arc, Mutex, OnceLock, RwLock},
+    sync::{Arc, Mutex, Once, OnceLock, RwLock},
     time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
@@ -81,6 +81,7 @@ mod way_helper;
 mod win_impl;
 
 static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
+static SET_SLINT_PLATFORM: Once = Once::new();
 
 #[derive(Debug)]
 pub(crate) struct States {
@@ -193,11 +194,13 @@ impl SpellWin {
             slint_proxy.clone(),
         );
 
-        if if_single {
+        if SET_SLINT_PLATFORM.is_completed() {
             trace!("Single window layer platform set");
-            let _ = slint::platform::set_platform(Box::new(SpellLayerShell::new(
-                adapter_value.clone(),
-            )));
+            if let Err(err) =
+                slint::platform::set_platform(Box::new(SpellLayerShell::new(adapter_value.clone())))
+            {
+                warn!("Error setting slint platform: {err}");
+            }
         }
         set_event_sources(&event_loop, handle);
 

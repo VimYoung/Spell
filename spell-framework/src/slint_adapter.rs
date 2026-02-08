@@ -10,10 +10,15 @@ use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use smithay_client_toolkit::reexports::client::Connection;
 use std::{
     cell::RefCell,
+    collections::HashMap,
     rc::Rc,
     sync::{Arc, Mutex},
 };
 use tracing::{Level, info, span, warn};
+
+thread_local! {
+    pub(crate) static ADAPTERS: RefCell<HashMap<String, Rc<SpellSkiaWinAdapter>>> = RefCell::new(HashMap::new());
+}
 
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -39,16 +44,17 @@ pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
-    /// An instance of [SpellSkiaWinAdapter].
-    pub window_adapter: Rc<SpellSkiaWinAdapter>,
+    /// /// An instance of [`SpellSkiaWinAdapter`]
+    /// pub window_adapter: Option<Rc<SpellSkiaWinAdapter>>,
+    pub layer_name: String,
     pub span: span::Span,
 }
 
 impl SpellLayerShell {
     /// Creates an instance of this Platform implementation, for internal use.
-    pub fn new(window_adapter: Rc<SpellSkiaWinAdapter>) -> Self {
+    pub fn new(layer_name: String) -> Self {
         SpellLayerShell {
-            window_adapter,
+            layer_name,
             span: span!(Level::INFO, "slint-log",),
         }
     }
@@ -56,7 +62,8 @@ impl SpellLayerShell {
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
-        Ok(self.window_adapter.clone())
+        let adapter = ADAPTERS.with(|v| v.borrow().get(&self.layer_name).unwrap().clone());
+        Ok(adapter)
     }
 
     fn debug_log(&self, arguments: core::fmt::Arguments) {
@@ -70,9 +77,13 @@ impl Platform for SpellLayerShell {
     }
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
-        Some(Box::new(SlintEventProxy(
-            self.window_adapter.slint_event_proxy.clone(),
-        )))
+        Some(Box::new(SlintEventProxy(ADAPTERS.with(|v| {
+            v.borrow()
+                .get(&self.layer_name)
+                .unwrap()
+                .slint_event_proxy
+                .clone()
+        }))))
     }
 }
 
