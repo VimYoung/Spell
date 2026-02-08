@@ -1,23 +1,18 @@
-//! This module contains relevent structs for slint side backend configurations. Apart
-//! from [SpellMultiLayerShell] and [SpellMultiWinHandler], rest of the structs mentioned are
-//! either internal or not used anymore. Still their implementation is public because they had be
-//! set by the user of library in intial iterations of spell_framework.
-use crate::{
-    configure::{LayerConf, WindowConf, set_up_tracing},
-    wayland_adapter::SpellWin,
-};
+//! This module contains relevent structs for slint side backend configurations.
+//! All structs mentioned are either internal or not used anymore. Still their
+//! implementation is public because they had to be set by the user of library
+//! in intial iterations of spell_framework.
+use crate::configure::LayerConf;
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
-use smithay_client_toolkit::reexports::client::Connection;
 use std::{
     cell::RefCell,
-    collections::HashMap,
     rc::Rc,
     sync::{Arc, Mutex},
 };
 use tracing::{Level, info, span, warn};
 
 thread_local! {
-    pub(crate) static ADAPTERS: RefCell<HashMap<String, Rc<SpellSkiaWinAdapter>>> = RefCell::new(HashMap::new());
+    pub(crate) static ADAPTERS: RefCell<Vec<Rc<SpellSkiaWinAdapter>>> = const { RefCell::new(Vec::new()) };
 }
 
 #[cfg(not(docsrs))]
@@ -44,17 +39,13 @@ pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
-    /// /// An instance of [`SpellSkiaWinAdapter`]
-    /// pub window_adapter: Option<Rc<SpellSkiaWinAdapter>>,
-    pub layer_name: String,
     pub span: span::Span,
 }
 
-impl SpellLayerShell {
+impl Default for SpellLayerShell {
     /// Creates an instance of this Platform implementation, for internal use.
-    pub fn new(layer_name: String) -> Self {
+    fn default() -> Self {
         SpellLayerShell {
-            layer_name,
             span: span!(Level::INFO, "slint-log",),
         }
     }
@@ -62,7 +53,7 @@ impl SpellLayerShell {
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
-        let adapter = ADAPTERS.with(|v| v.borrow().get(&self.layer_name).unwrap().clone());
+        let adapter = ADAPTERS.with(|v| v.borrow().last().unwrap().clone());
         Ok(adapter)
     }
 
@@ -78,54 +69,16 @@ impl Platform for SpellLayerShell {
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
         Some(Box::new(SlintEventProxy(ADAPTERS.with(|v| {
-            v.borrow()
-                .get(&self.layer_name)
-                .unwrap()
-                .slint_event_proxy
-                .clone()
+            v.borrow().last().unwrap().slint_event_proxy.clone()
         }))))
     }
 }
 
-/// This struct needs to be set when multiple windows are to be started together. It is
-/// used in combination with [`conjure_spells`](crate::slint_adapter::SpellMultiWinHandler::conjure_spells)
-/// and is required to be set before any other initialisation with an instance of [SpellMultiWinHandler].
-/// It implements slint's [Platform](https://docs.rs/slint/latest/slint/platform/trait.Platform.html) trait and is set internally.
-pub struct SpellMultiLayerShell {
-    /// An instance of [SpellMultiWinHandler].
-    pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
-    pub span: span::Span,
-}
-
-impl SpellMultiLayerShell {
-    fn new(window_manager: Rc<RefCell<SpellMultiWinHandler>>) -> Self {
-        SpellMultiLayerShell {
-            window_manager,
-            span: span!(Level::INFO, "slint-log",),
-        }
-    }
-}
-
-impl Platform for SpellMultiLayerShell {
-    fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
-        let value = self.window_manager.borrow_mut().request_new_window();
-        Ok(value)
-    }
-
-    fn debug_log(&self, arguments: core::fmt::Arguments) {
-        self.span.in_scope(|| {
-            if let Some(val) = arguments.as_str() {
-                info!(val);
-            } else {
-                info!("{}", arguments.to_string());
-            }
-        })
-    }
-}
-
-/// Used for the initialisation of [SpellMultiLayerShell], this struct is responsible
-/// for handling, initialising, updating and maintaing of various widgets that are being
-/// rendered simultaneously. It uses [SpellSkiaWinAdapter] internally.
+/// This struct is responsible for handling, initialising, updating and maintaining
+/// of various widgets that are being rendered simultaneously across monitors for
+/// your lock. It uses [SpellSkiaWinAdapter] internally. This struct is made public
+/// for documentation purposes (and was previously used by end user of library) but
+/// it is now not to be used directly.
 pub struct SpellMultiWinHandler {
     pub(crate) windows: Vec<(String, LayerConf)>,
     pub(crate) adapter: Vec<Rc<SpellSkiaWinAdapter>>,
@@ -133,52 +86,6 @@ pub struct SpellMultiWinHandler {
 }
 
 impl SpellMultiWinHandler {
-    /// This function is finally called to create instances of windows (in a multi
-    /// window scenario). These windows are ultimately passed on to [cast_spell](`crate::cast_spell`)
-    /// event loop, multi-window setup is unstable though and is not recommended for end use just
-    /// now.
-    pub fn conjure_spells(windows: Vec<(&str, WindowConf)>) -> Vec<SpellWin> {
-        tracing_subscriber::fmt()
-            .without_time()
-            .with_target(false)
-            .with_env_filter(tracing_subscriber::EnvFilter::new(
-                "spell_framework=trace,info",
-            ))
-            .init();
-        let handle = set_up_tracing("multi-window");
-        let conn = Connection::connect_to_env().unwrap();
-        let new_windows: Vec<(String, LayerConf)> = windows
-            .iter()
-            .map(|(layer_name, conf)| (layer_name.to_string(), LayerConf::Window(conf.clone())))
-            .collect();
-
-        let mut new_adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
-        let mut windows_spell: Vec<SpellWin> = Vec::new();
-        windows.iter().for_each(|(layer_name, conf)| {
-            let window = SpellWin::create_window(
-                &conn,
-                conf.clone(),
-                layer_name.to_string(),
-                false,
-                handle.clone(),
-            );
-            new_adapters.push(window.adapter.clone());
-            windows_spell.push(window);
-        });
-        let windows_handler = Rc::new(RefCell::new(SpellMultiWinHandler {
-            windows: new_windows,
-            adapter: new_adapters,
-            value_given: 0,
-        }));
-
-        if let Err(error) =
-            slint::platform::set_platform(Box::new(SpellMultiLayerShell::new(windows_handler)))
-        {
-            warn!("Error setting multilayer platform: {}", error);
-        }
-        windows_spell
-    }
-
     pub(crate) fn new_lock(lock_outputs: Vec<(String, (u32, u32))>) -> Rc<RefCell<Self>> {
         let new_locks: Vec<(String, LayerConf)> = lock_outputs
             .iter()
@@ -190,12 +97,6 @@ impl SpellMultiWinHandler {
             adapter: Vec::new(),
             value_given: 0,
         }))
-    }
-
-    fn request_new_window(&mut self) -> Rc<dyn WindowAdapter> {
-        self.value_given += 1;
-        let index = self.value_given - 1;
-        self.adapter[index as usize].clone()
     }
 
     fn request_new_lock(&mut self) -> Rc<dyn WindowAdapter> {

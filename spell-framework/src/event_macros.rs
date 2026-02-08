@@ -303,5 +303,10 @@ macro_rules! cast_spell {
 
     (@run $way:expr) => {
         $crate::cast_spell_inner($way)
+    };
+
+    // SpellLock Locking
+    (lock: $lock:expr) => {
+        $crate::cast_spell!(@run $lock)
     }
 }

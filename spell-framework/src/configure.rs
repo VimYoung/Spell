@@ -60,8 +60,8 @@ impl std::clone::Clone for Rgba8Pixel {
     }
 }
 
-/// WindowConf is an essential struct passed on to widget constructor functions (like [invoke_spell](crate::wayland_adapter::SpellWin::invoke_spell))
-/// for defining the specifications of the widget.
+/// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
+/// of generated code) for defining the specifications of the widget.
 ///
 /// ## Panics
 ///

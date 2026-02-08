@@ -86,6 +86,8 @@ pub fn cast_spells_new(
     }
 }
 
+// TODO Update docs of spellock and spellwin to justify their use being purely internal.
+// TODO IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
 // Code to launch a Zbus service
 // <BS>
 // pub async fn deploy_zbus_service(

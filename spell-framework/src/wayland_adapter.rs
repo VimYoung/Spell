@@ -5,7 +5,9 @@
 use crate::{
     SpellAssociatedNew,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
-    slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
+    slint_adapter::{
+        ADAPTERS, SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter,
+    },
     wayland_adapter::{
         fractional_scaling::{
             FractionalScaleHandler, FractionalScaleState, delegate_fractional_scale,
@@ -134,7 +136,6 @@ impl SpellWin {
         conn: &Connection,
         window_conf: WindowConf,
         layer_name: String,
-        if_single: bool,
         handle: HomeHandle,
     ) -> Self {
         let (globals, mut event_queue) = registry_queue_init(conn).unwrap();
@@ -194,14 +195,13 @@ impl SpellWin {
             slint_proxy.clone(),
         );
 
-        if SET_SLINT_PLATFORM.is_completed() {
-            trace!("Single window layer platform set");
-            if let Err(err) =
-                slint::platform::set_platform(Box::new(SpellLayerShell::new(adapter_value.clone())))
-            {
+        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
+        SET_SLINT_PLATFORM.call_once(|| {
+            trace!("Slint platform set");
+            if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
                 warn!("Error setting slint platform: {err}");
             }
-        }
+        });
         set_event_sources(&event_loop, handle);
 
         let mut win = SpellWin {
@@ -328,7 +328,7 @@ impl SpellWin {
     pub fn invoke_spell(name: &str, window_conf: WindowConf) -> Self {
         let handle = set_up_tracing(name);
         let conn = Connection::connect_to_env().unwrap();
-        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true, handle)
+        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), handle)
     }
 
     /// Hides the layer (aka the widget) if it is visible in screen.
