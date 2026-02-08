@@ -87,6 +87,7 @@ pub fn cast_spells_new(
 }
 
 // TODO Update docs of spellock and spellwin to justify their use being purely internal.
+// TODO and configuration file to ensure that a single widget is open for a single layer name.
 // TODO IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
 // Code to launch a Zbus service
 // <BS>
