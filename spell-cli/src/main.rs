@@ -8,12 +8,12 @@ use futures_util::stream::StreamExt;
 use std::{
     env::{self, Args},
     fs::{self, OpenOptions},
-    io::{self, Write},
-    os::unix::net::UnixDatagram,
+    io::{self, Read, Write},
+    os::unix::net::{UnixDatagram, UnixStream},
     path::Path,
     process::Command,
 };
-use zbus::{Connection, Result as BusResult, proxy, zvariant::OwnedObjectPath};
+use zbus::{Connection, proxy, zvariant::OwnedObjectPath};
 
 #[proxy(
     default_path = "/net/reactivated/Fprint/Manager",
@@ -47,31 +47,10 @@ trait FprintdClient {
     fn list_enrolled_fingers(&self, username: &str) -> Result<Vec<String>, SpellError>;
 }
 
-#[proxy(
-    default_path = "/org/VimYoung/VarHandler",
-    default_service = "org.VimYoung.Spell",
-    interface = "org.VimYoung.Spell1"
-)]
-trait SpellClient {
-    fn set_value(&mut self, layer_name: &str, key: &str, val: &str) -> Result<(), SpellError>;
-    fn find_value(&self, layer_name: &str, key: &str) -> BusResult<String>;
-    fn show_window_back(&self, layer_name: &str) -> Result<(), SpellError>;
-    fn hide_window(&self, layer_name: &str) -> Result<(), SpellError>;
-    #[zbus(signal)]
-    fn layer_var_value_changed(
-        &self,
-        layer_name: &str,
-        var_name: &str,
-        value: &str,
-    ) -> zbus::Result<()>;
-}
-
 #[tokio::main]
 async fn main() -> Result<(), SpellError> {
     let mut values = env::args();
     values.next();
-    let conn = Connection::session().await?;
-    let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.trim() {
             "--version" | "-v" => {
@@ -82,10 +61,10 @@ async fn main() -> Result<(), SpellError> {
             "-l" | "--layer" => match values.next() {
                 Some(layer_value) => match values.next() {
                     Some(sub_command_after_layer) => match sub_command_after_layer.trim() {
-                        "update" => update_value(layer_value, values, proxy).await,
-                        "look" => look_value(layer_value, values, proxy).await,
-                        "show" => proxy.show_window_back(&layer_value).await,
-                        "hide" => proxy.hide_window(&layer_value).await,
+                        "update" => update_value(layer_value, values).await,
+                        "look" => look_value(layer_value, values).await,
+                        "show" => show_window_back(layer_value).await,
+                        "hide" => hide_window(layer_value).await,
                         "log" => get_logs(Some(layer_value), values).await,
                         _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
                     },
@@ -410,25 +389,39 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     }
 }
 
-async fn look_value(
-    layer_name: String,
-    mut values: Args,
-    proxy: SpellClientProxy<'_>,
-) -> Result<(), SpellError> {
+async fn hide_window(layer_name: String) -> Result<(), SpellError> {
+    let request = String::from("hide");
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    Ok(())
+}
+
+async fn show_window_back(layer_name: String) -> Result<(), SpellError> {
+    let request = String::from("show");
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    Ok(())
+}
+
+async fn look_value(layer_name: String, mut values: Args) -> Result<(), SpellError> {
     let remain_arg: String = values
         .next()
         .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
         .clone();
-    let value: String = proxy.find_value(&layer_name, &remain_arg).await?;
+
+    let request = format!("look {}", remain_arg);
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    let mut value = String::new();
+    stream.read_to_string(&mut value)?;
     println!("{value}");
     Ok(())
 }
 
-async fn update_value(
-    layer_name: String,
-    values: Args,
-    mut proxy: SpellClientProxy<'_>,
-) -> Result<(), SpellError> {
+async fn update_value(layer_name: String, values: Args) -> Result<(), SpellError> {
     let remain_arg: Vec<String> = values.collect();
     if remain_arg.len() < 2 {
         Err(SpellError::CLI(Cli::UndefinedArg(
@@ -439,9 +432,13 @@ async fn update_value(
             "More than 2 arg given. Only provide {{key}} and {{Value}}".to_string(),
         )))
     } else {
-        proxy
-            .set_value(&layer_name, &remain_arg[0], &remain_arg[1])
-            .await?;
+        let request = format!("update {}", remain_arg.join(" "));
+        let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+        let mut stream = UnixStream::connect(path)?;
+        stream.write_all(request.as_bytes())?;
+        // proxy
+        //     .set_value(&layer_name, &remain_arg[0], &remain_arg[1])
+        //     .await?;
         Ok(())
     }
 }

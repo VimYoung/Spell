@@ -70,7 +70,9 @@ Usage: spell-cli enable [<argument>] [sub-command] ...
 implementation willl come in upcoming versions.
 ";
 
-pub const APP_WINDOW_SLINT: &str = r#"export component AppWindow inherits Window {
+pub const APP_WINDOW_SLINT: &str = r#"import { VerticalBox, Button } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
     in-out property <int> counter: 42;
     callback request-increase-value();
     width: 276px;

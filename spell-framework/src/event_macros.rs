@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
-        use $crate::wayland_adapter::WinHandle;
+        use $crate::wayland_adapter::{WinHandle, SpellWin};
         $crate::macro_internal::paste! {
             $(
                 struct [<$slint_win Spell>] {
@@ -109,7 +109,7 @@ macro_rules! generate_widgets {
                         &self.ui
                     }
                 }
-            )?
+            )+
         }
     };
 }
@@ -152,7 +152,7 @@ macro_rules! cast_spell {
         let mut windows = Vec::new();
         $(
             $crate::cast_spell!(@expand entry: $entry);
-            $crate::cast_spell!(@vector_add windows, $entry)
+            $crate::cast_spell!(@vector_add windows, way);
         )+
         $crate::cast_spells_new(windows)
     }};
@@ -178,7 +178,6 @@ macro_rules! cast_spell {
         @expand
         entry: ($waywindow:expr, ipc)
     ) => {{
-        // use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
         let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
@@ -196,23 +195,19 @@ macro_rules! cast_spell {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
-                            if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
+                            if let Err(_) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 // tracing::warn!("Couldn't read CLI stream");
                             }
-                            let (operation, command_args) = request.split_once(" ").unwrap();
+                            let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
-                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
-                                // "update" => match format!("set_{}",command).as_str() {
-                                //     $(
-                                //         stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                                //     );*
-                                //     _=> {}
-                                // },
                                 "update" => {
-                                    IpcController::get_type(&ui,command);
+                                    let returned_type = IpcController::get_type(&ui,command);
+                                    if let Err(_) = stream.write_all(returned_type.as_bytes()) {
+                                        // warn!("Couldn't send back return type");
+                                    }
                                 }
                                 "look"=> IpcController::change_val(&mut ui, command, args),
                                 // TODO provide mechanism for custom calls from the below
@@ -290,10 +285,10 @@ macro_rules! cast_spell {
         $crate::cast_spell!(@run way)
     }};
     (@vector_add $wins:expr, ($waywindow:expr, ipc)) => {
-        wins.append(Box::new($waywindow) as Box<dyn $crate::SpellAssociated>)
+        $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
     };
     (@vector_add $wins:expr, $waywindow:expr) => {
-        wins.append(Box::new($waywindow) as Box<dyn $crate::SpellAssociated>)
+        $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
     };
     // Notification Logic
     (@notification $noti:expr) => {
