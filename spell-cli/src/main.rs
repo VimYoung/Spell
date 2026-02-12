@@ -200,7 +200,6 @@ pub(crate) async fn list_devices_and_fingerprints(
     manager_proxy: &FprintdManagerClientProxy<'_>,
 ) -> Result<(), SpellError> {
     let devices = manager_proxy.get_devices().await?;
-    println!("swenvferjkdvff");
     for (manager_index, device) in devices.iter().enumerate() {
         println!("{:?}", device);
         let proxy = FprintdClientProxy::builder(conn_system)

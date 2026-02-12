@@ -159,6 +159,7 @@ macro_rules! cast_spell {
             let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
             $crate::cast_spell!(@vector_add windows, way);
         )+
+        println!("{:?}", windows);
         $crate::cast_spells_new(windows)
     }};
     //
@@ -202,6 +203,7 @@ macro_rules! cast_spell {
                             // tracing::info!("new connection");
                             if let Err(_) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 // tracing::warn!("Couldn't read CLI stream");
+                                println!("Biggeest errorrrrr!!!!");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
@@ -250,15 +252,16 @@ macro_rules! cast_spell {
         let _ = way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, meta, data| {
-                println!("{:?}", meta);
+                println!("generic listener {:?}", meta);
                 loop {
                     // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
-                    match meta.accept() {
+                    match meta.as_ref().accept() {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
                             if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 // tracing::warn!("Couldn't read CLI stream");
+                                println!("Biggeest errorrrrr!!!!");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap();
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
@@ -275,7 +278,7 @@ macro_rules! cast_spell {
                             break; // drained all pending connections;
                         }
                         Err(e) => {
-                            break;
+                            panic!("Following error occured.{}",e);
                         }
                     }
                 }

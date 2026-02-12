@@ -20,35 +20,27 @@ Before starting further, it is important to note that due to nature of rust, som
 
 ## Examples and Basic Usage
 
-Create a new project with `cargo new project_name`. Let's start by adding Slint and Spell as dependencies in your project's `Cargo.toml`.
+Let's first install the CLI of Spell.
 
-```toml
-[dependencies]
-slint = { version = "1.14.1", features = ["renderer-software"] }
-spell = "1.0.1"
+```
+# To install CLI
+cargo install spell-cli
 
-[build-dependencies]
-slint-build = "1.14.1"
-
-[patch.crates-io]
-slint = { git = "https://github.com/slint-ui/slint" }
-slint-build = { git = "https://github.com/slint-ui/slint" }
-i-slint-core = { git = "https://github.com/slint-ui/slint" }
-i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
+# To create a starter project
+sp new project-name
 ```
 
-Since, spell uses some of the private APIs of Slint, it is necessary to provide the above mentioned patches. Build deps are required by slint during compilation process. Moving on, add the `ui` directory (which will store your `.slint` files) in your project root (via command `mkdir ui`). Also add `build.rs` in project root with the following contents for building slint files.
+`sp` CLI offers this clean way to create a project so you wouldn't have to hustle with
+the initial setup. Under the hood, it uses `cargo new` command paired
+with filling the files with appropriate content.
 
-```rust
-fn main() {
-    slint_build::compile("ui/app-window.slint").expect("Slint build failed");
-}
-```
-
-Now the main juice, let's create a counter widget with a button to increment a count which starts from, say 42.
+Now the main code, following code in you slint file create a counter and initialises it
+from default value of 42.
 
 ```slint
 // In path and file name `ui/app-window.slint`
+import { VerticalBox, Button } from "std-widgets.slint";
+
 export component AppWindow inherits Window {
     in-out property <int> counter: 42;
     callback request-increase-value();
@@ -70,38 +62,29 @@ export component AppWindow inherits Window {
 Now, to increment the data and specify the dimensions of widget add the following to your `src/main.rs` file.
 
 ```rust
-use std::{
-    error::Error,
-    sync::mpsc,
-    sync::{Arc, RwLock},
-};
-
 use slint::ComponentHandle;
-use spell::{
-    cast_spell,
-    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf, BoardType},
-    wayland_adapter::SpellWin,
-    Handle,
+use spell_framework::{
+    self, cast_spell,
+    layer_properties::{LayerAnchor, LayerType, WindowConf},
 };
+use std::{env, error::Error};
 slint::include_modules!();
+// Generating Spell widgets/windows from slint windows.
+spell_framework::generate_widgets![AppWindow];
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Necessary configurations for the widget like dimensions, layer etc.
-    let window_conf = WindowConf::new(
-        376,
-        576,
-        (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
-        (5, 0, 0, 10),
-        LayerType::Top,
-        BoardType::None,
-        None,
-    );
+    // Setting configurations for the window.
+    let window_conf = WindowConf::builder()
+        .width(376_u32)
+        .height(576_u32)
+        .anchor_1(LayerAnchor::TOP)
+        .margins(5, 0, 0, 10)
+        .layer_type(LayerType::Top)
+        .build()
+        .unwrap();
 
-    // Getting the window and its event_queue given the properties and a window name.
-    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
-
-    // Slint specific code. Like initialising the window.
-    let ui = AppWindow::new().unwrap();
+    // Initialising Slint Window and corresponding wayland part.
+    let ui = AppWindowSpell::invoke_spell("counter-widget", window_conf);
 
     // Setting the callback closure value which will be called on when the button is clicked.
     ui.on_request_increase_value({
@@ -113,14 +96,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Calling the event loop function for running the window
-    cast_spell(waywindow, None, None)
+    cast_spell!(ui)
 }
 ```
 
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## Spell CLI
 

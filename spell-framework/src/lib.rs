@@ -52,24 +52,28 @@ pub trait IpcController {
 /// This is an internal trait implemented by objects generated from [`generate_widgets`].
 /// It helps in running every SpellWidget (like [SpellWin](`wayland_adapter::SpellWin`),
 /// [SpellLock](`wayland_adapter::SpellLock`)) through the same event_loop function.
-pub trait SpellAssociatedNew {
+pub trait SpellAssociatedNew: std::fmt::Debug {
     fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
 
     fn get_span(&self) -> span::Span {
         span!(Level::INFO, "unnamed-widget")
     }
+
+    fn is_locked(&self) -> bool {
+        true
+    }
 }
 
 /// event loop function internally used by [`cast_spell`] for single widget setups.
 /// Not to be used by end user,
-pub fn cast_spell_inner<S: SpellAssociatedNew + std::fmt::Debug>(
-    mut waywindow: S,
-) -> Result<(), Box<dyn Error>> {
+pub fn cast_spell_inner<S: SpellAssociatedNew>(mut waywindow: S) -> Result<(), Box<dyn Error>> {
     let span = waywindow.get_span();
-    span.in_scope(|| {
-        trace!("{:?}", &waywindow);
-        waywindow.on_call()
-    })
+    let _gaurd = span.enter();
+    trace!("{:?}", &waywindow);
+    while waywindow.is_locked() {
+        waywindow.on_call()?
+    }
+    Ok(())
 }
 
 /// event loop function internally used by [`cast_spell`] for multiple widget setups.

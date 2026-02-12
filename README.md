@@ -20,47 +20,46 @@
   <br />
 </p>
 
-**Don't forget to star the project if you liked it 🌟🌟**
+**Don't forget to star the project if you like it 🌟🌟**
 
 <https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77>
 
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
 
 Spell is a framework that provides necessary tooling to create highly customisable,
-shells for your wayland compositors (like hyprland) using Slint UI.
+shells for your wayland compositors (like niri, hyprland) using Slint UI.
 
 > [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell) is a tutorial for new comers to get a hang of spell.
 
-Rather then leveraging Gtk for widget creation, Slint declarative language provides
-a very easy but comprehensive way to make aesthetic interfaces. It, supports rust
-as backend, so as though there are not many batteries (for now) included
-in the framework itself, everything can be brought to life from the dark arts of
-rust.
+Rather then leveraging Gtk for widget creation.Spell leverages Slint, a declarative
+language provides a very easy but comprehensive way to make aesthetic interfaces.
+It, supports rust as backend, so as though there are not many batteries (for now)
+included in the framework itself, everything can be brought to life from the dark
+arts of rust.
 
 > [!IMPORTANT]
 > Please provide your inputs to improve Spell. Don't use 1.0.2. It is unstable and contains
-> experimental changes, either wait for 1.0.3 or use 1.0.1 till the new APIs become stable.
+> experimental changes, either wait for 1.0.3 or use 1.0.1 till the new APIs become stable. 1.0.3 will
+> be out but remote IPC access remains broken.
 
 ## Features 🖊️
 
-1. **Simple frontend with fast backend:** Spell leverages slint for creating widgets,
+1. **Simple frontend with fast backend:** As Spell uses Slint for creating widgets,
    which is extremely customisable while being easy to use. Backed by rust, the code remains
    lightweight, memory safe and predictable.
 1. **Hot Reload:** Once the size of widget is set. Changes in slint code is reflected
-   as is in the widget. Leading to faster iterations on code.
-1. **Remote Accessibility:** Spell also ships a CLI to which state of widget can be made accessible,
+   as is in the widget. Leading to faster iterations of code.
+1. **Remote Accessibility:** Spell also ships a CLI through which state of widget can be made accessible,
    enabling integration in compositor settings.
-1. **Prebuilt Material Components:** Spell's CLI can port slint's [material components](https://material.slint.dev/)
-   to your project, Just add `--material` when creating a starter project with `sp`.
+1. **Prebuilt Components(Material, Vivi):** Spell's CLI can port slint's
+   [material components](https://material.slint.dev/) to your project, Just add `--material`
+   or `--vivi` when creating a starter project with `sp`.
 1. **Services:** (WIP) Spell also provides a vault with common functionalities like
    app launcher backend, notification backend, MPRIS etc.
 
 ## Minimal Example ✨
 
-> [!NOTE]
-> If you don't want to go through the hassle and simply want to jump over to
-> analyse the code, a ready-made starter spell project can be made
-> with command. Make sure spell-cli is installed.
+Let's first install the CLI of Spell.
 
 ```
 # To install CLI
@@ -70,35 +69,17 @@ cargo install spell-cli
 sp new project-name
 ```
 
-Create a new project with `cargo new project_name`. Let's start by adding Slint and Spell as dependencies in your project's `Cargo.toml`.
+`sp` CLI offers this clean way to create a project so you wouldn't have to hustle with
+the initial setup. Under the hood, it uses `cargo new` command paired
+with filling the files with appropriate content.
 
-```toml
-[dependencies]
-slint = { version = "1.13.1", features = ["renderer-software"] }
-spell = "1.0.0"
-
-[build-dependencies]
-slint-build = "1.13.1"
-
-[patch.crates-io]
-slint = { git = "https://github.com/slint-ui/slint" }
-slint-build = { git = "https://github.com/slint-ui/slint" }
-i-slint-core = { git = "https://github.com/slint-ui/slint" }
-i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
-```
-
-Since, spell uses some of the private APIs of Slint, it is necessary to provide the above mentioned patches. Build deps are required by slint during compilation process. Moving on, add the `ui` directory (which will store your `.slint` files) in your project root (via command `mkdir ui`). Also add `build.rs` in project root with the following contents for building slint files.
-
-```rust
-fn main() {
-    slint_build::compile("ui/app-window.slint").expect("Slint build failed");
-}
-```
-
-Now the main juice, let's create a counter widget with a button to increment a count which starts from, say 42.
+Now the main code, following code in you slint file create a counter and initialises it
+from default value of 42.
 
 ```slint
 // In path and file name `ui/app-window.slint`
+import { VerticalBox, Button } from "std-widgets.slint";
+
 export component AppWindow inherits Window {
     in-out property <int> counter: 42;
     callback request-increase-value();
@@ -121,31 +102,28 @@ Now, to increment the data and specify the dimensions of widget add the followin
 
 ```rust
 use slint::ComponentHandle;
-use spell::{
-    cast_spell,
-    layer_properties::{ForeignController, LayerAnchor, LayerType, WindowConf, BoardType},
-    wayland_adapter::SpellWin,
-    Handle,
+use spell_framework::{
+    self, cast_spell,
+    layer_properties::{LayerAnchor, LayerType, WindowConf},
 };
+use std::{env, error::Error};
 slint::include_modules!();
+// Generating Spell widgets/windows from slint windows.
+spell_framework::generate_widgets![AppWindow];
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Necessary configurations for the widget like dimensions, layer etc.
-    let window_conf = WindowConf::new(
-        376,
-        576,
-        (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
-        (5, 0, 0, 10),
-        LayerType::Top,
-        BoardType::None,
-        false,
-    );
+fn main() -> Result<(), Box<dyn Error>> {
+    // Setting configurations for the window.
+    let window_conf = WindowConf::builder()
+        .width(376_u32)
+        .height(576_u32)
+        .anchor_1(LayerAnchor::TOP)
+        .margins(5, 0, 0, 10)
+        .layer_type(LayerType::Top)
+        .build()
+        .unwrap();
 
-    // Getting the window and its event_queue given the properties and a window name.
-    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
-
-    // Slint specific code. Like initialising the window.
-    let ui = AppWindow::new().unwrap();
+    // Initialising Slint Window and corresponding wayland part.
+    let ui = AppWindowSpell::invoke_spell("counter-widget", window_conf);
 
     // Setting the callback closure value which will be called on when the button is clicked.
     ui.on_request_increase_value({
@@ -157,14 +135,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Calling the event loop function for running the window
-    cast_spell(waywindow, None, None)
+    cast_spell!(ui)
 }
 ```
 
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-The same frontend code for this example can also be found in [slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## When can we expect a stable release?
 
@@ -172,8 +150,8 @@ I remember adding this section a few months ago, now I can say that the first st
 Create a spell project and give it a shot.
 
 > [!WARNING]
-> There will be some heavy breaking changes for making management of CLI access to
-> variables easier. `ForeignController` will essentially be replaced by a macro.
+> There are some heavy breaking changes for making CLI/IPC/Remote access to
+> variables easier. `ForeignController` essentially replaced by `IpcController`.
 > Leading to a much lighter window.
 
 ## Caution

@@ -336,6 +336,7 @@ impl SpellWin {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
+            self.layer.as_ref().unwrap().commit();
         }
     }
 
@@ -532,13 +533,10 @@ impl SpellWin {
 impl SpellAssociatedNew for SpellWin {
     fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
-        info!("Internal reciever set with start of event loop.");
-        loop {
-            event_loop
-                .borrow_mut()
-                .dispatch(std::time::Duration::from_millis(1), self)
-                .unwrap();
-        }
+        event_loop
+            .borrow_mut()
+            .dispatch(std::time::Duration::from_millis(1), self)?;
+        Ok(())
     }
 
     fn get_span(&self) -> tracing::span::Span {
@@ -1152,13 +1150,13 @@ impl SpellLock {
 impl SpellAssociatedNew for SpellLock {
     fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
-        while self.is_locked {
-            event_loop
-                .borrow_mut()
-                .dispatch(std::time::Duration::from_millis(1), self)
-                .unwrap();
-        }
+        event_loop
+            .borrow_mut()
+            .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
+    }
+    fn is_locked(&self) -> bool {
+        self.is_locked
     }
 }
 
