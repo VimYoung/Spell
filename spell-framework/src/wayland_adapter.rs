@@ -687,9 +687,9 @@ impl FractionalScaleHandler for SpellWin {
         //     .as_ref()
         //     .unwrap()
         //     .set_destination(width as i32, height as i32);
-        self.adapter
-            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
-            .unwrap();
+        // self.adapter
+        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+        //     .unwrap();
         self.adapter.request_redraw();
         self.layer.as_ref().unwrap().commit();
     }

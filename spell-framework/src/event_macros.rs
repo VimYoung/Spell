@@ -126,7 +126,9 @@ macro_rules! cast_spell {
         $(
             $crate::cast_spell!(@notification $noti);
         )?
-        $crate::cast_spell!(@expand entry: $win)
+        let (x,_y) = $crate::cast_spell!(@expand entry: $win);
+        println!("{:?}", x);
+        $crate::cast_spell!(@run x)
     }};
     // Single window (IPC)
     (
@@ -137,7 +139,9 @@ macro_rules! cast_spell {
         $(
             $crate::cast_spell!(@notification $noti);
         )?
-        $crate::cast_spell!(@expand entry: ($win, ipc))
+        let (x, _y) = $crate::cast_spell!(@expand entry: ($win, ipc));
+        println!("{:?}", x);
+        $crate::cast_spell!(@run x)
     }};
 
     // Multiple windows (mixed IPC / non-IPC) (Defined individually)
@@ -151,7 +155,8 @@ macro_rules! cast_spell {
         )?
         let mut windows = Vec::new();
         $(
-            $crate::cast_spell!(@expand entry: $entry);
+            // NOTE that this won't work in case of ipc windows being passed.
+            let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
             $crate::cast_spell!(@vector_add windows, way);
         )+
         $crate::cast_spells_new(windows)
@@ -227,7 +232,7 @@ macro_rules! cast_spell {
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        $crate::cast_spell!(@run way)
+        (way, ui)
     }};
     // Non-IPC window
     (
@@ -282,13 +287,25 @@ macro_rules! cast_spell {
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        $crate::cast_spell!(@run way)
+        (way, ui)
     }};
     (@vector_add $wins:expr, ($waywindow:expr, ipc)) => {
         $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
     };
     (@vector_add $wins:expr, $waywindow:expr) => {
         $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
+    };
+
+    (@name ($win:expr,ipc)) => {
+        $crate::macro_internal::paste! {
+            [<$win _var>]
+        }
+    };
+
+    (@name $win:expr) => {
+        $crate::macro_internal::paste! {
+            [<$win _var>]
+        }
     };
     // Notification Logic
     (@notification $noti:expr) => {
@@ -303,5 +320,5 @@ macro_rules! cast_spell {
     // SpellLock Locking
     (lock: $lock:expr) => {
         $crate::cast_spell!(@run $lock)
-    }
+    };
 }
