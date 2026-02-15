@@ -1,0 +1,11 @@
+[package]
+name = "spell-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+slint = { version = "1.15.1", features = ["live-preview", "renderer-software"] }
+spell-framework = { path = "../spell-framework" }
+
+[build-dependencies]
+slint-build = "1.15.1"

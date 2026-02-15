@@ -1207,5 +1207,8 @@ delegate_pointer!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
 
+/// Future XDGpopup implementation will occur on this struct;
+pub struct SpellXdg;
+
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

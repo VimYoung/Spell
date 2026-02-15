@@ -47,14 +47,17 @@ arts of rust.
 1. **Simple frontend with fast backend:** As Spell uses Slint for creating widgets,
    which is extremely customisable while being easy to use. Backed by rust, the code remains
    lightweight, memory safe and predictable.
-1. **Hot Reload:** Once the size of widget is set. Changes in slint code is reflected
+2. **Hot Reload:** Once the size of widget is set. Changes in slint code is reflected
    as is in the widget. Leading to faster iterations of code.
-1. **Remote Accessibility:** Spell also ships a CLI through which state of widget can be made accessible,
+3. **Streamline Project Structure:** Spell doesn't change the project structure
+   of slint in any way. So, no new paradigm needs to be learned for working with
+   spell.
+4. **Remote Accessibility:** Spell also ships a CLI through which state of widget can be made accessible,
    enabling integration in compositor settings.
-1. **Prebuilt Components(Material, Vivi):** Spell's CLI can port slint's
+5. **Prebuilt Components(Material, Vivi):** Spell's CLI can port slint's
    [material components](https://material.slint.dev/) to your project, Just add `--material`
    or `--vivi` when creating a starter project with `sp`.
-1. **Services:** (WIP) Spell also provides a vault with common functionalities like
+6. **Services:** (WIP) Spell also provides a vault with common functionalities like
    app launcher backend, notification backend, MPRIS etc.
 
 ## Minimal Example ✨
@@ -142,7 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-The same frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## When can we expect a stable release?
 
