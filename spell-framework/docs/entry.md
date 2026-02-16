@@ -103,11 +103,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+ehe frontend code for this example is adopted from.[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## Spell CLI
 
-Spell CLI is a utility for managing and handling remotely running windows/widgets. It provides various features like hiding/opening the widget, toggling the widget, remotely setting variables with new/changed values, seeing logs etc. CLI's commands can be combined with your wayland compositor's configuration file to make keybind for your windows. Read more about it in its documentation.
+Spell CLI is a utility for managing and handling remotely running windows/widgets. It provides various features like hiding/opening the widget, toggling the widget, remotely setting variables with new/changed values, seeing logs etc. CLI's commands can be combined with your wayland compositor's configuration file to make keybind for your windows. Read more about it in its documentation. You can install the command `sp` by the following command
+
+```
+cargo install spell-cli
+```
 
 ## Inspiration
 

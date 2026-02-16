@@ -1,4 +1,4 @@
-#[doc = include_str!("../docs/generate_widget.md")]
+#[doc = include_str!("../docs/generate_widgets.md")]
 #[macro_export]
 macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
@@ -120,7 +120,7 @@ macro_rules! cast_spell {
     // Single window (non-IPC)
     (
         $win:expr
-        $(, Notification: $noti:expr)?
+        $(, notification: $noti:expr)?
         $(,)?
     ) => {{
         $(
@@ -133,7 +133,7 @@ macro_rules! cast_spell {
     // Single window (IPC)
     (
         ($win:expr, ipc)
-        $(, Notification: $noti:expr)?
+        $(, notification: $noti:expr)?
         $(,)?
     ) => {{
         $(
@@ -147,7 +147,7 @@ macro_rules! cast_spell {
     // Multiple windows (mixed IPC / non-IPC) (Defined individually)
     (
         windows: [ $($entry:tt),+ $(,)? ]
-        $(, Notification: $noti:expr)?
+        $(, notification: $noti:expr)?
         $(,)?
     ) => {{
         $(

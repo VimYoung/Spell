@@ -1,3 +1,18 @@
+# 1.0.3 & 1.0.3 CLI (Due Date)
+
+Changes:
+
+1. Added docs for new macros. It should also be defined in the main docs page, that
+   most of the struct are becoming not directly usable by the end user. Some way to tell
+   what to use and what not to touch directly.
+2. Added examples from demo, moved examples from young-shell to here so that it can
+   be accessed and used. Removing example widgets from the shell so that remains strictly
+   for use to create a spell.
+
+Changes(spell-cli):
+
+1. Added tags to add third party component library to be used and initialise in a project.
+
 # 1.0.2 & 1.0.2 CLI (25-02-02)
 
 Changes:
