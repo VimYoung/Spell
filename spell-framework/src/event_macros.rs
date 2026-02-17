@@ -197,7 +197,7 @@ macro_rules! cast_spell {
                 println!("{:?}", meta);
                 loop {
                     // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
-                    match meta.accept() {
+                    match meta.as_ref().accept() {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
@@ -245,25 +245,28 @@ macro_rules! cast_spell {
         let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
+        let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
         // let handle_weak = $waywindow.ui.as_weak().clone();
         // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
-        let (ui, way) = $waywindow.parts();
+        let (ui, mut way) = $waywindow.parts();
+        way.ipc_handler = Some(listener_clone);
         let _ = way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
-            move |_, meta, data| {
-                println!("generic listener {:?}", meta);
+            move |_, _, data| {
+                // println!("generic listener {:?}", meta);
                 loop {
                     // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
-                    match meta.as_ref().accept() {
+                    match data.ipc_handler.as_ref().unwrap().accept() {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
                             if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
-                                // tracing::warn!("Couldn't read CLI stream");
-                                println!("Biggeest errorrrrr!!!!");
+                                $crate::macro_internal::warn!("Couldn't read CLI stream");
                             }
-                            let (operation, command_args) = request.split_once(" ").unwrap();
+                                println!("\n\n GIven request {}", request);
+                            let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
+                            println!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
                             println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {

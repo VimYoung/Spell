@@ -69,6 +69,7 @@ use smithay_client_toolkit::{
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
     sync::{Arc, Mutex, Once, OnceLock, RwLock},
@@ -102,6 +103,7 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
+    pub ipc_handler: Option<UnixListener>,
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
@@ -207,6 +209,7 @@ impl SpellWin {
         let mut win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
+            ipc_handler: None,
             queue: qh.clone(),
             buffer: way_pri_buffer,
             states: States {
@@ -335,8 +338,19 @@ impl SpellWin {
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
+            let width: u32 = self.adapter.size.get().width;
+            let height: u32 = self.adapter.size.get().height;
+            // let width: u32 = self.adapter.size.get().width;
+            // let height: u32 = self.adapter.size.get().height;
+            // self.layer.as_ref().unwrap().wl_surface().damage_buffer(
+            //     0,
+            //     0,
+            //     width as i32,
+            //     height as i32,
+            // );
+            //
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
-            self.layer.as_ref().unwrap().commit();
+            // self.layer.as_ref().unwrap().commit();
         }
     }
 
@@ -344,16 +358,9 @@ impl SpellWin {
     pub fn show_again(&self) {
         if self.is_hidden.replace(false) {
             info!("Win: Showing window again");
-            let qh = self.queue.clone();
-            self.converter(&qh);
-            // let primary_buf = self.adapter.refersh_buffer();
-            // self.buffer = primary_buf;
-            // self.layer.commit();
-            // self.set_config_internal();
-            // self.layer
-            //     .wl_surface()
-            //     .attach(Some(self.buffer.wl_buffer()), 0, 0);
-            // self.layer.commit();
+            self.set_config_internal();
+            self.first_configure.set(true);
+            self.layer.as_ref().unwrap().commit();
         }
     }
 
@@ -429,7 +436,6 @@ impl SpellWin {
         set_config(
             &self.config,
             self.layer.as_ref().unwrap(),
-            //self.first_configure,
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
         );
@@ -443,12 +449,12 @@ impl SpellWin {
 
         // Rendering from Skia
         if !self.is_hidden.get() {
-            let skia_now = std::time::Instant::now();
+            // let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            let elasped_time = skia_now.elapsed().as_millis();
-            if elasped_time != 0 {
-                // debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
-            }
+            // let elasped_time = skia_now.elapsed().as_millis();
+            // if elasped_time != 0 {
+            //     debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            // }
 
             let buffer = &self.buffer;
             if self.first_configure.get() || redraw_val {
@@ -482,17 +488,25 @@ impl SpellWin {
                     .unwrap()
                     .wl_surface()
                     .attach(Some(buffer.wl_buffer()), 0, 0);
+                println!("Reattavhed");
             }
+
+            self.layer
+                .as_ref()
+                .unwrap()
+                .wl_surface()
+                .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+            println!("Frame reattahed");
+            self.layer.as_ref().unwrap().commit();
         } else {
             // debug!("Is hidden is true, window is true");
+            // self.layer
+            //     .as_ref()
+            //     .unwrap()
+            //     .wl_surface()
+            //     .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+            self.layer.as_ref().unwrap().commit();
         }
-
-        self.layer
-            .as_ref()
-            .unwrap()
-            .wl_surface()
-            .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
-        self.layer.as_ref().unwrap().commit();
     }
 
     /// Grabs the focus of keyboard. Can be used in combination with other functions
@@ -703,7 +717,7 @@ impl LayerShellHandler for SpellWin {
         _conn: &Connection,
         qh: &QueueHandle<Self>,
         _layer: &LayerSurface,
-        _configure: LayerSurfaceConfigure,
+        configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
         self.converter(qh);

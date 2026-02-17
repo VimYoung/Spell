@@ -173,7 +173,7 @@ impl SpellSkiaWinAdapterReal {
         })
     }
 
-    fn draw(&self) -> bool {
+    pub fn draw(&self) -> bool {
         if self.needs_redraw.replace(false) {
             self.renderer.render().unwrap_or_else(|err| {
                 warn!("Panicking because of error: {}", err);
