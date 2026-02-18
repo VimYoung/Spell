@@ -488,7 +488,6 @@ impl SpellWin {
                     .unwrap()
                     .wl_surface()
                     .attach(Some(buffer.wl_buffer()), 0, 0);
-                println!("Reattavhed");
             }
 
             self.layer
@@ -496,15 +495,8 @@ impl SpellWin {
                 .unwrap()
                 .wl_surface()
                 .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
-            println!("Frame reattahed");
             self.layer.as_ref().unwrap().commit();
         } else {
-            // debug!("Is hidden is true, window is true");
-            // self.layer
-            //     .as_ref()
-            //     .unwrap()
-            //     .wl_surface()
-            //     .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
             self.layer.as_ref().unwrap().commit();
         }
     }

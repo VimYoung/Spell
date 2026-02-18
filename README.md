@@ -38,9 +38,8 @@ included in the framework itself, everything can be brought to life from the dar
 arts of rust.
 
 > [!IMPORTANT]
-> Please provide your inputs to improve Spell. Don't use 1.0.2. It is unstable and contains
-> experimental changes, either wait for 1.0.3 or use 1.0.1 till the new APIs become stable. 1.0.3 will
-> be out but remote IPC access remains broken.
+> Please provide your inputs to improve Spell 1.0.3 is out but remote IPC access remains broken.
+> Ability to pass vectors of ipc and non ipc will be added in the next release.
 
 ## Features 🖊️
 

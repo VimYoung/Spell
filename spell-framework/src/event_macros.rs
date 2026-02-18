@@ -127,7 +127,6 @@ macro_rules! cast_spell {
             $crate::cast_spell!(@notification $noti);
         )?
         let (x,_y) = $crate::cast_spell!(@expand entry: $win);
-        println!("{:?}", x);
         $crate::cast_spell!(@run x)
     }};
     // Single window (IPC)
@@ -140,7 +139,6 @@ macro_rules! cast_spell {
             $crate::cast_spell!(@notification $noti);
         )?
         let (x, _y) = $crate::cast_spell!(@expand entry: ($win, ipc));
-        println!("{:?}", x);
         $crate::cast_spell!(@run x)
     }};
 
@@ -159,23 +157,23 @@ macro_rules! cast_spell {
             let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
             $crate::cast_spell!(@vector_add windows, way);
         )+
-        println!("{:?}", windows);
         $crate::cast_spells_new(windows)
     }};
-    //
+
+    // Moved to next release, only for non -ipc scenarios
     // // Multiple windows (mixed IPC / non-IPC) (Defined as non-ipc vector)
-    // (
-    //     windows: $windows:expr
-    //     $(, windows_ipc: $windows_ipc:expr)?
-    //     $(, Notification: $noti:expr)?
-    //     $(,)?
-    // ) => {{
-    //     $(
-    //         $crate::cast_spell!(@notification $noti);
-    //     )?
-    //     $crate::cast_spells_new(windows)
-    // }};
-    //
+    (
+        windows: $windows:expr
+        $(, windows_ipc: $windows_ipc:expr)?
+        $(, Notification: $noti:expr)?
+        $(,)?
+    ) => {{
+        $(
+            $crate::cast_spell!(@notification $noti);
+        )?
+        $crate::cast_spells_new(windows)
+    }};
+
     // INTERNAL EXPANSION RULES
     // ==================================================
 
@@ -187,23 +185,20 @@ macro_rules! cast_spell {
         let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
+        let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
-        // let handle_weak = $waywindow.ui.as_weak().clone();
-        // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
-        let (ui, way) = $waywindow.parts();
+        let (ui, mut way) = $waywindow.parts();
+        way.ipc_handler = Some(listener_clone);
         let _ = way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, meta, data| {
-                println!("{:?}", meta);
                 loop {
-                    // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
-                    match meta.as_ref().accept() {
+                    match data.ipc_handler.as_ref().unwrap().accept() {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();
                             // tracing::info!("new connection");
-                            if let Err(_) = std::io::Read::read_to_string(&mut stream, &mut request) {
-                                // tracing::warn!("Couldn't read CLI stream");
-                                println!("Biggeest errorrrrr!!!!");
+                            if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
+                                $crate::macro_internal::warn!("Couldn't read CLI stream");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
@@ -254,9 +249,7 @@ macro_rules! cast_spell {
         let _ = way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, _, data| {
-                // println!("generic listener {:?}", meta);
                 loop {
-                    // match data.ipc_listener.borrow().as_ref().unwrap().accept() {
                     match data.ipc_handler.as_ref().unwrap().accept() {
                         Ok((mut stream, _addr)) => {
                             let mut request = String::new();

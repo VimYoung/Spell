@@ -269,7 +269,7 @@ pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result
     Ok(())
 }
 
-fn create_spell_project(path: String) -> Result<(), SpellError> {
+fn create_spell_project(path: String, /*, lib: ThirdPartyComponents*/) -> Result<(), SpellError> {
     if let Ok(output) = Command::new("cargo").args(["new", &path]).output() {
         io::stdout().write_all(&output.stdout)?;
         io::stderr().write_all(&output.stderr)?;
@@ -440,6 +440,13 @@ async fn update_value(layer_name: String, values: Args) -> Result<(), SpellError
         //     .await?;
         Ok(())
     }
+}
+
+#[allow(dead_code)]
+enum ThirdPartyComponents {
+    Sleek,
+    Material,
+    Vivi,
 }
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
