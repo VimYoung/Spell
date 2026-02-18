@@ -4741,7 +4741,7 @@ version = "1.0.2"
 dependencies = [
  "futures-util",
  "slint-build",
- "spell-framework 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spell-framework 1.0.2",
  "tokio",
  "zbus",
 ]
@@ -4752,31 +4752,7 @@ version = "0.1.0"
 dependencies = [
  "slint",
  "slint-build",
- "spell-framework 1.0.2",
-]
-
-[[package]]
-name = "spell-framework"
-version = "1.0.2"
-dependencies = [
- "env_logger",
- "event-listener",
- "fs2",
- "futures-util",
- "i-slint-core",
- "i-slint-renderer-skia",
- "nonstick",
- "paste",
- "rust-fuzzy-search",
- "signal-hook 0.4.3",
- "slint",
- "smithay-client-toolkit 0.20.0",
- "tokio",
- "tracing",
- "tracing-appender",
- "tracing-rfc-5424",
- "tracing-subscriber",
- "zbus",
+ "spell-framework 1.0.4",
 ]
 
 [[package]]
@@ -4795,6 +4771,30 @@ dependencies = [
  "paste",
  "rust-fuzzy-search",
  "signal-hook 0.3.18",
+ "slint",
+ "smithay-client-toolkit 0.20.0",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-rfc-5424",
+ "tracing-subscriber",
+ "zbus",
+]
+
+[[package]]
+name = "spell-framework"
+version = "1.0.4"
+dependencies = [
+ "env_logger",
+ "event-listener",
+ "fs2",
+ "futures-util",
+ "i-slint-core",
+ "i-slint-renderer-skia",
+ "nonstick",
+ "paste",
+ "rust-fuzzy-search",
+ "signal-hook 0.4.3",
  "slint",
  "smithay-client-toolkit 0.20.0",
  "tokio",

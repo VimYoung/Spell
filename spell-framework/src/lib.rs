@@ -6,8 +6,10 @@
 )]
 // #![doc(html_favicon_url = "https://github.com/VimYoung/Spell/blob/bb01ae94a365d237ebb0db1df1b6eb37aea25367/spell-framework/assets/Spell.png")]
 #![doc = include_str!("../docs/entry.md")]
+#![warn(missing_docs)]
 mod configure;
-#[warn(missing_docs)]
+#[cfg(docsrs)]
+mod dummy_skia_docs;
 mod event_macros;
 pub mod forge;
 #[cfg(feature = "i-slint-renderer-skia")]
@@ -40,6 +42,7 @@ pub mod macro_internal {
 use std::error::Error;
 use tracing::{Level, span, trace};
 
+/// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
     /// On calling `spell-cli -l layer_name look
     /// var_name`, the cli calls `get_type` method of the trait with `var_name` as input.
@@ -53,12 +56,15 @@ pub trait IpcController {
 /// It helps in running every SpellWidget (like [SpellWin](`wayland_adapter::SpellWin`),
 /// [SpellLock](`wayland_adapter::SpellLock`)) through the same event_loop function.
 pub trait SpellAssociatedNew: std::fmt::Debug {
+    /// Internal method used to call to update UI in a loop.
     fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
 
+    /// Internal method used to retrive logging span of a window.
     fn get_span(&self) -> span::Span {
         span!(Level::INFO, "unnamed-widget")
     }
 
+    /// Internal method used to specify when to eliminate the event loop.
     fn is_locked(&self) -> bool {
         true
     }

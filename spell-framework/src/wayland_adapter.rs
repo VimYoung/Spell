@@ -338,8 +338,8 @@ impl SpellWin {
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
-            let width: u32 = self.adapter.size.get().width;
-            let height: u32 = self.adapter.size.get().height;
+            // let width: u32 = self.adapter.size.get().width;
+            // let height: u32 = self.adapter.size.get().height;
             // let width: u32 = self.adapter.size.get().width;
             // let height: u32 = self.adapter.size.get().height;
             // self.layer.as_ref().unwrap().wl_surface().damage_buffer(
@@ -709,7 +709,7 @@ impl LayerShellHandler for SpellWin {
         _conn: &Connection,
         qh: &QueueHandle<Self>,
         _layer: &LayerSurface,
-        configure: LayerSurfaceConfigure,
+        _configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
         self.converter(qh);
