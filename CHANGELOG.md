@@ -1,4 +1,17 @@
-# 1.0.3 & 1.0.3 CLI (Due Date)
+# 1.0.5 & 1.0.5 CLI (Due Date)
+
+Changes:
+
+1. Activated touch screen inputs in SpellWin and SpellLock.
+2. Added support for lock in `generate_widgets` macro.
+3. Added notification manger.
+4. XDG popup implementation recently.
+
+Changes(spell-cli):
+
+1. Added tags to add third party component library to be used and initialise in a project.
+
+# 1.0.4 (26-02-18)
 
 Changes:
 
@@ -9,11 +22,7 @@ Changes:
    be accessed and used. Removing example widgets from the shell so that remains strictly
    for use to create a spell.
 
-Changes(spell-cli):
-
-1. Added tags to add third party component library to be used and initialise in a project.
-
-# 1.0.2 & 1.0.2 CLI (25-02-02)
+# 1.0.2 & 1.0.2 CLI (26-02-02)
 
 Changes:
 
