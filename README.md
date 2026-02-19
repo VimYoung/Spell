@@ -141,10 +141,23 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 ```
 
-Running this code with cargo will display a widget in your wayland compositor. It is important to
-mention that if you have defined width and height in both your window and in the rust
-code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+Running this code with cargo will display a widget in your wayland compositor.
+
+It is important to mention that if you have defined width and height in both your
+window and in the rust code,then the renderer will manage the more or less dimensions
+accordingly, which may lead to undefined behaviour.
+
+For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs. The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+
+## More Examples
+
+You can clone this repository and run the following examples.
+
+1. Example of a simple bar.
+
+```bash
+cargo run -p spell-demo --bin bar
+```
 
 ## When can we expect a stable release?
 

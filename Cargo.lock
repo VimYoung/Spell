@@ -4750,6 +4750,7 @@ dependencies = [
 name = "spell-demo"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "slint",
  "slint-build",
  "spell-framework 1.0.4",

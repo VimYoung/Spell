@@ -17,3 +17,84 @@ export component AppWindow inherits Window {
         }
     }
 }
+
+export component TopBar inherits Window {
+    in-out property <string> time_var: "04:34 PM";
+    callback set-time();
+    background: transparent;
+    height: 40px;
+    width: 1536px;
+
+    Timer {
+        running: true;
+        interval: 1s;
+        triggered => {
+            parent.set-time();
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 29px;
+        height: 10px;
+        background: transparent;
+        Path {
+            x: 0px;
+            commands: "M 7 8 L 7 3 L 12 3 C 9 4 8 5 7 8";
+            stroke: black;
+            fill: black;
+            width: 10px;
+        }
+
+        Path {
+            x: parent.width - 10px;
+            commands: "M 7 3 L 12 3 L 12 8 C 11 5 10 4 7 3";
+            stroke: black;
+            fill: black;
+            width: 10px;
+        }
+    }
+
+    Rectangle {
+        clip: true;
+        x: 0px;
+        y: 0px;
+        height: 30px;
+        width: parent.width;
+        background: black;
+        animate height { duration: 200ms; }
+        Rectangle {
+            clip: true;
+            y: 0px;
+            background: black;
+            height: 30px;
+
+            Rectangle {
+                x: 5px;
+                width: 20px;
+                background: black;
+                Image {
+                    y: 7px;
+                    width: 18px;
+                    source: @image-url("../assets/icons/artixlinux.svg");
+                    colorize: white;
+                }
+            }
+
+            Rectangle {
+                background: cyan;
+                x: (root.width / 2) - 40px;
+                width: 100px;
+                height: parent.height - 10px;
+                border-radius: 5px;
+                Text {
+                    color: black;
+                    horizontal-alignment: TextHorizontalAlignment.center;
+                    vertical-alignment: TextVerticalAlignment.center;
+                    text: time_var;
+                    font-size: 17px;
+                }
+            }
+        }
+    }
+}

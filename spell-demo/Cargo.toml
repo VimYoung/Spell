@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chrono = "0.4.43"
 slint = { version = "1.15.1", features = ["live-preview", "renderer-software"] }
 spell-framework = { path = "../spell-framework" }
 
