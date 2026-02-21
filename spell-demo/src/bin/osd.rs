@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build()
         .unwrap();
 
-    let ui = TopBarSpell::invoke_spell("counter-widget", window_conf);
+    let ui = TopBarSpell::invoke_spell("osd", window_conf);
     ui.on_set_time({
         let ui_handle = ui.as_weak();
         move || {
