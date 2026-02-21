@@ -1,57 +1,70 @@
 pub mod constantvals;
 use constantvals::{
-    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, LOGS_HELP, MAIN_FILE, MAIN_HELP,
+    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_FILE,
+    MAIN_HELP, SPELL_PAM_FPRINT,
 };
 use core::panic;
+use futures_util::stream::StreamExt;
 use std::{
     env::{self, Args},
     fs::{self, OpenOptions},
-    io::{self, Write},
-    os::unix::net::UnixDatagram,
+    io::{self, Read, Write},
+    os::unix::net::{UnixDatagram, UnixStream},
     path::Path,
     process::Command,
 };
-use zbus::{Connection, Result as BusResult, proxy};
+use zbus::{Connection, proxy, zvariant::OwnedObjectPath};
 
 #[proxy(
-    default_path = "/org/VimYoung/VarHandler",
-    default_service = "org.VimYoung.Spell",
-    interface = "org.VimYoung.Spell1"
+    default_path = "/net/reactivated/Fprint/Manager",
+    default_service = "net.reactivated.Fprint",
+    interface = "net.reactivated.Manager"
 )]
-trait SpellClient {
-    fn set_value(&mut self, layer_name: &str, key: &str, val: &str) -> Result<(), SpellError>;
-    fn find_value(&self, layer_name: &str, key: &str) -> BusResult<String>;
-    fn show_window_back(&self, layer_name: &str) -> Result<(), SpellError>;
-    fn hide_window(&self, layer_name: &str) -> Result<(), SpellError>;
+trait FprintdManagerClient {
+    fn get_default_device(&self) -> Result<OwnedObjectPath, SpellError>;
+    fn get_devices(&self) -> Result<Vec<OwnedObjectPath>, SpellError>;
+}
+
+#[proxy(
+    default_path = "/net/reactivated/Fprint/Device/0",
+    default_service = "net.reactivated.Fprint",
+    interface = "net.reactivated.Fprint.Device"
+)]
+trait FprintdClient {
     #[zbus(signal)]
-    fn layer_var_value_changed(
-        &self,
-        layer_name: &str,
-        var_name: &str,
-        value: &str,
-    ) -> zbus::Result<()>;
+    fn enroll_status(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn verify_status(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn verify_finger_selected(&self, result: &str, done: bool) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn name(&self) -> zbus::Result<String>;
+    fn claim(&self, username: &str) -> Result<(), SpellError>;
+    fn enroll_start(&self, finger_name: &str) -> Result<(), SpellError>;
+    fn enroll_stop(&self) -> Result<(), SpellError>;
+    fn verify_start(&self, finger_name: &str) -> Result<(), SpellError>;
+    fn verify_stop(&self) -> Result<(), SpellError>;
+    fn list_enrolled_fingers(&self, username: &str) -> Result<Vec<String>, SpellError>;
 }
 
 #[tokio::main]
 async fn main() -> Result<(), SpellError> {
     let mut values = env::args();
     values.next();
-    let conn = Connection::session().await?;
-    let proxy = SpellClientProxy::new(&conn).await?;
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.trim() {
             "--version" | "-v" => {
-                println!("spell-cli version 1.0.0");
+                println!("spell-cli version 1.0.2");
             Ok(())
             },
             "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l|--layer `name` sub command".to_string()))),
             "-l" | "--layer" => match values.next() {
                 Some(layer_value) => match values.next() {
                     Some(sub_command_after_layer) => match sub_command_after_layer.trim() {
-                        "update" => update_value(layer_value, values, proxy).await,
-                        "look" => look_value(layer_value, values, proxy).await,
-                        "show" => proxy.show_window_back(&layer_value).await,
-                        "hide" => proxy.hide_window(&layer_value).await,
+                        "update" => update_value(layer_value, values).await,
+                        "look" => look_value(layer_value, values).await,
+                        "show" => show_window_back(layer_value).await,
+                        "hide" => hide_window(layer_value).await,
                         "log" => get_logs(Some(layer_value), values).await,
                         _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
                     },
@@ -92,6 +105,18 @@ async fn main() -> Result<(), SpellError> {
             // List the running instancs of windows and subwindows.
             "list" => Ok(()),
             "--help" | "-h" => show_help(None),
+            "fprint" => {
+                match values.next() {
+                Some(fprint_sub) => match fprint_sub.trim() {
+                    "--help" => show_help(Some("fprint")),
+                    "list" => fingerprint(Fprint::List).await,
+                    "enroll" => fingerprint(Fprint::Enroll).await,
+                    "verify" =>fingerprint(Fprint::Verify).await,
+                    sub => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub}\" doesn't exist, use `spell --help` to view available commands"))))
+                }
+                None => fingerprint(Fprint::List).await
+                }
+            },
             _ => {
                 if sub_command.starts_with('-') || sub_command.starts_with("--") {
                     Err(SpellError::CLI(Cli::BadSubCommand(format!(
@@ -110,15 +135,10 @@ async fn main() -> Result<(), SpellError> {
             // TODO below code can be avoided by implementing Debug manually for the erum
             match recieved_error {
                 SpellError::CLI(cli) => match cli {
-                    Cli::BadSubCommand(err) => {
-                        eprintln!("[Bad Sub-command]: {err}");
-                    }
-                    Cli::UndefinedArg(err) => {
-                        eprintln!("[Undefined Arg]: {err}");
-                    }
-                    Cli::UnknownVal(err) => {
-                        eprintln!("[Unknown Value] {err}");
-                    }
+                    Cli::BadSubCommand(err) => eprintln!("[Bad Sub-command]: {err}"),
+                    Cli::UndefinedArg(err) => eprintln!("[Undefined Arg]: {err}"),
+                    Cli::UnknownVal(err) => eprintln!("[Unknown Value] {err}"),
+                    Cli::UndeclaredVal(err) => eprintln!("[Undeclared Content]: {err}"),
                 },
                 SpellError::Buserror(bus_error) => match bus_error {
                     zbus::Error::MethodError(rare_err_1, err_val, rare_err_2) => {
@@ -126,6 +146,9 @@ async fn main() -> Result<(), SpellError> {
                             match value.as_str() {
                                 "Value is not supported" => eprintln!(
                                     "[Parse Error]: Given Value for key couldn't be parsed."
+                                ),
+                                "Sender is not authorized to send message" => eprintln!(
+                                    "List couldn't currently display devices and fingerprints. Use `fprintd-list` instead if installed"
                                 ),
                                 _ => eprintln!(
                                     "[Method Error]: Seems like the service is not running. \n Invoke `cast_spell` before calling for changes. {value}"
@@ -157,7 +180,96 @@ async fn main() -> Result<(), SpellError> {
     Ok(())
 }
 
-fn create_spell_project(path: String) -> Result<(), SpellError> {
+async fn fingerprint(fprint: Fprint) -> Result<(), SpellError> {
+    let conn_system = Connection::system().await?;
+    let proxy = FprintdClientProxy::new(&conn_system).await?;
+    match fprint {
+        Fprint::Enroll => enroll_fingerprint(&proxy).await?,
+        Fprint::Verify => verify_fingerprint(&proxy).await?,
+        Fprint::List => {
+            // TODO this functionality doesn't work currently, fix it.
+            let manager_proxy = FprintdManagerClientProxy::new(&conn_system).await?;
+            list_devices_and_fingerprints(&conn_system, &manager_proxy).await?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn list_devices_and_fingerprints(
+    conn_system: &Connection,
+    manager_proxy: &FprintdManagerClientProxy<'_>,
+) -> Result<(), SpellError> {
+    let devices = manager_proxy.get_devices().await?;
+    for (manager_index, device) in devices.iter().enumerate() {
+        println!("{:?}", device);
+        let proxy = FprintdClientProxy::builder(conn_system)
+            .path(device)?
+            .build()
+            .await?;
+        println!("Device {}: {}", manager_index, proxy.name().await?);
+        let fingerprints = proxy.list_enrolled_fingers("").await?;
+        for (index, fingerprint) in fingerprints.iter().enumerate() {
+            println!("    Fingerprint {}: {}", index, fingerprint);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn verify_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result<(), SpellError> {
+    proxy.claim("").await?;
+    let fingerprints = proxy.list_enrolled_fingers("").await?;
+    for finger in fingerprints {
+        proxy.verify_start(&finger).await?;
+        while let Some(msg) = proxy.receive_verify_status().await?.next().await {
+            // struct `JobNewArgs` is generated from `job_new` signal function arguments
+            let args: VerifyStatusArgs<'_> = msg.args().expect("Error parsing message");
+            println!("Result={}", args.result);
+            if args.done {
+                break;
+            }
+        }
+        proxy.verify_stop().await?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result<(), SpellError> {
+    println!("{}", SPELL_PAM_FPRINT);
+    let mut finger_str = String::from("");
+    print!(
+        r#"Enter Fingerprint type (Available options):
+            Value               : Meaning
+            left-thumb          : Left thumb
+            left-index-finger   : Left index finger
+            left-middle-finger  : Left middle finger
+            left-ring-finger    : Left ring finger
+            left-little-finger  : Left little finger
+            right-thumb         : Right thumb
+            right-index-finger  : Right index finger
+            right-middle-finger : Right middle finger
+            right-ring-finger   : Right ring finger
+            right-little-finger : Right little finger 
+            :"#
+    );
+    io::stdin()
+        .read_line(&mut finger_str)
+        .expect("unable to read finger type");
+    proxy.claim("").await?;
+    proxy.enroll_start(finger_str.trim()).await?;
+    while let Some(msg) = proxy.receive_enroll_status().await?.next().await {
+        // struct `JobNewArgs` is generated from `job_new` signal function arguments
+        let args: EnrollStatusArgs<'_> = msg.args().expect("Error parsing message");
+
+        println!("Result={}", args.result);
+        if args.done {
+            break;
+        }
+    }
+    proxy.enroll_stop().await?;
+    Ok(())
+}
+
+fn create_spell_project(path: String, /*, lib: ThirdPartyComponents*/) -> Result<(), SpellError> {
     if let Ok(output) = Command::new("cargo").args(["new", &path]).output() {
         io::stdout().write_all(&output.stdout)?;
         io::stderr().write_all(&output.stderr)?;
@@ -264,6 +376,7 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
             match sub_comm {
                 "log" => println!("{LOGS_HELP}"),
                 "enable" => println!("{ENABLE_HELP}"),
+                "fprint" => println!("{FPRINT_HELP}"),
                 _ => {}
             }
             Ok(())
@@ -275,25 +388,39 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
     }
 }
 
-async fn look_value(
-    layer_name: String,
-    mut values: Args,
-    proxy: SpellClientProxy<'_>,
-) -> Result<(), SpellError> {
+async fn hide_window(layer_name: String) -> Result<(), SpellError> {
+    let request = String::from("hide");
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    Ok(())
+}
+
+async fn show_window_back(layer_name: String) -> Result<(), SpellError> {
+    let request = String::from("show");
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    Ok(())
+}
+
+async fn look_value(layer_name: String, mut values: Args) -> Result<(), SpellError> {
     let remain_arg: String = values
         .next()
         .ok_or_else(|| SpellError::CLI(Cli::UndefinedArg("No variable name provided".to_string())))?
         .clone();
-    let value: String = proxy.find_value(&layer_name, &remain_arg).await?;
+
+    let request = format!("look {}", remain_arg);
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
+    let mut value = String::new();
+    stream.read_to_string(&mut value)?;
     println!("{value}");
     Ok(())
 }
 
-async fn update_value(
-    layer_name: String,
-    values: Args,
-    mut proxy: SpellClientProxy<'_>,
-) -> Result<(), SpellError> {
+async fn update_value(layer_name: String, values: Args) -> Result<(), SpellError> {
     let remain_arg: Vec<String> = values.collect();
     if remain_arg.len() < 2 {
         Err(SpellError::CLI(Cli::UndefinedArg(
@@ -304,20 +431,23 @@ async fn update_value(
             "More than 2 arg given. Only provide {{key}} and {{Value}}".to_string(),
         )))
     } else {
-        proxy
-            .set_value(&layer_name, &remain_arg[0], &remain_arg[1])
-            .await?;
+        let request = format!("update {}", remain_arg.join(" "));
+        let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+        let mut stream = UnixStream::connect(path)?;
+        stream.write_all(request.as_bytes())?;
+        // proxy
+        //     .set_value(&layer_name, &remain_arg[0], &remain_arg[1])
+        //     .await?;
         Ok(())
     }
 }
 
-enum LogType {
-    Slint,
-    Debug,
-    Dump,
-    Dev,
+#[allow(dead_code)]
+enum ThirdPartyComponents {
+    Sleek,
+    Material,
+    Vivi,
 }
-
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
 // Currently Buserror is not being used. THis requires type implementations
@@ -335,6 +465,7 @@ pub enum Cli {
     BadSubCommand(String),
     UndefinedArg(String),
     UnknownVal(String),
+    UndeclaredVal(String),
 }
 
 impl From<std::io::Error> for SpellError {
@@ -347,6 +478,19 @@ impl From<zbus::Error> for SpellError {
     fn from(value: zbus::Error) -> Self {
         SpellError::Buserror(value)
     }
+}
+
+enum Fprint {
+    Enroll,
+    List,
+    Verify,
+}
+
+enum LogType {
+    Slint,
+    Debug,
+    Dump,
+    Dev,
 }
 
 // TODO write man docs for the command line tool and its Config if expanded further.

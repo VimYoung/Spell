@@ -21,10 +21,10 @@ Sub-commands:
     list: Lists the running instances of windows created by spell-framework.
 
 Arguments:
-    --layer | -l :  Specifies the name of layer (aka window) to be used for specific commands. Use
-                    unique names of layers to avoid undefined behaviour. Required by
-                    update, look, show and hide sub commands.
-    --help | -h :   Shows this help message.
+    --layer | -l:   Specifies the name of layer (aka window) to be used for specific
+                    commands. Use unique names of layers to avoid undefined behaviour.
+                    Required by update, look, show and hide sub commands.
+    --help | -h:    Shows this help message.
     --version | -v: Displays the version of spell-cli.
 ";
 
@@ -48,6 +48,21 @@ Arguments:
                     logs can't be specified on the basis of layer_name.
     --help | -h :   Shows this help message.
 ";
+
+pub const FPRINT_HELP: &str = "
+Usage: spell-cli fprint [<argument>] [sub-command]
+
+`fprint` subcommand is used to enroll, verify and list fingerprints.
+
+Sub-commands:
+    enroll: Specify the finger and register its fingerprint. Make Sure that a polkit
+            agent and fprintd service are up and running.
+    verify: Opens the sensor for verification for a fingerprint.
+    list:   (WIP) Lists available fingerprint sensors along with enrolled fingerprints.
+Argument:
+    --help | -h :   Shows this help message.
+";
+
 pub const ENABLE_HELP: &str = "
 Usage: spell-cli enable [<argument>] [sub-command] ...
 
@@ -55,7 +70,9 @@ Usage: spell-cli enable [<argument>] [sub-command] ...
 implementation willl come in upcoming versions.
 ";
 
-pub const APP_WINDOW_SLINT: &str = r#"export component AppWindow inherits Window {
+pub const APP_WINDOW_SLINT: &str = r#"import { VerticalBox, Button } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
     in-out property <int> counter: 42;
     callback request-increase-value();
     width: 276px;
@@ -88,7 +105,7 @@ edition = "2021"
 
 [dependencies]
 slint = { version = "1.14.1", features = ["live-preview", "renderer-software"] }
-spell-framework = "1.0.1"
+spell-framework = "1.0.3"
 
 [build-dependencies]
 slint-build = "1.14.1"
@@ -99,29 +116,31 @@ slint-build = { git = "https://github.com/slint-ui/slint" }
 i-slint-core = { git = "https://github.com/slint-ui/slint" }
 i-slint-renderer-skia = { git = "https://github.com/slint-ui/slint" }
 "#;
-pub const MAIN_FILE: &str = r#"use std::{ env, error::Error};
-
-use slint::ComponentHandle;
+pub const MAIN_FILE: &str = r#"use slint::ComponentHandle;
 use spell_framework::{
-    cast_spell,
-    layer_properties::{BoardType, LayerAnchor, LayerType, WindowConf},
-    wayland_adapter::SpellWin,
+    self, cast_spell,
+    layer_properties::{LayerAnchor, LayerType, WindowConf},
 };
+use std::{env, error::Error};
 slint::include_modules!();
+// Generating Spell widgets/windows from slint windows.
+spell_framework::generate_widgets![AppWindow];
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let window_conf = WindowConf::new(
-        376,
-        576,
-        (Some(LayerAnchor::TOP), Some(LayerAnchor::LEFT)),
-        (5, 0, 0, 10),
-        LayerType::Top,
-        BoardType::None,
-        None,
-    );
+    // Setting configurations for the window.
+    let window_conf = WindowConf::builder()
+        .width(376_u32)
+        .height(576_u32)
+        .anchor_1(LayerAnchor::TOP)
+        .margins(5, 0, 0, 10)
+        .layer_type(LayerType::Top)
+        .build()
+        .unwrap();
 
-    let waywindow = SpellWin::invoke_spell("counter-widget", window_conf);
-    let ui = AppWindow::new().unwrap();
+    // Initialising Slint Window and corresponding wayland part.
+    let ui = AppWindowSpell::invoke_spell("counter-widget", window_conf);
+
+    // Setting the callback closure value which will be called on when the button is clicked.
     ui.on_request_increase_value({
         let ui_handle = ui.as_weak();
         move || {
@@ -129,6 +148,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui.set_counter(ui.get_counter() + 1);
         }
     });
-    cast_spell(waywindow, None, None)
+
+    // Calling the event loop function for running the window
+    cast_spell!(ui)
 }
+"#;
+
+pub const SPELL_PAM_FPRINT: &str = r#"Make sure that a polkit agent is up and running!!
+Also `login` file in `/etc/pam.d/` should have following line in top below comments:
+auth      sufficient pam_fprintd.so
 "#;

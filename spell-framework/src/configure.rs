@@ -1,7 +1,6 @@
 use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
-use tracing::warn;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     EnvFilter, Layer as TracingTraitLayer,
@@ -61,23 +60,23 @@ impl std::clone::Clone for Rgba8Pixel {
     }
 }
 
-/// WindowConf is an essential struct passed on to widget constructor functions (like [invoke_spell](crate::wayland_adapter::SpellWin::invoke_spell))
-/// for defining the specifications of the widget.
+/// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
+/// of generated code) for defining the specifications of the widget.
 ///
 /// ## Panics
 ///
-/// event loops like [cast_spell](crate::cast_spell) and [encahnt_spells](crate::enchant_spells) will panic if 0 is provided as width or height.
+/// event loops like [cast_spell](crate::cast_spell) will panic if 0 is provided as width or height.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
     /// Defines the widget width in pixels. On setting values greater than the provided pixels of
     /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
     /// note that the value should be the maximum width the widget will ever attain, not the
-    /// current width in case of resizeable widgets.
+    /// current width in case of resizeable widgets. This value has no default and needs to be set.
     pub width: u32,
     /// Defines the widget height in pixels. On setting values greater than the provided pixels of
     /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
     /// note that the value should be the maximum height the widget will ever attain, not the
-    /// current height in case of resizeable widgets.
+    /// current height in case of resizeable widgets. This value has no default and needs to be set.
     pub height: u32,
     /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
     /// related explaination of usage. If both values are None, then widget is displayed in the
@@ -85,24 +84,32 @@ pub struct WindowConf {
     pub anchor: (Option<Anchor>, Option<Anchor>),
     /// Defines the margin of widget from monitor edges, negative values make the widget go outside
     /// of monitor pixels if anchored to some edge(s). Otherwise, the widget moves to the opposite
-    /// direction to the given pixels.
+    /// direction to the given pixels. Defaults to `0` for all sides.
     pub margin: (i32, i32, i32, i32),
     /// Defines the possible layer on which to define the widget. View [`Layer`] for more details.
+    /// Defaults to [`Layer::Top`].
     pub layer_type: Layer,
     /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`] for more
-    /// details.
+    /// details. Defauts to [`KeyboardInteractivity::None`]
     pub board_interactivity: Cell<KeyboardInteractivity>,
     /// Defines if the widget is exclusive of not,if not set to None, else set to number of pixels to
-    /// set as exclusive zone as i32.
+    /// set as exclusive zone as i32. Defaults to no exclusive zone.
     pub exclusive_zone: Option<i32>,
     /// Defines the monitor name on which to spawn the window.
     /// When no monitor is provided, the window is spawned on the default monitor.
     pub monitor_name: Option<String>,
+    /// Defines if the method of scrolling for the widget should be natural or
+    /// reverse. Defaults to reverse scrolling. Learn more about scrolling types
+    /// [here](https://blog.logrocket.com/ux-design/natural-vs-reverse-scrolling/).
+    pub natural_scroll: bool,
 }
 
 impl WindowConf {
     /// constructor method for initialising an instance of WindowConf.
-    #[allow(clippy::too_many_arguments)]
+    #[deprecated(
+        since = "1.0.2",
+        note = "Use the builder method to access all the configuration. It will be removed in release 1.0.3."
+    )]
     pub fn new(
         max_width: u32,
         max_height: u32,
@@ -111,7 +118,6 @@ impl WindowConf {
         layer_type: Layer,
         board_interactivity: KeyboardInteractivity,
         exclusive_zone: Option<i32>,
-        monitor_name: Option<String>,
     ) -> Self {
         WindowConf {
             width: max_width,
@@ -121,8 +127,128 @@ impl WindowConf {
             layer_type,
             board_interactivity: Cell::new(board_interactivity),
             exclusive_zone,
-            monitor_name,
+            monitor_name: None,
+            natural_scroll: false,
         }
+    }
+
+    /// Creates a builder instance for creation of WindowConf, to view defaults
+    /// head over to documentation of [`WindowConf`]'s parameters.
+    pub fn builder() -> WindowConfBuilder {
+        WindowConfBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct WindowConfBuilder {
+    max_width: u32,
+    max_height: u32,
+    anchor: (Option<Anchor>, Option<Anchor>),
+    margin: (i32, i32, i32, i32),
+    layer_type: Option<Layer>,
+    board_interactivity: KeyboardInteractivity,
+    exclusive_zone: Option<i32>,
+    monitor_name: Option<String>,
+    natural_scroll: bool,
+}
+
+impl WindowConfBuilder {
+    /// Sets [`WindowConf::width`].
+    pub fn width<I: Into<u32>>(&mut self, width: I) -> &mut Self {
+        let new = self;
+        new.max_width = width.into();
+        new
+    }
+
+    /// Sets [`WindowConf::height`].
+    pub fn height<I: Into<u32>>(&mut self, height: I) -> &mut Self {
+        let x = self;
+        x.max_height = height.into();
+        x
+    }
+
+    /// Sets first anchor of [`WindowConf::anchor`].
+    pub fn anchor_1(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor.0 = Some(anchor);
+        x
+    }
+
+    /// Sets second anchor of [`WindowConf::anchor`].
+    pub fn anchor_2(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor.1 = Some(anchor);
+        x
+    }
+
+    /// Sets [`WindowConf::margin`].
+    pub fn margins(&mut self, top: i32, right: i32, bottom: i32, left: i32) -> &mut Self {
+        let x = self;
+        x.margin = (top, right, bottom, left);
+        x
+    }
+
+    /// Sets [`WindowConf::layer_type`].
+    pub fn layer_type(&mut self, layer: Layer) -> &mut Self {
+        let x = self;
+        x.layer_type = Some(layer);
+        x
+    }
+
+    /// Sets [`WindowConf::board_interactivity`].
+    pub fn board_interactivity(&mut self, board: KeyboardInteractivity) -> &mut Self {
+        let x = self;
+        x.board_interactivity = board;
+        x
+    }
+
+    /// Sets [`WindowConf::exclusive_zone`].
+    pub fn exclusive_zone(&mut self, dimention: i32) -> &mut Self {
+        let x = self;
+        x.exclusive_zone = Some(dimention);
+        x
+    }
+
+    /// Sets [`WindowConf::monitor_name`].
+    pub fn monitor(&mut self, name: String) -> &mut Self {
+        let x = self;
+        x.monitor_name = Some(name);
+        x
+    }
+
+    /// Sets [`WindowConf::natural_scroll`].
+    pub fn natural_scroll(&mut self, scroll: bool) -> &mut Self {
+        let x = self;
+        x.natural_scroll = scroll;
+        x
+    }
+
+    /// Creates an instnce of [`WindowConf`] with the provided configurations.
+    /// This function result in an error if width and height are not set or they
+    /// are set to zero.
+    pub fn build(&self) -> Result<WindowConf, Box<dyn std::error::Error>> {
+        Ok(WindowConf {
+            width: if self.max_width != 0 {
+                self.max_width
+            } else {
+                return Err("width is either not defined or set to zero".into());
+            },
+            height: if self.max_width != 0 {
+                self.max_height
+            } else {
+                return Err("height is either not defined or set to zero".into());
+            },
+            anchor: self.anchor,
+            margin: self.margin,
+            layer_type: match self.layer_type {
+                None => Layer::Top,
+                Some(val) => val,
+            },
+            board_interactivity: Cell::new(self.board_interactivity),
+            exclusive_zone: self.exclusive_zone,
+            monitor_name: self.monitor_name.clone(),
+            natural_scroll: self.natural_scroll,
+        })
     }
 }
 

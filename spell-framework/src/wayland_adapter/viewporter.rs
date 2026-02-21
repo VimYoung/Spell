@@ -60,9 +60,12 @@ impl ViewporterState {
 }
 
 impl Viewport {
+    #[allow(dead_code)]
     pub fn set_source(&self, x: f64, y: f64, width: f64, height: f64) {
         self.viewport.set_source(x, y, width, height);
     }
+
+    #[allow(dead_code)]
     pub fn set_destination(&self, width: i32, height: i32) {
         self.viewport.set_destination(width, height);
     }
@@ -106,7 +109,6 @@ where
     }
 }
 
-#[macro_export]
 macro_rules! delegate_viewporter {
     ($(@<$( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+>)? $ty: ty) => {
         smithay_client_toolkit::reexports::client::delegate_dispatch!($(@< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $ty: [
@@ -117,3 +119,4 @@ macro_rules! delegate_viewporter {
         ] => $crate::wayland_adapter::viewporter::ViewporterState);
     };
 }
+pub(crate) use delegate_viewporter;

@@ -1,4 +1,46 @@
-# 1.0.1 & 1.0.1 CLI (Due date)
+# 1.0.5 & 1.0.5 CLI (Due Date)
+
+Changes:
+
+1. Activated touch screen inputs in SpellWin and SpellLock.
+2. Added support for lock in `generate_widgets` macro.
+3. Added notification manger.
+4. XDG popup implementation recently.
+
+Changes(spell-cli):
+
+1. Added tags to add third party component library to be used and initialise in a project.
+
+# 1.0.4 (26-02-18)
+
+Changes:
+
+1. Added docs for new macros. It should also be defined in the main docs page, that
+   most of the struct are becoming not directly usable by the end user. Some way to tell
+   what to use and what not to touch directly.
+2. Added examples from demo, moved examples from young-shell to here so that it can
+   be accessed and used. Removing example widgets from the shell so that remains strictly
+   for use to create a spell.
+
+# 1.0.2 & 1.0.2 CLI (26-02-02)
+
+Changes:
+
+- WindowConf creation is replaced by a builder method for cleaner creation of configuration.
+  Following new configurations are added.
+  - `monitor_name`: specify the monitor to display the widget.
+  - `natural_scroll`: Whether to enable natural scrolling. (Default: false)
+- Added fingerprint support in SpellLock. Now, You can make your lockscreens open by fingerprint.
+- Experimental macro addition (not ready for usage) to combine wayland and slint
+  UIs into a single variable. This removes the need to manage two separate variables
+  (for wayland and slint separately) for same widget.
+
+Changes(spell-cli):
+
+- Addition of `fprint` subcommand to add enroll, verify and list fingerprints for the
+  purpose of being used in SpellLock.
+
+# 1.0.1 & 1.0.1 CLI (25-12-27)
 
 Changes:
 

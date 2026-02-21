@@ -4,14 +4,13 @@
 //! Hovering over each rectangle should change the cursor to the corresponding shape,
 //! allowing visual verification that the Wayland cursor implementation works correctly.
 //!
-//! Run with: cargo run --example cursor_test
+//! Run with: cargo run -p spell-demo --bin cursor_test
 
 use std::error::Error;
 
 use spell_framework::{
     cast_spell,
     layer_properties::{BoardType, LayerAnchor, LayerType, WindowConf},
-    wayland_adapter::SpellWin,
 };
 
 slint::slint! {
@@ -138,6 +137,7 @@ slint::slint! {
         }
     }
 }
+spell_framework::generate_widgets![CursorTest];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let window_conf = WindowConf::new(
@@ -148,15 +148,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         LayerType::Top,
         BoardType::None,
         None,
-        None,
     );
 
-    let waywindow = SpellWin::invoke_spell("cursor-test", window_conf);
-    let _ui = CursorTest::new().unwrap();
+    let ui = CursorTestSpell::invoke_spell("cursor-test", window_conf);
 
     println!("Cursor Test Started!");
     println!("Hover over each tile to test the Wayland cursor implementation.");
     println!("Press ESC to exit when the window has keyboard focus.");
 
-    cast_spell(waywindow, None, None)
+    cast_spell!(ui)
 }

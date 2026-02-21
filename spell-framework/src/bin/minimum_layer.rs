@@ -96,7 +96,7 @@ fn main() {
         }
         let elapsed_time = time.elapsed().as_secs();
         if elapsed_time > 4 {
-            if elapsed_time % 2 == 0 {
+            if elapsed_time.is_multiple_of(2) {
                 simple_layer.hide();
             } else {
                 simple_layer.show_again();

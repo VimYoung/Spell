@@ -14,7 +14,7 @@ use std::{
     rc::{Rc, Weak},
     sync::{Arc, Mutex},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 #[cfg(feature = "i-slint-renderer-skia")]
 use i_slint_renderer_skia::{
@@ -191,9 +191,12 @@ impl SpellSkiaWinAdapterReal {
         })
     }
 
-    fn draw(&self) -> bool {
+    pub fn draw(&self) -> bool {
         if self.needs_redraw.replace(false) {
-            self.renderer.render().unwrap();
+            self.renderer.render().unwrap_or_else(|err| {
+                warn!("Panicking because of error: {}", err);
+                panic!("Seems like you have initialised slint before SpellWin");
+            });
             true
         } else {
             false

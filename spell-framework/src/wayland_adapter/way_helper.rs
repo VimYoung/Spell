@@ -4,6 +4,7 @@ use crate::{
     wayland_adapter::{SpellWin, slint_to_wl_cursor_mapping},
 };
 use i_slint_core::items::MouseCursor;
+use nonstick::{ConversationAdapter, Result as PamResult};
 use slint::{SharedString, platform::Key};
 use smithay_client_toolkit::{
     reexports::{
@@ -27,7 +28,7 @@ use std::{
     io::{BufReader, prelude::*},
     time::Duration,
 };
-use tracing::warn;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 pub(super) fn set_config(
@@ -285,7 +286,6 @@ pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handl
                                 });
                         }
                         "dev" => {
-                            println!("ENtered the dev mode");
                             handle
                                 .modify(|layer| {
                                     *layer.filter_mut() =
@@ -326,4 +326,60 @@ pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handl
             },
         )
         .unwrap();
+}
+
+// TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
+
+/// A basic Conversation that assumes that any "regular" prompt is for
+/// the username, and that any "masked" prompt is for the password.
+///
+/// A typical Conversation will provide the user with an interface
+/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
+pub(crate) struct UsernamePassConvo {
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+// ConversationAdapter is a convenience wrapper for the common case
+// of only handling one request at a time.
+impl ConversationAdapter for UsernamePassConvo {
+    fn prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        info!("Request: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(&self.username))
+    }
+
+    fn masked_prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        info!("Masked Request: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(&self.password))
+    }
+
+    fn error_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        warn!("Ignored Error Message: {:?}", message.as_ref());
+    }
+
+    fn info_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        warn!("Ignored Info Message: {:?}", message.as_ref());
+    }
+}
+
+pub(crate) struct FingerprintInfo;
+
+impl ConversationAdapter for FingerprintInfo {
+    fn prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        warn!("Ignored Prompt: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(""))
+    }
+
+    fn masked_prompt(&self, request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
+        warn!("Ignored masked prompt: {:?}", request.as_ref());
+        Ok(std::ffi::OsString::from(""))
+    }
+
+    fn info_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        info!("Info Message: {:?}", message.as_ref());
+    }
+
+    fn error_msg(&self, message: impl AsRef<std::ffi::OsStr>) {
+        info!("Error Message: {:?}", message.as_ref());
+    }
 }

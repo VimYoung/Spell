@@ -3,15 +3,20 @@
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
 use crate::{
-    SpellAssociated, State,
+    SpellAssociatedNew,
     configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
-    dbus_window_state::InternalHandle,
-    delegate_fractional_scale, delegate_viewporter, helper_fn_for_deploy,
-    slint_adapter::{SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter},
+    slint_adapter::{
+        ADAPTERS, SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter,
+    },
     wayland_adapter::{
-        fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
-        viewporter::{Viewport, ViewporterState},
-        way_helper::{KeyboardState, PointerState, set_config, set_event_sources},
+        fractional_scaling::{
+            FractionalScaleHandler, FractionalScaleState, delegate_fractional_scale,
+        },
+        viewporter::{Viewport, ViewporterState, delegate_viewporter},
+        way_helper::{
+            FingerprintInfo, KeyboardState, PointerState, UsernamePassConvo, set_config,
+            set_event_sources,
+        },
     },
 };
 use i_slint_core::items::MouseCursor;
@@ -19,7 +24,10 @@ pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
-use slint::{PhysicalSize, platform::Key};
+use slint::{
+    PhysicalSize,
+    platform::{Key, WindowAdapter},
+};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor,
@@ -35,7 +43,6 @@ use smithay_client_toolkit::{
     reexports::{
         calloop::{
             EventLoop, LoopHandle, RegistrationToken,
-            channel::Event,
             timer::{TimeoutAction, Timer},
         },
         calloop_wayland_source::WaylandSource,
@@ -63,9 +70,10 @@ use smithay_client_toolkit::{
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
-    sync::{Arc, Mutex, OnceLock, RwLock},
+    sync::{Arc, Mutex, Once, OnceLock, RwLock},
     time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
@@ -76,6 +84,9 @@ mod slint_to_wl_cursor_mapping;
 mod viewporter;
 mod way_helper;
 mod win_impl;
+
+static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
+static SET_SLINT_PLATFORM: Once = Once::new();
 
 #[derive(Debug)]
 pub(crate) struct States {
@@ -90,29 +101,24 @@ pub(crate) struct States {
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
 /// implementation, thus providing various features.
-/// ## Panics
-///
-/// Event loop [enchant_spells](crate::enchant_spells) will
-/// panic if the number of `WindowConf`s provided to  method [conjure_spells](crate::wayland_adapter::SpellMultiWinHandler::conjure_spells) are
-/// not equal to the amount of slint widgets that are
-/// initialised in the scope. The solution to avoid panic is to add more `let _name =
-/// WidgetName::new().unwrap();` for all the widgets/window components you are declaring in your
-/// slint files and adding [WindowConf]s in [SpellMultiWinHandler].
 pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
+    pub ipc_handler: Option<UnixListener>,
     pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
-    pub(crate) first_configure: bool,
+    pub(crate) first_configure: Cell<bool>,
+    pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
-    pub(crate) layer_name: String,
+    pub layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
-    pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
+    pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
+    /// Span required for proper logging.
     pub span: span::Span,
     // #[allow(dead_code)]
     // pub(crate) backspace: calloop::RegistrationToken,
@@ -129,14 +135,11 @@ impl std::fmt::Debug for SpellWin {
     }
 }
 
-static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
-
 impl SpellWin {
     pub(crate) fn create_window(
         conn: &Connection,
         window_conf: WindowConf,
         layer_name: String,
-        if_single: bool,
         handle: HomeHandle,
     ) -> Self {
         let (globals, mut event_queue) = registry_queue_init(conn).unwrap();
@@ -198,17 +201,19 @@ impl SpellWin {
             slint_proxy.clone(),
         );
 
-        if if_single {
-            trace!("Single window layer platform set");
-            let _ = slint::platform::set_platform(Box::new(SpellLayerShell::new(
-                adapter_value.clone(),
-            )));
-        }
+        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
+        SET_SLINT_PLATFORM.call_once(|| {
+            trace!("Slint platform set");
+            if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
+                warn!("Error setting slint platform: {err}");
+            }
+        });
         set_event_sources(&event_loop, handle);
 
         let mut win = SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
+            ipc_handler: None,
             queue: qh.clone(),
             buffer: way_pri_buffer,
             states: States {
@@ -221,7 +226,8 @@ impl SpellWin {
                 viewporter: None,
             },
             layer: None,
-            first_configure: true,
+            first_configure: Cell::new(true),
+            natural_scroll: window_conf.natural_scroll,
             is_hidden: Cell::new(false),
             layer_name: layer_name.clone(),
             config: window_conf.clone(),
@@ -305,7 +311,6 @@ impl SpellWin {
             win.states
                 .output_state
                 .outputs()
-                .into_iter()
                 .filter_map(|output| {
                     let info = win.states.output_state.info(&output)?;
                     Some((info.name?, output))
@@ -330,31 +335,36 @@ impl SpellWin {
     pub fn invoke_spell(name: &str, window_conf: WindowConf) -> Self {
         let handle = set_up_tracing(name);
         let conn = Connection::connect_to_env().unwrap();
-        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), true, handle)
+        SpellWin::create_window(&conn, window_conf.clone(), name.to_string(), handle)
     }
 
     /// Hides the layer (aka the widget) if it is visible in screen.
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
+            // let width: u32 = self.adapter.size.get().width;
+            // let height: u32 = self.adapter.size.get().height;
+            // let width: u32 = self.adapter.size.get().width;
+            // let height: u32 = self.adapter.size.get().height;
+            // self.layer.as_ref().unwrap().wl_surface().damage_buffer(
+            //     0,
+            //     0,
+            //     width as i32,
+            //     height as i32,
+            // );
+            //
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
+            // self.layer.as_ref().unwrap().commit();
         }
     }
 
     /// Brings back the layer (aka the widget) back on screen if it is hidden.
-    pub fn show_again(&mut self) {
+    pub fn show_again(&self) {
         if self.is_hidden.replace(false) {
             info!("Win: Showing window again");
-            let qh = self.queue.clone();
-            self.converter(&qh);
-            // let primary_buf = self.adapter.refersh_buffer();
-            // self.buffer = primary_buf;
-            // self.layer.commit();
-            // self.set_config_internal();
-            // self.layer
-            //     .wl_surface()
-            //     .attach(Some(self.buffer.wl_buffer()), 0, 0);
-            // self.layer.commit();
+            self.set_config_internal();
+            self.first_configure.set(true);
+            self.layer.as_ref().unwrap().commit();
         }
     }
 
@@ -430,7 +440,6 @@ impl SpellWin {
         set_config(
             &self.config,
             self.layer.as_ref().unwrap(),
-            //self.first_configure,
             Some(self.input_region.wl_region()),
             Some(self.opaque_region.wl_region()),
         );
@@ -444,21 +453,21 @@ impl SpellWin {
 
         // Rendering from Skia
         if !self.is_hidden.get() {
-            let skia_now = std::time::Instant::now();
+            // let skia_now = std::time::Instant::now();
             let redraw_val: bool = window_adapter.draw_if_needed();
-            let elasped_time = skia_now.elapsed().as_millis();
-            if elasped_time != 0 {
-                // debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
-            }
+            // let elasped_time = skia_now.elapsed().as_millis();
+            // if elasped_time != 0 {
+            //     debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+            // }
 
             self.states
                 .pointer_state
                 .update_cursor(self.adapter.current_cursor.get(), &qh);
 
             let buffer = &self.buffer;
-            if self.first_configure || redraw_val {
+            if self.first_configure.get() || redraw_val {
                 // if self.first_configure {
-                self.first_configure = false;
+                self.first_configure.set(false);
                 self.layer.as_ref().unwrap().wl_surface().damage_buffer(
                     0,
                     0,
@@ -488,16 +497,16 @@ impl SpellWin {
                     .wl_surface()
                     .attach(Some(buffer.wl_buffer()), 0, 0);
             }
-        } else {
-            // debug!("Is hidden is true, window is true");
-        }
 
-        self.layer
-            .as_ref()
-            .unwrap()
-            .wl_surface()
-            .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
-        self.layer.as_ref().unwrap().commit();
+            self.layer
+                .as_ref()
+                .unwrap()
+                .wl_surface()
+                .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+            self.layer.as_ref().unwrap().commit();
+        } else {
+            self.layer.as_ref().unwrap().commit();
+        }
     }
 
     /// Grabs the focus of keyboard. Can be used in combination with other functions
@@ -535,55 +544,13 @@ impl SpellWin {
     }
 }
 
-impl SpellAssociated for SpellWin {
-    fn on_call(
-        &mut self,
-        state: Option<State>,
-        set_callback: Option<Box<dyn FnMut(State)>>,
-        span_log: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let rx = helper_fn_for_deploy(self.layer_name.clone(), &state, span_log);
+impl SpellAssociatedNew for SpellWin {
+    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
-        if let Some(mut callback) = set_callback {
-            self.event_loop
-                .borrow()
-                .handle()
-                .insert_source(rx, move |event_msg, _, state_data| {
-                    trace!("Internal event recieved");
-                    match event_msg {
-                        Event::Msg(int_handle) => match int_handle {
-                            InternalHandle::StateValChange((key, data_type)) => {
-                                trace!("Internal variable change called");
-                                {
-                                    let mut state_inst = state.as_ref().unwrap().write().unwrap();
-                                    state_inst.change_val(&key, data_type);
-                                }
-                                callback(state.as_ref().unwrap().clone());
-                            }
-                            InternalHandle::ShowWinAgain => {
-                                trace!("Internal show Called");
-                                state_data.show_again();
-                            }
-                            InternalHandle::HideWindow => {
-                                trace!("Internal hide called");
-                                state_data.hide();
-                            }
-                        },
-                        // TODO have to handle it properly.
-                        Event::Closed => {
-                            info!("Internal Channel closed");
-                        }
-                    }
-                })
-                .unwrap();
-        }
-        info!("Internal reciever set with start of event loop.");
-        loop {
-            event_loop
-                .borrow_mut()
-                .dispatch(std::time::Duration::from_millis(1), self)
-                .unwrap();
-        }
+        event_loop
+            .borrow_mut()
+            .dispatch(std::time::Duration::from_millis(1), self)?;
+        Ok(())
     }
 
     fn get_span(&self) -> tracing::span::Span {
@@ -714,21 +681,28 @@ impl FractionalScaleHandler for SpellWin {
         let scale_factor: f32 = scale as f32 / 120.0;
         let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
         let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
+        info!("Physical Size: width: {}, height: {}", width, height);
+
         self.adapter.scale_factor.set(scale_factor);
-        self.states
-            .viewporter
-            .as_ref()
-            .unwrap()
-            .set_destination(width as i32, height as i32);
-        self.states.viewporter.as_ref().unwrap().set_source(
-            0.,
-            0.,
-            self.adapter.size.get().width.into(),
-            self.adapter.size.get().height.into(),
-        );
+        // TODO I can't get the viewporter to work properly. Currently spell
+        // relies on the scaling by the compositor itself. Technically all crap of
+        // related to scaling can be removed.
+        // self.states.viewporter.as_ref().unwrap().set_source(
+        //     0.,
+        //     0.,
+        //     self.adapter.size.get().width.into(),
+        //     self.adapter.size.get().height.into(),
+        // );
+        //
+        // self.states
+        //     .viewporter
+        //     .as_ref()
+        //     .unwrap()
+        //     .set_destination(width as i32, height as i32);
         // self.adapter
         //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
         //     .unwrap();
+        self.adapter.request_redraw();
         self.layer.as_ref().unwrap().commit();
     }
 }
@@ -746,19 +720,6 @@ impl LayerShellHandler for SpellWin {
         _configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        // THis error TODO find if it is necessary.
-        // self.adapter.size.width = NonZeroU32::new(configure.new_size.0).map_or(256, NonZeroU32::get);
-        // self.adapter.size.height =
-        //     NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
-
-        // Initiate the first draw.
-        // println!("Config event is called");
-        if !self.first_configure {
-            // debug!("[{}]: First draw called", self.layer_name);
-            self.first_configure = true;
-        } else {
-            // debug!("[{}]: First draw called", self.layer_name);
-        }
         self.converter(qh);
     }
 }
@@ -827,12 +788,6 @@ impl WinHandle {
 
 /// SpellLock is a struct which represents a window lock. It can be run and initialised
 /// on a custom lockscreen implementation with slint.
-/// <div class="warning">
-/// Remember, with great power comes great responsibility. The struct doen't implement
-/// pointer events so you would need to make sure that your lock screen has a text input field
-/// and it is in focus on startup. Also spell doesn't add any
-/// restrictions on what you can have in your lockscreen so that is a bonus
-/// </div>
 /// Know limitations include the abscence to verify from fingerprints and unideal issues on
 /// multi-monitor setup. You can add the path of binary of your lock in your compositor config and idle
 /// manager config to use the program. It will be linked to spell-cli directly in coming releases.
@@ -891,6 +846,7 @@ pub struct SpellLock {
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
+    // TODO, check if it need internal mutability?
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
     pub(crate) backspace: Option<RegistrationToken>,
 }
@@ -903,9 +859,11 @@ impl std::fmt::Debug for SpellLock {
     }
 }
 impl SpellLock {
+    /// This function creates an instance of SpellLock which can be combined with
+    /// slint windows to create a lockscreen.
     pub fn invoke_lock_spell() -> Self {
         let conn = Connection::connect_to_env().unwrap();
-
+        let _ = set_up_tracing("SpellLock");
         let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
         let qh: QueueHandle<SpellLock> = event_queue.handle();
         let registry_state = RegistryState::new(&globals);
@@ -1123,6 +1081,35 @@ impl SpellLock {
         // of the canvas.
     }
 
+    fn unlock_finger(&mut self) -> PamResult<()> {
+        let finger = FingerprintInfo;
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+            .output()
+            .expect("Couldn't retrive username");
+
+        let val = String::from_utf8_lossy(&output.stdout);
+        let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+        let user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
+
+        let mut txn = TransactionBuilder::new_with_service("login")
+            .username(user_name)
+            .build(finger.into_conversation())?;
+        // If authentication fails, this will return an error.
+        // We immediately give up rather than re-prompting the user.
+        txn.authenticate(AuthnFlags::empty())?;
+        txn.account_management(AuthnFlags::empty())?;
+        if let Some(locked_val) = self.session_lock.take() {
+            locked_val.unlock();
+        } else {
+            warn!("Authentication verified but couldn't unlock");
+        }
+        self.is_locked = false;
+        self.conn.roundtrip().unwrap();
+        Ok(())
+    }
+
     fn unlock(
         &mut self,
         username: Option<&str>,
@@ -1160,43 +1147,45 @@ impl SpellLock {
         on_unlock_callback();
         if let Some(locked_val) = self.session_lock.take() {
             locked_val.unlock();
+        } else {
+            warn!("Authentication verified but couldn't unlock");
         }
         self.is_locked = false;
         self.conn.roundtrip().unwrap();
         Ok(())
     }
 
+    /// Provides a lockscreen handler used to invoke the unlock
+    /// callback with the user entered password.For more details
+    /// view [`LockHandle`].
     pub fn get_handler(&self) -> LockHandle {
         LockHandle(self.loop_handle.clone())
     }
 }
 
-impl SpellAssociated for SpellLock {
-    fn on_call(
-        &mut self,
-        _: Option<State>,
-        _: Option<Box<dyn FnMut(State)>>,
-        _: tracing::span::Span,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+impl SpellAssociatedNew for SpellLock {
+    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let event_loop = self.event_loop.clone();
-        while self.is_locked {
-            event_loop
-                .borrow_mut()
-                .dispatch(std::time::Duration::from_millis(1), self)
-                .unwrap();
-        }
+        event_loop
+            .borrow_mut()
+            .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
+    }
+    fn is_locked(&self) -> bool {
+        self.is_locked
     }
 }
 
-/// Struct to handle unlocking of a SpellLock instance.
+/// Struct to handle unlocking of a SpellLock instance. It can be captured from
+/// [`SpellLock::get_handler`].
+#[derive(Debug, Clone)]
 pub struct LockHandle(LoopHandle<'static, SpellLock>);
 
 impl LockHandle {
     /// Call this method to unlock Spelllock. It also takes two callbacks which
-    /// are invoked when the password parsed is wrong and when the lock is
-    /// opened respectively. It can be used to invoke UI specific changes for
-    /// your slint frontend.
+    /// are invoked when the password parsed is wrong or right (i.e. resulting
+    /// in an screen unlock) respectively. Callbacks can be used to invoke UI
+    /// specific changes for your slint frontend.
     pub fn unlock(
         &self,
         username: Option<String>,
@@ -1213,8 +1202,18 @@ impl LockHandle {
             }
         });
     }
-}
 
+    pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce()>) {
+        self.0.insert_idle(move |app_data| {
+            if let Err(err) = app_data.unlock_finger() {
+                println!("{:?}", err);
+                error_callback();
+            } else {
+                println!("Passed");
+            }
+        });
+    }
+}
 delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
@@ -1223,36 +1222,9 @@ delegate_registry!(SpellLock);
 delegate_pointer!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
-// TODO have to add no auth allowed after 3 consecutive wrong attempts feature.
 
-/// A basic Conversation that assumes that any "regular" prompt is for
-/// the username, and that any "masked" prompt is for the password.
-///
-/// A typical Conversation will provide the user with an interface
-/// to interact with PAM, e.g. a dialogue box or a terminal prompt.
-struct UsernamePassConvo {
-    username: String,
-    password: String,
-}
-
-// ConversationAdapter is a convenience wrapper for the common case
-// of only handling one request at a time.
-impl ConversationAdapter for UsernamePassConvo {
-    fn prompt(&self, _request: impl AsRef<std::ffi::OsStr>) -> PamResult<std::ffi::OsString> {
-        Ok(std::ffi::OsString::from(&self.username))
-    }
-
-    fn masked_prompt(
-        &self,
-        _request: impl AsRef<std::ffi::OsStr>,
-    ) -> PamResult<std::ffi::OsString> {
-        Ok(std::ffi::OsString::from(&self.password))
-    }
-
-    fn error_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
-
-    fn info_msg(&self, _message: impl AsRef<std::ffi::OsStr>) {}
-}
+/// Future XDGpopup implementation will occur on this struct;
+pub struct SpellXdg;
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;
