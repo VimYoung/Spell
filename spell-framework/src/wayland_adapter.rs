@@ -662,38 +662,33 @@ impl FractionalScaleHandler for SpellWin {
         scale: u32,
     ) {
         info!("Scale factor changed, invoked from custom trait. {}", scale);
-
+        let width_old = self.adapter.size_original.get().width;
+        let height_old = self.adapter.size_original.get().height;
         self.layer.as_ref().unwrap().wl_surface().damage_buffer(
             0,
             0,
             self.adapter.size.get().width as i32,
             self.adapter.size.get().height as i32,
         );
-        // floor((273 * scale + 60) / 120)
-        let scale_factor: f32 = scale as f32 / 120.0;
-        let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
-        let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
-        info!("Physical Size: width: {}, height: {}", width, height);
+        let (buffer, width, height, scale_factor) = self.adapter.changed_scale_factor(scale);
+        self.config.width = width;
+        self.config.height = height;
+        self.buffer = buffer;
+        self.adapter
+            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+            .unwrap();
+        self.states.viewporter.as_ref().unwrap().set_source(
+            0.,
+            0.,
+            self.adapter.size.get().width.into(),
+            self.adapter.size.get().height.into(),
+        );
 
-        self.adapter.scale_factor.set(scale_factor);
-        // TODO I can't get the viewporter to work properly. Currently spell
-        // relies on the scaling by the compositor itself. Technically all crap of
-        // related to scaling can be removed.
-        // self.states.viewporter.as_ref().unwrap().set_source(
-        //     0.,
-        //     0.,
-        //     self.adapter.size.get().width.into(),
-        //     self.adapter.size.get().height.into(),
-        // );
-        //
-        // self.states
-        //     .viewporter
-        //     .as_ref()
-        //     .unwrap()
-        //     .set_destination(width as i32, height as i32);
-        // self.adapter
-        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
-        //     .unwrap();
+        self.states
+            .viewporter
+            .as_ref()
+            .unwrap()
+            .set_destination(width_old as i32, height_old as i32);
         self.adapter.request_redraw();
         self.layer.as_ref().unwrap().commit();
     }

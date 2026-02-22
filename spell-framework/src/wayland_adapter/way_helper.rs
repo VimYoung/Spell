@@ -29,7 +29,6 @@ use tracing_subscriber::EnvFilter;
 pub(super) fn set_config(
     window_conf: &WindowConf,
     layer: &LayerSurface,
-    // first_configure: bool,
     input_region: Option<&WlRegion>,
     opaque_region: Option<&WlRegion>,
 ) {

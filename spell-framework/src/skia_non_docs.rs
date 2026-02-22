@@ -4,7 +4,10 @@ use i_slint_core::partial_renderer::DirtyRegion;
 use slint::{PhysicalSize, Window, platform::WindowAdapter};
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
-use smithay_client_toolkit::shm::slot::{Slot, SlotPool};
+use smithay_client_toolkit::{
+    reexports::client::protocol::wl_shm,
+    shm::slot::{Buffer, Slot, SlotPool},
+};
 use std::{
     cell::Cell,
     cell::RefCell,
@@ -26,6 +29,19 @@ pub struct SkiaSoftwareBufferReal {
     pub primary_slot: RefCell<Slot>,
     pub pool: Rc<RefCell<SlotPool>>,
     pub last_dirty_region: RefCell<Option<DirtyRegion>>,
+}
+
+impl SkiaSoftwareBufferReal {
+    fn refresh_buffer(&self, width: i32, height: i32) -> Buffer {
+        let stride = width as i32 * 4;
+        let (buffer, raw_canvas) = self
+            .pool
+            .borrow_mut()
+            .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
+            .unwrap();
+        *self.primary_slot.borrow_mut() = buffer.slot();
+        buffer
+    }
 }
 
 impl RenderBuffer for SkiaSoftwareBufferReal {
@@ -99,6 +115,7 @@ pub struct SpellSkiaWinAdapterReal {
     // TODO size is no longer required to be in cell as it is never modified
     // and scaling is handled on the end of wayland only.
     pub(crate) size: Cell<PhysicalSize>,
+    pub(crate) size_original: Cell<PhysicalSize>,
     pub(crate) renderer: SkiaRenderer,
     #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
@@ -165,10 +182,11 @@ impl SpellSkiaWinAdapterReal {
         Rc::new_cyclic(|w: &Weak<Self>| Self {
             window: slint::Window::new(w.clone()),
             size: Cell::new(PhysicalSize { width, height }),
+            size_original: Cell::new(PhysicalSize { width, height }),
             renderer,
             buffer_slint: buffer,
-            needs_redraw: Cell::new(true),
             scale_factor: Cell::new(1.),
+            needs_redraw: Cell::new(true),
             slint_event_proxy: slint_proxy,
         })
     }
@@ -196,13 +214,23 @@ impl SpellSkiaWinAdapterReal {
         self.window.try_dispatch_event(event)
     }
 
-    // pub(crate) fn refersh_buffer(&self) -> Buffer {
-    //     let width: u32 = self.size.get().width;
-    //     let height: u32 = self.size.get().height;
-    //     // self.needs_redraw.set(true);
-    //     self.buffer_slint.refresh_buffer(width, height)
-    // }
-    //
+    pub(crate) fn changed_scale_factor(&self, scale: u32) -> (Buffer, u32, u32, f32) {
+        let width: u32 = (self.size.get().width * scale + 60) / 120;
+        let height: u32 = (self.size.get().height * scale + 60) / 120;
+        let scale_factor: f32 = scale as f32 / 120.0;
+        self.scale_factor.set(scale_factor);
+        self.size.set(PhysicalSize { width, height });
+        info!("Physical Size: width: {}, height: {}", width, height);
+        // self.needs_redraw.set(true);
+        (
+            self.buffer_slint
+                .refresh_buffer(width as i32, height as i32),
+            width,
+            height,
+            scale_factor,
+        )
+    }
+
     // fn last_dirty_region_bounding_box_size(&self) -> Option<slint::LogicalSize> {
     //     self.buffer.last_dirty_region.borrow().as_ref().map(|r| {
     //         let size = r.bounding_rect().size;
