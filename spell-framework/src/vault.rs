@@ -24,6 +24,7 @@
 //! As a general tip, the best way to implement traits is to stores weak reference to
 //! your widget windows on slint side in structs and then implement these traits on it.
 use crate::vault::application::desktop_entry_extracter;
+pub use mpris;
 use rust_fuzzy_search::fuzzy_search_best_n;
 use std::{
     env,
