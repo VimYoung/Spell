@@ -103,18 +103,21 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
+    /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
-    pub(crate) queue: QueueHandle<SpellWin>,
+    // pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
     pub(crate) first_configure: Cell<bool>,
     pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
+    /// Name of widget's layer.
     pub layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
+    /// Event loop which runs and refreshes UI.
     pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     /// Span required for proper logging.
     pub span: span::Span,
@@ -210,7 +213,7 @@ impl SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
             ipc_handler: None,
-            queue: qh.clone(),
+            // queue: qh.clone(),
             buffer: way_pri_buffer,
             states: States {
                 registry_state: RegistryState::new(&globals),
@@ -1188,6 +1191,9 @@ impl LockHandle {
         });
     }
 
+    /// Function which opens fingerprint device for authentication.
+    /// error_callback is executed when fingerprint is not registered and fails
+    /// to unlock the lockscreen.
     pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce()>) {
         self.0.insert_idle(move |app_data| {
             if let Err(err) = app_data.unlock_finger() {

@@ -34,7 +34,7 @@ pub struct SkiaSoftwareBufferReal {
 impl SkiaSoftwareBufferReal {
     fn refresh_buffer(&self, width: i32, height: i32) -> Buffer {
         let stride = width as i32 * 4;
-        let (buffer, raw_canvas) = self
+        let (buffer, _raw_canvas) = self
             .pool
             .borrow_mut()
             .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
