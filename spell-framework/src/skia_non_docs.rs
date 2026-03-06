@@ -29,6 +29,9 @@ pub struct SkiaSoftwareBufferReal {
     pub primary_slot: RefCell<Slot>,
     pub pool: Rc<RefCell<SlotPool>>,
     pub last_dirty_region: RefCell<Option<DirtyRegion>>,
+    /// Buffer age for partial rendering. 0 means the buffer is new and
+    /// requires a full redraw; 1 means reuse from the previous frame.
+    pub age: Cell<u8>,
 }
 
 impl SkiaSoftwareBufferReal {
@@ -40,6 +43,8 @@ impl SkiaSoftwareBufferReal {
             .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
             .unwrap();
         *self.primary_slot.borrow_mut() = buffer.slot();
+        // New buffer has no prior content; force a full redraw.
+        self.age.set(0);
         buffer
     }
 }
@@ -91,14 +96,17 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
         // };
 
         // let bytes = bytemuck::cast_slice_mut(&mut native_buffer);
+        let age = self.age.get();
         *self.last_dirty_region.borrow_mut() = render_callback(
             width,
             height,
             skia_safe::ColorType::BGRA8888,
-            1,
+            age,
             self.primary_slot.borrow_mut().canvas(pool).unwrap(),
         )
         .unwrap();
+        // After the first full render, subsequent frames can use partial rendering.
+        self.age.set(1);
         Ok(())
     }
 }
@@ -174,6 +182,7 @@ impl SpellSkiaWinAdapterReal {
             primary_slot,
             pool,
             last_dirty_region: Default::default(),
+            age: Cell::new(0),
         });
         let renderer = SkiaRenderer::new_with_surface(
             &SkiaSharedContext::default(),
@@ -215,8 +224,8 @@ impl SpellSkiaWinAdapterReal {
     }
 
     pub(crate) fn changed_scale_factor(&self, scale: u32) -> (Buffer, u32, u32, f32) {
-        let width: u32 = (self.size.get().width * scale + 60) / 120;
-        let height: u32 = (self.size.get().height * scale + 60) / 120;
+        let width: u32 = (self.size_original.get().width * scale + 60) / 120;
+        let height: u32 = (self.size_original.get().height * scale + 60) / 120;
         let scale_factor: f32 = scale as f32 / 120.0;
         self.scale_factor.set(scale_factor);
         self.size.set(PhysicalSize { width, height });

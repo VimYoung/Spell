@@ -660,19 +660,13 @@ impl FractionalScaleHandler for SpellWin {
     fn preferred_scale(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_surface::WlSurface,
         scale: u32,
     ) {
         info!("Scale factor changed, invoked from custom trait. {}", scale);
         let width_old = self.adapter.size_original.get().width;
         let height_old = self.adapter.size_original.get().height;
-        self.layer.as_ref().unwrap().wl_surface().damage_buffer(
-            0,
-            0,
-            self.adapter.size.get().width as i32,
-            self.adapter.size.get().height as i32,
-        );
         let (buffer, width, height, scale_factor) = self.adapter.changed_scale_factor(scale);
         self.config.width = width;
         self.config.height = height;
@@ -692,8 +686,11 @@ impl FractionalScaleHandler for SpellWin {
             .as_ref()
             .unwrap()
             .set_destination(width_old as i32, height_old as i32);
-        self.adapter.request_redraw();
-        self.layer.as_ref().unwrap().commit();
+
+        // Force a full render-damage-attach cycle so the newly scaled buffer
+        // is actually presented to the compositor on this commit.
+        self.first_configure.set(true);
+        self.converter(qh);
     }
 }
 
