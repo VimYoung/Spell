@@ -39,6 +39,7 @@ pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
+    /// Span storing the logging context for `debug`` statements of slint.
     pub span: span::Span,
 }
 
@@ -106,13 +107,19 @@ impl SpellMultiWinHandler {
     }
 }
 
+/// Slint Platform implementation for lock screens. This struct is used internally
+/// and it is provided here just for reference.
 pub struct SpellLockShell {
     /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+    /// Span storing the logging context for `debug`` statements of slint for
+    /// lock screens.
     pub span: span::Span,
 }
 
 impl SpellLockShell {
+    /// Internal function that creates an instance of layer implementation given
+    /// [`SpellMultiWinHandler`] wrapped in smart pointers.
     pub fn new(window_manager: Rc<RefCell<SpellMultiWinHandler>>) -> Self {
         SpellLockShell {
             window_manager,

@@ -105,18 +105,21 @@ pub struct SpellWin {
     pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
+    /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
-    pub(crate) queue: QueueHandle<SpellWin>,
+    // pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Buffer,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
     pub(crate) first_configure: Cell<bool>,
     pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
+    /// Name of widget's layer.
     pub layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
+    /// Event loop which runs and refreshes UI.
     pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     /// Span required for proper logging.
     pub span: span::Span,
@@ -214,7 +217,7 @@ impl SpellWin {
             adapter: adapter_value,
             loop_handle: event_loop.handle(),
             ipc_handler: None,
-            queue: qh.clone(),
+            // queue: qh.clone(),
             buffer: way_pri_buffer,
             states: States {
                 registry_state: RegistryState::new(&globals),
@@ -670,38 +673,33 @@ impl FractionalScaleHandler for SpellWin {
         scale: u32,
     ) {
         info!("Scale factor changed, invoked from custom trait. {}", scale);
-
+        let width_old = self.adapter.size_original.get().width;
+        let height_old = self.adapter.size_original.get().height;
         self.layer.as_ref().unwrap().wl_surface().damage_buffer(
             0,
             0,
             self.adapter.size.get().width as i32,
             self.adapter.size.get().height as i32,
         );
-        // floor((273 * scale + 60) / 120)
-        let scale_factor: f32 = scale as f32 / 120.0;
-        let width: u32 = (self.adapter.size.get().width * scale + 60) / 120;
-        let height: u32 = (self.adapter.size.get().height * scale + 60) / 120;
-        info!("Physical Size: width: {}, height: {}", width, height);
+        let (buffer, width, height, scale_factor) = self.adapter.changed_scale_factor(scale);
+        self.config.width = width;
+        self.config.height = height;
+        self.buffer = buffer;
+        self.adapter
+            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+            .unwrap();
+        self.states.viewporter.as_ref().unwrap().set_source(
+            0.,
+            0.,
+            self.adapter.size.get().width.into(),
+            self.adapter.size.get().height.into(),
+        );
 
-        self.adapter.scale_factor.set(scale_factor);
-        // TODO I can't get the viewporter to work properly. Currently spell
-        // relies on the scaling by the compositor itself. Technically all crap of
-        // related to scaling can be removed.
-        // self.states.viewporter.as_ref().unwrap().set_source(
-        //     0.,
-        //     0.,
-        //     self.adapter.size.get().width.into(),
-        //     self.adapter.size.get().height.into(),
-        // );
-        //
-        // self.states
-        //     .viewporter
-        //     .as_ref()
-        //     .unwrap()
-        //     .set_destination(width as i32, height as i32);
-        // self.adapter
-        //     .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
-        //     .unwrap();
+        self.states
+            .viewporter
+            .as_ref()
+            .unwrap()
+            .set_destination(width_old as i32, height_old as i32);
         self.adapter.request_redraw();
         self.layer.as_ref().unwrap().commit();
     }
@@ -1203,6 +1201,9 @@ impl LockHandle {
         });
     }
 
+    /// Function which opens fingerprint device for authentication.
+    /// error_callback is executed when fingerprint is not registered and fails
+    /// to unlock the lockscreen.
     pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce()>) {
         self.0.insert_idle(move |app_data| {
             if let Err(err) = app_data.unlock_finger() {
