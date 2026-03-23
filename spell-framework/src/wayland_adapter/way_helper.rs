@@ -46,6 +46,7 @@ pub(super) fn set_config(
     if let Some(op_region) = opaque_region {
         layer.set_opaque_region(Some(op_region));
     }
+    layer.set_layer(window_conf.layer_type);
     set_anchor(window_conf, layer);
 }
 
