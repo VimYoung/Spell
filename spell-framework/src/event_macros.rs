@@ -257,11 +257,11 @@ macro_rules! cast_spell {
                             if let Err(err) = std::io::Read::read_to_string(&mut stream, &mut request) {
                                 $crate::macro_internal::warn!("Couldn't read CLI stream");
                             }
-                                println!("\n\n GIven request {}", request);
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
-                            println!("Operation:{}, command_args:{}", operation, command_args);
+                            // These info statements doesn't seem to be working due to them running in the wrong space.
+                            $crate::macro_internal::info!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
-                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
+                            $crate::macro_internal::info!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
