@@ -23,4 +23,4 @@ no-default-features = true
 features = ["docs-only"]
 
 [build-dependencies]
-slint-build = "1.13.0"
+slint-build = "1.15.1"
