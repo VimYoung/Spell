@@ -1,7 +1,9 @@
 // use i_slint_core::item_rendering::DirtyRegion;
-use i_slint_core::partial_renderer::DirtyRegion;
+use i_slint_core::window::WindowAdapterInternal;
+use i_slint_core::{items::MouseCursor, partial_renderer::DirtyRegion, platform::WindowAdapter};
+
 #[cfg(not(docsrs))]
-use slint::{PhysicalSize, Window, platform::WindowAdapter};
+use slint::{PhysicalSize, Window};
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::{
@@ -123,6 +125,7 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) scale_factor: Cell<f32>,
     #[allow(clippy::type_complexity)]
     pub(crate) slint_event_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
+    pub(crate) current_cursor: Cell<MouseCursor>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -131,6 +134,16 @@ impl Debug for SpellSkiaWinAdapterReal {
             .field("size", &self.size)
             .field("redraw", &self.needs_redraw)
             .finish()
+    }
+}
+
+impl WindowAdapterInternal for SpellSkiaWinAdapterReal {
+    ///? Current approach uses an internal (normally private) api.
+    ///? According to the slint docs, they are planning on making it public
+    ///? Both this trait impl & the MouseCursor enum are currently private, but still accessible
+    ///? through the slint internal crate.
+    fn set_mouse_cursor(&self, cursor: MouseCursor) {
+        self.current_cursor.set(cursor);
     }
 }
 
@@ -158,6 +171,10 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
 
     fn request_redraw(&self) {
         self.needs_redraw.set(true);
+    }
+
+    fn internal(&self, _: i_slint_core::InternalToken) -> Option<&dyn WindowAdapterInternal> {
+        Some(self)
     }
 }
 
@@ -188,6 +205,7 @@ impl SpellSkiaWinAdapterReal {
             scale_factor: Cell::new(1.),
             needs_redraw: Cell::new(true),
             slint_event_proxy: slint_proxy,
+            current_cursor: Cell::new(MouseCursor::Default),
         })
     }
 
