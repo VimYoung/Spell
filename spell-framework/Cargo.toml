@@ -19,9 +19,10 @@ i-slint-renderer-skia = { version = "1.15.1", features = [
 ], optional = true }
 rust-fuzzy-search = "0.1.1"
 signal-hook = "0.4.3"
-slint = { version = "1.15.1", features = [
-  "raw-window-handle-06",
-  "renderer-software",
+slint = { version = "1.15.1", default-features = false, features = [
+  "renderer-skia",
+  # "std",
+  "compat-1-2"
 ] }
 smithay-client-toolkit = "0.20.0"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }

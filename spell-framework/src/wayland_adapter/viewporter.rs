@@ -60,13 +60,11 @@ impl ViewporterState {
 }
 
 impl Viewport {
-    #[allow(dead_code)]
-    pub fn set_source(&self, x: f64, y: f64, width: f64, height: f64) {
+    pub(crate) fn set_source(&self, x: f64, y: f64, width: f64, height: f64) {
         self.viewport.set_source(x, y, width, height);
     }
 
-    #[allow(dead_code)]
-    pub fn set_destination(&self, width: i32, height: i32) {
+    pub(crate) fn set_destination(&self, width: i32, height: i32) {
         self.viewport.set_destination(width, height);
     }
 }

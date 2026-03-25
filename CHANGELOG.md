@@ -2,10 +2,11 @@
 
 Changes:
 
+1. Mouse cursor implementation not supports various cursors over hovering (thanks dotsem).
 1. Activated touch screen inputs in SpellWin and SpellLock.
-2. Added support for lock in `generate_widgets` macro.
-3. Added notification manger.
-4. XDG popup implementation recently.
+1. Added support for lock in `generate_widgets` macro.
+1. Added notification manger.
+1. XDG popup implementation recently.
 
 Changes(spell-cli):
 
