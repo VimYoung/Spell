@@ -3,6 +3,8 @@
 macro_rules! generate_widgets {
     ($($slint_win:ty),+) => {
         use $crate::wayland_adapter::{WinHandle, SpellWin};
+        #[allow(unused_imports)]
+        use std::io::Write;
         $crate::macro_internal::paste! {
             $(
                 struct [<$slint_win Spell>] {
@@ -154,7 +156,8 @@ macro_rules! cast_spell {
         let mut windows = Vec::new();
         $(
             // NOTE that this won't work in case of ipc windows being passed.
-            let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
+            // let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
+            let way = $crate::cast_spell!(@expand entry: $entry);
             $crate::cast_spell!(@vector_add windows, way);
         )+
         $crate::cast_spells_new(windows)
@@ -187,7 +190,7 @@ macro_rules! cast_spell {
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
-        let (ui, mut way) = $waywindow.parts();
+        let (mut ui, mut way) = $waywindow.parts();
         way.ipc_handler = Some(listener_clone);
         let _ = way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
@@ -201,20 +204,26 @@ macro_rules! cast_spell {
                                 $crate::macro_internal::warn!("Couldn't read CLI stream");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
+                            println!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
+                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
                                 "update" => {
+                                    IpcController::change_val(&mut ui, command, args);
+                                }
+                                "look"=> {
                                     let returned_type = IpcController::get_type(&ui,command);
                                     if let Err(_) = stream.write_all(returned_type.as_bytes()) {
                                         // warn!("Couldn't send back return type");
                                     }
                                 }
-                                "look"=> IpcController::change_val(&mut ui, command, args),
                                 // TODO provide mechanism for custom calls from the below
                                 // matching.
-                                _=> {}
+                                comm => {
+                                    IpcController::custom_command(&mut ui, comm);
+                                }
                             }
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -229,7 +238,8 @@ macro_rules! cast_spell {
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        (way, ui)
+        way
+        // (way, ui)
     }};
     // Non-IPC window
     (
@@ -260,8 +270,10 @@ macro_rules! cast_spell {
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
                             // These info statements doesn't seem to be working due to them running in the wrong space.
                             $crate::macro_internal::info!("Operation:{}, command_args:{}", operation, command_args);
+                            println!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
                             $crate::macro_internal::info!("Operation:{}, Command {}, args: {}",operation, command, args);
+                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
@@ -288,24 +300,24 @@ macro_rules! cast_spell {
         );
         (way, ui)
     }};
-    (@vector_add $wins:expr, ($waywindow:expr, ipc)) => {
+    (@vector_add $wins:expr, ($waywindow:expr,$_ui:expr)) => {
         $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
     };
     (@vector_add $wins:expr, $waywindow:expr) => {
         $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
     };
 
-    (@name ($win:expr,ipc)) => {
-        $crate::macro_internal::paste! {
-            [<$win _var>]
-        }
-    };
+    // (@name ($win:expr,ipc)) => {
+    //     $crate::macro_internal::paste! {
+    //         [<$win _var>]
+    //     }
+    // };
 
-    (@name $win:expr) => {
-        $crate::macro_internal::paste! {
-            [<$win _var>]
-        }
-    };
+    // (@name $win:expr) => {
+    //     $crate::macro_internal::paste! {
+    //         [<$win _var>]
+    //     }
+    // };
     // Notification Logic
     (@notification $noti:expr) => {
         // runs ONCE

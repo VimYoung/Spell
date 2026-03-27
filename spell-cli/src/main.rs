@@ -66,7 +66,11 @@ async fn main() -> Result<(), SpellError> {
                         "show" => show_window_back(layer_value).await,
                         "hide" => hide_window(layer_value).await,
                         "log" => get_logs(Some(layer_value), values).await,
-                        _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
+                        val => {
+                            println!("[Warning]: Custom Command Invoked");
+                            custom_called(layer_value, val).await
+                        }
+                        // _ => Err(SpellError::CLI(Cli::BadSubCommand(format!("The subcommand \"{sub_command_after_layer}\" doesn't exist, use `spell --help` to view available commands"))))
                     },
                     None => Err(SpellError::CLI(Cli::UndefinedArg(
                         "provide a subcommand like 'update', 'look' etc".to_string(),
@@ -248,7 +252,7 @@ pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result
             right-index-finger  : Right index finger
             right-middle-finger : Right middle finger
             right-ring-finger   : Right ring finger
-            right-little-finger : Right little finger 
+            right-little-finger : Right little finger
             :"#
     );
     io::stdin()
@@ -417,6 +421,14 @@ async fn look_value(layer_name: String, mut values: Args) -> Result<(), SpellErr
     let mut value = String::new();
     stream.read_to_string(&mut value)?;
     println!("{value}");
+    Ok(())
+}
+
+async fn custom_called(layer_name: String, command: &str) -> Result<(), SpellError> {
+    let request = format!("{}", command);
+    let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
+    let mut stream = UnixStream::connect(path)?;
+    stream.write_all(request.as_bytes())?;
     Ok(())
 }
 
