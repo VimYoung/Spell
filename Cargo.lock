@@ -4982,6 +4982,7 @@ dependencies = [
  "signal-hook",
  "slint",
  "smithay-client-toolkit 0.20.0",
+ "smithay-clipboard",
  "tokio",
  "tracing",
  "tracing-appender",

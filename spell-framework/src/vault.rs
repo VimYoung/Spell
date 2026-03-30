@@ -137,7 +137,16 @@ impl Default for AppSelector {
                                 let filtered_data: Vec<AppData> = new_data
                                     .iter()
                                     .filter_map(|val| val.to_owned())
-                                    .collect::<Vec<AppData>>();
+                                    .filter(|new| {
+                                        !app_line_data.iter().any(|existing| {
+                                            existing.desktop_file_id == new.desktop_file_id
+                                        })
+                                    })
+                                    .collect();
+                                // let filtered_data: Vec<AppData> = new_data
+                                //     .iter()
+                                //     .filter_map(|val| val.to_owned())
+                                //     .collect::<Vec<AppData>>();
                                 app_line_data.extend(filtered_data);
                                 // if let Some(data) = new_data {
                                 //     // if !app_line_data.iter().any(|pushed_data| {

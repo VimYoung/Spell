@@ -7,8 +7,360 @@ use std::{
     io::{BufReader, prelude::*},
     path::{Component, Path, PathBuf},
     process::Command,
-    str::FromStr,
 };
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/// Preferred icon size. No size parameter is exposed; this is resolved
+/// internally. Change here if a different default is needed.
+const PREFERRED_SIZE: u32 = 48;
+
+/// Extension preference order: PNG first (fast decode, wide support),
+/// then SVG (scalable, common in modern themes), then XPM (legacy fallback).
+const ICON_EXTENSIONS: &[&str] = &["png", "svg", "xpm"];
+
+// ─── Public entry point (signature unchanged) ────────────────────────────────
+
+/// Resolves an icon name to an absolute file path using the freedesktop
+/// icon theme specification lookup algorithm.
+///
+/// Search order:
+///   1. Active GTK icon theme (from gsettings), following Inherits= chains
+///   2. hicolor fallback theme
+///   3. /usr/share/pixmaps
+///
+/// Returns None if no icon is found in any location.
+pub fn get_image_path(val: &str) -> Option<String> {
+    let theme_name = get_icon_theme_name();
+    let search_dirs = build_icon_search_dirs();
+    lookup_icon(val, &theme_name, &search_dirs).map(|p| p.to_string_lossy().into_owned())
+}
+
+// ─── Theme name ──────────────────────────────────────────────────────────────
+
+/// Queries the active icon theme via gsettings. Returns "hicolor" on failure.
+fn get_icon_theme_name() -> String {
+    let Ok(out) = Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", "icon-theme"])
+        .output()
+    else {
+        return "hicolor".to_owned();
+    };
+
+    if !out.status.success() {
+        return "hicolor".to_owned();
+    }
+
+    let raw = String::from_utf8_lossy(&out.stdout);
+    let trimmed = raw.trim();
+
+    // gsettings wraps the value in single quotes: 'Adwaita'
+    let name = trimmed
+        .strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(trimmed);
+
+    if name.is_empty() {
+        "hicolor".to_owned()
+    } else {
+        name.to_owned()
+    }
+}
+
+// ─── Search directory list ────────────────────────────────────────────────────
+
+/// Builds the ordered list of base icon directories per the spec:
+///   $HOME/.icons
+///   $XDG_DATA_HOME/icons  (defaults to $HOME/.local/share/icons)
+///   $XDG_DATA_DIRS/icons  (defaults to /usr/local/share:/usr/share)
+///
+/// /usr/share/pixmaps is handled separately as a last-resort fallback.
+fn build_icon_search_dirs() -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+
+    if let Ok(home) = env::var("HOME") {
+        // $HOME/.icons — kept for backwards compatibility with the spec
+        dirs.push(PathBuf::from(format!("{}/.icons", home)));
+
+        let xdg_data_home =
+            env::var("XDG_DATA_HOME").unwrap_or_else(|_| format!("{}/.local/share", home));
+        dirs.push(PathBuf::from(format!("{}/icons", xdg_data_home)));
+    }
+
+    let xdg_data_dirs =
+        env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".to_owned());
+    for data_dir in xdg_data_dirs.split(':') {
+        dirs.push(PathBuf::from(format!("{}/icons", data_dir)));
+    }
+
+    dirs
+}
+
+// ─── Top-level lookup with theme inheritance ─────────────────────────────────
+
+/// Performs the full icon lookup: active theme chain → hicolor → pixmaps.
+fn lookup_icon(icon_name: &str, theme_name: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
+    let mut visited: Vec<String> = Vec::new();
+
+    // 1. Active theme (recursively follows Inherits=)
+    if let Some(path) = lookup_in_theme_chain(icon_name, theme_name, search_dirs, &mut visited) {
+        return Some(path);
+    }
+
+    // 2. hicolor fallback (skip if already visited through inheritance)
+    if !visited.iter().any(|v| v == "hicolor") {
+        if let Some(path) = lookup_in_theme_chain(icon_name, "hicolor", search_dirs, &mut visited) {
+            return Some(path);
+        }
+    }
+
+    // 3. /usr/share/pixmaps — spec-mandated last resort
+    for ext in ICON_EXTENSIONS {
+        let path = PathBuf::from(format!("/usr/share/pixmaps/{}.{}", icon_name, ext));
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+/// Searches `theme_name` across all `search_dirs`, then recurses into each
+/// theme listed in its `Inherits=` line. `visited` prevents cycles.
+fn lookup_in_theme_chain(
+    icon_name: &str,
+    theme_name: &str,
+    search_dirs: &[PathBuf],
+    visited: &mut Vec<String>,
+) -> Option<PathBuf> {
+    if visited.iter().any(|v| v == theme_name) {
+        return None;
+    }
+    visited.push(theme_name.to_owned());
+
+    // Try every base directory for this theme
+    for base_dir in search_dirs {
+        let theme_path = base_dir.join(theme_name);
+        if !theme_path.is_dir() {
+            continue;
+        }
+        if let Some(path) = find_icon_in_theme_dir(&theme_path, icon_name) {
+            return Some(path);
+        }
+    }
+
+    // Follow Inherits= chain declared in index.theme
+    for parent_theme in parse_theme_inherits(theme_name, search_dirs) {
+        if let Some(path) = lookup_in_theme_chain(icon_name, &parent_theme, search_dirs, visited) {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+// ─── Single-theme directory search ───────────────────────────────────────────
+
+/// Scans all subdirectories of a theme directory for `icon_name`, returning
+/// the path whose size is closest to PREFERRED_SIZE.
+///
+/// Supports both fixed-size (e.g. "48x48/apps") and scalable ("scalable/apps")
+/// subdirectories, and all context folders (apps, mimetypes, places, etc.).
+fn find_icon_in_theme_dir(theme_path: &Path, icon_name: &str) -> Option<PathBuf> {
+    let subdirs = read_theme_directories(theme_path);
+    let mut best: Option<(u32, PathBuf)> = None;
+
+    for subdir in &subdirs {
+        let dist = size_distance(subdir);
+        let subdir_path = theme_path.join(subdir);
+        if !subdir_path.is_dir() {
+            continue;
+        }
+        for ext in ICON_EXTENSIONS {
+            let candidate = subdir_path.join(format!("{}.{}", icon_name, ext));
+            if candidate.exists() {
+                let is_better = best.as_ref().map_or(true, |(d, _)| dist < *d);
+                if is_better {
+                    best = Some((dist, candidate));
+                }
+                // Exact match — no need to keep scanning
+                if dist == 0 {
+                    return best.map(|(_, p)| p);
+                }
+            }
+        }
+    }
+
+    best.map(|(_, p)| p)
+}
+
+// ─── index.theme parsing ─────────────────────────────────────────────────────
+
+/// Returns the subdirectory list from `Directories=` in index.theme.
+/// Falls back to a raw filesystem scan if the file is absent or unparseable.
+fn read_theme_directories(theme_path: &Path) -> Vec<String> {
+    let index_path = theme_path.join("index.theme");
+
+    if let Ok(content) = fs::read_to_string(&index_path) {
+        for line in content.lines() {
+            if let Some(rest) = line.trim().strip_prefix("Directories=") {
+                return rest
+                    .split(',')
+                    .map(|s| s.trim().to_owned())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+        }
+    }
+
+    // Fallback: treat every subdirectory as a candidate
+    scan_theme_subdirs_recursive(theme_path, theme_path)
+}
+
+/// Recursively collects subdirectory paths relative to `theme_path`.
+/// Stops after two levels (size_dir/context_dir) to match the typical
+/// theme layout and avoid excessive traversal.
+fn scan_theme_subdirs_recursive(theme_path: &Path, current: &Path) -> Vec<String> {
+    let Ok(entries) = current.read_dir() else {
+        return Vec::new();
+    };
+
+    let mut result = Vec::new();
+    for entry in entries.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let relative = entry
+            .path()
+            .strip_prefix(theme_path)
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned());
+        if let Some(rel) = relative {
+            let depth = rel.chars().filter(|&c| c == '/').count();
+            result.push(rel);
+            // Recurse one more level so "48x48/apps" is included when
+            // the Directories= line lists "48x48/apps" style paths
+            if depth == 0 {
+                result.extend(scan_theme_subdirs_recursive(theme_path, &entry.path()));
+            }
+        }
+    }
+    result
+}
+
+/// Reads `Inherits=` from a theme's index.theme, searching across all base
+/// directories (a theme may be split across multiple XDG data dirs).
+fn parse_theme_inherits(theme_name: &str, search_dirs: &[PathBuf]) -> Vec<String> {
+    for base_dir in search_dirs {
+        let index_path = base_dir.join(theme_name).join("index.theme");
+        let Ok(content) = fs::read_to_string(&index_path) else {
+            continue;
+        };
+        for line in content.lines() {
+            if let Some(rest) = line.trim().strip_prefix("Inherits=") {
+                return rest
+                    .split(',')
+                    .map(|s| s.trim().to_owned())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+        }
+    }
+    Vec::new()
+}
+
+// ─── Size distance ────────────────────────────────────────────────────────────
+
+/// Computes how far a theme subdirectory's size is from PREFERRED_SIZE.
+/// Lower is better; 0 is an exact match.
+///
+/// Handles formats like "48x48", "48x48@2x", "scalable", "scalable@2x",
+/// and paths like "48x48/apps" (spec uses bare subdir names in Directories=).
+fn size_distance(subdir: &str) -> u32 {
+    // Strip context suffix ("48x48/apps" → "48x48") and HiDPI suffix ("@2x")
+    let base = subdir
+        .split('/')
+        .next()
+        .unwrap_or(subdir)
+        .split('@')
+        .next()
+        .unwrap_or(subdir);
+
+    if base.eq_ignore_ascii_case("scalable") {
+        // Scalable SVGs work at any size. Give them a moderate distance so
+        // a correctly-sized PNG is preferred, but SVG beats a wildly
+        // mismatched fixed size.
+        return PREFERRED_SIZE / 2;
+    }
+
+    // Parse "WxH" — only W is used (icons are square)
+    if let Some(w_str) = base.split('x').next() {
+        if let Ok(w) = w_str.parse::<u32>() {
+            return w.abs_diff(PREFERRED_SIZE);
+        }
+    }
+
+    // Unrecognised format — sort to the back
+    u32::MAX
+}
+
+// ─── Unchanged functions ──────────────────────────────────────────────────────
+
+// TODO: Backslash and quoting is not handled properly, needs to be done.
+fn get_exec_command(input: &str) -> String {
+    let mut output = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '%' => {
+                if let Some('%') = chars.peek() {
+                    // %% -> %
+                    output.push('%');
+                    chars.next();
+                } else {
+                    // %X -> remove both
+                    chars.next();
+                }
+            }
+            '"' => {
+                // Remove double quotes entirely
+            }
+            _ => {
+                output.push(c);
+            }
+        }
+    }
+
+    // Removing file inputs from flatpak exec commands
+    if output.ends_with('@') {
+        output = output.chars().take(output.chars().count() - 7).collect();
+    }
+    output.trim().to_owned()
+}
+
+fn get_desktop_id(file_path: &Path) -> String {
+    let mut return_string_val = String::new();
+    let mut app_index: i32 = -1;
+    for (index, part) in file_path.components().enumerate() {
+        if part == Component::Normal(OsStr::new("applications")) {
+            app_index = index as i32;
+        }
+        if index > app_index as usize
+            && let Component::Normal(string_val) = part
+        {
+            return_string_val.push_str(string_val.to_str().unwrap());
+            if !part.as_os_str().to_str().unwrap().ends_with(".desktop") {
+                return_string_val.push('-');
+            }
+        }
+    }
+    return_string_val
+}
+
+// TODO: Have to add binding for other side of application for following 2 tasks
+//  1. Updating the list if new apps get added (via traits).
+//  2. Providing a way to add category to which the apps belong (games, config, tools, etc.)
 pub(super) fn desktop_entry_extracter(file_path: PathBuf) -> Vec<Option<AppData>> {
     let desktop_file_id: String = get_desktop_id(&file_path);
     let mut image_path: Option<String> = None;
@@ -117,204 +469,3 @@ pub(super) fn desktop_entry_extracter(file_path: PathBuf) -> Vec<Option<AppData>
     }
     return_vector
 }
-
-// Image path implementation as mentioned in https://specifications.freedesktop.org/icon-theme-spec/latest/#example
-fn get_image_path(val: &str) -> Option<String> {
-    let mut theme_name: String = "hicolor".to_string();
-    let theme_name_getter = Command::new("gsettings")
-        .arg("get")
-        .arg("org.gnome.desktop.interface")
-        .arg("icon-theme")
-        .output()
-        .expect("Failed to execute command gsettings.");
-    if theme_name_getter.status.success() {
-        theme_name = String::from_utf8(theme_name_getter.stdout).expect("Failed to process theme");
-        if theme_name.starts_with('\'') {
-            theme_name.pop();
-            theme_name.pop();
-            theme_name.remove(0);
-        }
-    }
-    // $HOME/.icons (for backwards compatibility), in $XDG_DATA_DIRS/icons and in /usr/share/pixmaps
-    let mut dir_list = Vec::new();
-    if let Ok(home_val) = env::var("HOME") {
-        dir_list.push(home_val);
-        dir_list.extend(
-            env::var("XDG_DATA_DIRS")
-                .expect("XDG_DATA_DIRS not set")
-                .split(':')
-                .map(|val| val.to_owned() + "/icons/"),
-        );
-        dir_list.push("/usr/share/pixmaps/".to_string());
-    }
-    let mut icon_path: Option<String> = None;
-    // println!("Finding Icon of name: {val} in theme : {theme_name}");
-    for dir in &dir_list {
-        // dir is some_path/icons here, in which the file is presnet.
-        icon_path = find_icon_path(dir, &theme_name, val);
-        if icon_path.is_some() {
-            break;
-        }
-    }
-
-    if icon_path.is_none() {
-        // println!("SEARCHING IN HICOLOR DEFAULT THEME");
-        for dir in dir_list {
-            icon_path = find_icon_path(&dir, "hicolor", val);
-            if icon_path.is_some() {
-                break;
-            }
-        }
-    }
-    icon_path
-}
-
-fn find_icon_path(dir: &str, theme_name: &str, icon_name_given: &str) -> Option<String> {
-    if Path::new(dir).is_dir() {
-        for theme_dir in Path::new(dir)
-            .read_dir()
-            .expect("Unable to read dir")
-            .flatten()
-        {
-            if theme_dir.path().iter().next_back() == Some(OsStr::new(theme_name)) {
-                // let pathh = theme_dir.path();
-                // println!("GIVEN THEME FOUND, path: {pathh:?}");
-                let index_file_path_vec = &Path::new(&theme_dir.path())
-                    .read_dir()
-                    .expect("Error reading dir")
-                    .flatten()
-                    .filter(|val| {
-                        if val.path().file_name() == Some(OsStr::new("index.theme")) {
-                            // println!("INDEX.THEME found");
-                            return true;
-                        }
-                        false
-                    })
-                    .collect::<Vec<_>>();
-                if !index_file_path_vec.is_empty() {
-                    // println!("Vector not empty");
-                    let index_file_path = &index_file_path_vec[0];
-                    let icon_path: Option<String> =
-                        get_path_from_index(index_file_path.path(), icon_name_given);
-                    if icon_path.is_some() {
-                        return icon_path;
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-fn remove_last(path: &Path) -> PathBuf {
-    let val = String::from(path.as_os_str().to_str().unwrap());
-    let mut pathh = val.split('/').collect::<Vec<_>>();
-    pathh.pop();
-    let binding = pathh.join("/");
-    PathBuf::from_str(&binding).expect("Couldn't remove entry")
-}
-
-// TODO, future implementation will encoporate scale and size gathered from
-// user along with use of index.theme file
-fn get_path_from_index(theme_index_path: PathBuf, icon_name: &str) -> Option<String> {
-    let dir_path = remove_last(&theme_index_path);
-    if dir_path.is_dir() {
-        for scale_size_dir in dir_path.read_dir().expect("Error reading dir").flatten() {
-            let pathh = remove_last(&scale_size_dir.path());
-            for dir in pathh
-                .read_dir()
-                .expect("Couldn't read icon scaled file")
-                .flatten()
-            {
-                // let some_path = dir.path();
-                // println!("{some_path:?}");
-                if dir.path().iter().next_back() == Some(OsStr::new("24x24")) {
-                    for app_dir in dir
-                        .path()
-                        .read_dir()
-                        .expect("Error reading scaled value dir")
-                        .flatten()
-                    {
-                        if app_dir.path().iter().next_back() == Some(OsStr::new("apps")) {
-                            // let app_dir_path = app_dir.path();
-                            // println!("{app_dir_path:?}");
-                            let final_app_path_string =
-                                &(dir.path().to_str().unwrap().to_owned() + "/apps");
-                            let apps_folder = Path::new(final_app_path_string);
-                            for icon_path in apps_folder
-                                .read_dir()
-                                .expect("Error reading apps folder")
-                                .flatten()
-                            {
-                                // let app_dir_path = icon_path.path();
-                                // println!("{icon_name}");
-                                // println!("icon paths: {app_dir_path:?}");
-                                if icon_path.path().file_stem().unwrap() == OsStr::new(icon_name) {
-                                    return Some(String::from(
-                                        icon_path.path().as_os_str().to_str().unwrap(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-// TODO Backlash and quoting is not handled properly, needs to be done.
-fn get_exec_command(input: &str) -> String {
-    let mut output = String::new();
-    let mut chars = input.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        match c {
-            '%' => {
-                if let Some('%') = chars.peek() {
-                    // %% -> %
-                    output.push('%');
-                    chars.next();
-                } else {
-                    // %X -> remove both
-                    chars.next();
-                }
-            }
-            '"' => {
-                // Remove double quotes entirely
-            }
-            _ => {
-                output.push(c);
-            }
-        }
-    }
-
-    output.trim().to_owned()
-}
-
-fn get_desktop_id(file_path: &Path) -> String {
-    let mut return_string_val = String::new();
-    let mut app_index: i32 = -1;
-    for (index, part) in file_path.components().enumerate() {
-        if part == Component::Normal(OsStr::new("applications")) {
-            app_index = index as i32;
-        }
-        if index > app_index as usize
-            && let Component::Normal(string_val) = part
-        {
-            return_string_val.push_str(string_val.to_str().unwrap());
-            if !part.as_os_str().to_str().unwrap().ends_with(".desktop") {
-                return_string_val.push('-');
-            }
-        }
-    }
-    return_string_val
-}
-
-// TODO have to add break statements in for loops of above functions whene the desired
-// folder is found.
-// TODO Have to add binding for other side of application for following 2 tasks
-//  1. updating the list if new apps gets added (via traits).
-//  2. Providing a way to add category to which the apps belong, like games, config, tools etc.
-// TODO fix image path function so that it can find icons if app not present in /apps/

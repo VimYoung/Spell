@@ -1,3 +1,15 @@
+// #[macro_export]
+// macro_rules! take_a {
+//     // Case: (A, B)
+//     (($a:expr, $b:expr)) => {
+//         $a
+//     };
+
+//     // Case: just A
+//     ($a:expr) => {
+//         $a
+//     };
+// }
 #[doc = include_str!("../docs/generate_widgets.md")]
 #[macro_export]
 macro_rules! generate_widgets {
@@ -157,8 +169,14 @@ macro_rules! cast_spell {
         $(
             // NOTE that this won't work in case of ipc windows being passed.
             // let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
-            let way = $crate::cast_spell!(@expand entry: $entry);
-            $crate::cast_spell!(@vector_add windows, way);
+            let (way, _ui) = $crate::cast_spell!(@expand entry: $entry);
+            // match $crate::cast_spell!(@expand entry: $entry) {
+            //     (a, _ui) =>  windows.push(Box::new(a) as Box<dyn $crate::SpellAssociatedNew>),
+            //     a => windows.push(Box::new(a) as Box<dyn $crate::SpellAssociatedNew>),
+            // }
+            // $crate::cast_spell!(@vector_add windows, way);
+            //
+            windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
         )+
         $crate::cast_spells_new(windows)
     }};
@@ -204,9 +222,7 @@ macro_rules! cast_spell {
                                 $crate::macro_internal::warn!("Couldn't read CLI stream");
                             }
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
-                            println!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
-                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
@@ -238,7 +254,8 @@ macro_rules! cast_spell {
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        way
+        (way, String::from("None"))
+        // way
         // (way, ui)
     }};
     // Non-IPC window
@@ -270,10 +287,8 @@ macro_rules! cast_spell {
                             let (operation, command_args) = request.split_once(" ").unwrap_or((request.trim(), ""));
                             // These info statements doesn't seem to be working due to them running in the wrong space.
                             $crate::macro_internal::info!("Operation:{}, command_args:{}", operation, command_args);
-                            println!("Operation:{}, command_args:{}", operation, command_args);
                             let (command, args) = command_args.split_once(" ").unwrap_or((command_args.trim(), ""));
                             $crate::macro_internal::info!("Operation:{}, Command {}, args: {}",operation, command, args);
-                            println!("Operation:{}, Command {}, args: {}",operation, command, args);
                             match operation {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
@@ -300,12 +315,12 @@ macro_rules! cast_spell {
         );
         (way, ui)
     }};
-    (@vector_add $wins:expr, ($waywindow:expr,$_ui:expr)) => {
-        $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
-    };
-    (@vector_add $wins:expr, $waywindow:expr) => {
-        $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
-    };
+    // (@vector_add $wins:expr, ($waywindow:expr,$_ui:expr)) => {
+    //     $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
+    // };
+    // (@vector_add $wins:expr, $waywindow:expr) => {
+    //     $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
+    // };
 
     // (@name ($win:expr,ipc)) => {
     //     $crate::macro_internal::paste! {
