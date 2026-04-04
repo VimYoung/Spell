@@ -49,11 +49,11 @@ pub trait IpcController {
     fn get_type(&self, key: &str) -> String;
     /// It is called on `spell-cli -l layer_name update key value`. `as_any` is for syncing the changes
     /// internally for now and need not be implemented by the end user.
-    fn change_val(&mut self, key: &str, val: &str);
+    fn change_val(&self, key: &str, val: &str);
 
     /// This method is invoked is neither update nor look is called. Can be used to perform custom
     /// operations.
-    fn custom_command(&mut self, _command: &str) {}
+    fn custom_command(&self, _command: &str) {}
 }
 
 /// This is an internal trait implemented by objects generated from [`generate_widgets`].

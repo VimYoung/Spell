@@ -1,15 +1,3 @@
-// #[macro_export]
-// macro_rules! take_a {
-//     // Case: (A, B)
-//     (($a:expr, $b:expr)) => {
-//         $a
-//     };
-
-//     // Case: just A
-//     ($a:expr) => {
-//         $a
-//     };
-// }
 #[doc = include_str!("../docs/generate_widgets.md")]
 #[macro_export]
 macro_rules! generate_widgets {
@@ -137,11 +125,17 @@ macro_rules! cast_spell {
         $(, notification: $noti:expr)?
         $(,)?
     ) => {{
+        let (ui, mut way) = $win.parts();
+        let mut windows = Vec::new();
         $(
-            $crate::cast_spell!(@notification $noti);
+            let (ui_noti, mut way_noti) = $noti.parts();
+            $crate::cast_spell!(@notification way_noti);
+            windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
-        let (x,_y) = $crate::cast_spell!(@expand entry: $win);
-        $crate::cast_spell!(@run x)
+        $crate::cast_spell!(@expand entry: way, ui);
+        windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
+        $crate::cast_spells_new(windows)
+        // $crate::cast_spell!(@run x)
     }};
     // Single window (IPC)
     (
@@ -149,11 +143,17 @@ macro_rules! cast_spell {
         $(, notification: $noti:expr)?
         $(,)?
     ) => {{
+        let (ui, mut way) = $win.parts();
+        let mut windows = Vec::new();
         $(
-            $crate::cast_spell!(@notification $noti);
+            let (ui_noti, mut way_noti) = $noti.parts();
+            $crate::cast_spell!(@notification way_noti);
+            windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
-        let (x, _y) = $crate::cast_spell!(@expand entry: ($win, ipc));
-        $crate::cast_spell!(@run x)
+        $crate::cast_spell!(@expand entry: (way, ipc), ui: ui );
+        windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
+        $crate::cast_spells_new(windows)
+        // $crate::cast_spell!(@run x)
     }};
 
     // Multiple windows (mixed IPC / non-IPC) (Defined individually)
@@ -162,20 +162,20 @@ macro_rules! cast_spell {
         $(, notification: $noti:expr)?
         $(,)?
     ) => {{
-        $(
-            $crate::cast_spell!(@notification $noti);
-        )?
         let mut windows = Vec::new();
         $(
-            // NOTE that this won't work in case of ipc windows being passed.
-            // let (way, $crate::cast_spell!(@name $entry)) = $crate::cast_spell!(@expand entry: $entry);
-            let (way, _ui) = $crate::cast_spell!(@expand entry: $entry);
-            // match $crate::cast_spell!(@expand entry: $entry) {
-            //     (a, _ui) =>  windows.push(Box::new(a) as Box<dyn $crate::SpellAssociatedNew>),
-            //     a => windows.push(Box::new(a) as Box<dyn $crate::SpellAssociatedNew>),
-            // }
-            // $crate::cast_spell!(@vector_add windows, way);
-            //
+            let (ui_noti, mut way_noti) = $noti.parts();
+            $crate::cast_spell!(@notification way_noti);
+            windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
+        )?
+        $(
+            // let (ui, mut way) = $crate::cast_spell!();
+            let ((ui, mut way), is_ipc) = $crate::cast_spell!(@parts win: $entry);
+            if is_ipc {
+                $crate::cast_spell!(@expand entry: (way, ipc), ui: ui );
+            } else {
+                $crate::cast_spell!(@expand entry: way, ui );
+            }
             windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
         )+
         $crate::cast_spells_new(windows)
@@ -183,6 +183,7 @@ macro_rules! cast_spell {
 
     // Moved to next release, only for non -ipc scenarios
     // // Multiple windows (mixed IPC / non-IPC) (Defined as non-ipc vector)
+    // Older Implementation needs updation
     (
         windows: $windows:expr
         $(, windows_ipc: $windows_ipc:expr)?
@@ -201,16 +202,16 @@ macro_rules! cast_spell {
     // IPC-enabled window
     (
         @expand
-        entry: ($waywindow:expr, ipc)
-    ) => {{
-        let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
+        entry: ($way:expr, ipc),
+        ui: $ui: expr
+    ) => {
+        let socket_path = format!("/tmp/{}_ipc.sock", $way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
-        let (mut ui, mut way) = $waywindow.parts();
-        way.ipc_handler = Some(listener_clone);
-        let _ = way.loop_handle.clone().insert_source(
+        $way.ipc_handler = Some(listener_clone);
+        let _ = $way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, meta, data| {
                 loop {
@@ -227,10 +228,10 @@ macro_rules! cast_spell {
                                 "hide" => data.hide(),
                                 "show" => data.show_again(),
                                 "update" => {
-                                    IpcController::change_val(&mut ui, command, args);
+                                    IpcController::change_val(& $ui, command, args);
                                 }
                                 "look"=> {
-                                    let returned_type = IpcController::get_type(&ui,command);
+                                    let returned_type = IpcController::get_type(& $ui,command);
                                     if let Err(_) = stream.write_all(returned_type.as_bytes()) {
                                         // warn!("Couldn't send back return type");
                                     }
@@ -238,7 +239,7 @@ macro_rules! cast_spell {
                                 // TODO provide mechanism for custom calls from the below
                                 // matching.
                                 comm => {
-                                    IpcController::custom_command(&mut ui, comm);
+                                    IpcController::custom_command(& $ui, comm);
                                 }
                             }
                         }
@@ -254,26 +255,21 @@ macro_rules! cast_spell {
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        (way, String::from("None"))
-        // way
-        // (way, ui)
-    }};
+    };
     // Non-IPC window
     (
         @expand
-        entry: $waywindow:expr
-    ) => {{
+        entry: $way:expr,
+        $_ui: expr
+    ) => {
         // use std::{os::unix::{net::UnixListener, io::AsRawFd}, io::prelude::*};
-        let socket_path = format!("/tmp/{}_ipc.sock", $waywindow.way.layer_name);
+        let socket_path = format!("/tmp/{}_ipc.sock", $way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
-        // let handle_weak = $waywindow.ui.as_weak().clone();
-        // $waywindow.way.ipc_listener.replace(Some(listener.try_clone().expect("Couldn't clone the listener")));
-        let (ui, mut way) = $waywindow.parts();
-        way.ipc_handler = Some(listener_clone);
-        let _ = way.loop_handle.clone().insert_source(
+        $way.ipc_handler = Some(listener_clone);
+        let _ = $way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, _, data| {
                 loop {
@@ -305,34 +301,17 @@ macro_rules! cast_spell {
                         }
                     }
                 }
-
-                // $(
-                //     // stringify!($name) => handle_weak.unwrap().$name(args.trim().parse::<$ty>().unwrap()),
-                //     println!("dcfv {}", stringify!($name));
-                // );*
                 Ok($crate::macro_internal::PostAction::Continue)
             },
         );
-        (way, ui)
+    };
+
+    (@parts win: ($combowin:expr , ipc)) => {{
+        ($combowin.parts(), true)
     }};
-    // (@vector_add $wins:expr, ($waywindow:expr,$_ui:expr)) => {
-    //     $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
-    // };
-    // (@vector_add $wins:expr, $waywindow:expr) => {
-    //     $wins.push(Box::new($waywindow) as Box<dyn $crate::SpellAssociatedNew>)
-    // };
-
-    // (@name ($win:expr,ipc)) => {
-    //     $crate::macro_internal::paste! {
-    //         [<$win _var>]
-    //     }
-    // };
-
-    // (@name $win:expr) => {
-    //     $crate::macro_internal::paste! {
-    //         [<$win _var>]
-    //     }
-    // };
+    (@parts win: $combowin:expr) => {{
+        ($combowin.parts(), false)
+    }};
     // Notification Logic
     (@notification $noti:expr) => {
         // runs ONCE
