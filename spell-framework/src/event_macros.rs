@@ -163,19 +163,15 @@ macro_rules! cast_spell {
         $(,)?
     ) => {{
         let mut windows = Vec::new();
+        let mut _ui_handles: Vec<Box<dyn std::any::Any>> = Vec::new();
         $(
             let (ui_noti, mut way_noti) = $noti.parts();
             $crate::cast_spell!(@notification way_noti);
             windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
         $(
-            // let (ui, mut way) = $crate::cast_spell!();
-            let ((ui, mut way), is_ipc) = $crate::cast_spell!(@parts win: $entry);
-            if is_ipc {
-                $crate::cast_spell!(@expand entry: (way, ipc), ui: ui );
-            } else {
-                $crate::cast_spell!(@expand entry: way, ui );
-            }
+            let (ui, mut way) = $crate::cast_spell!(@handle_entry $entry);
+            _ui_handles.push(Box::new(ui));
             windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
         )+
         $crate::cast_spells_new(windows)
@@ -305,6 +301,22 @@ macro_rules! cast_spell {
             },
         );
     };
+
+    // Compile-time IPC dispatch for the multi-window arm.
+    // Both arms return (ui, way) so the caller can keep ui alive in the outer scope.
+    // For IPC: ui is moved into the event-loop closure, so clone it first and
+    // return the original handle to the caller.
+    (@handle_entry ($combowin:expr, ipc)) => {{
+        let (ui, mut way) = $combowin.parts();
+        // let _ui_for_closure = ui.clone();
+        $crate::cast_spell!(@expand entry: (way, ipc), ui: ui);
+        (String::from(""), way)
+    }};
+    (@handle_entry $combowin:expr) => {{
+        let (ui, mut way) = $combowin.parts();
+        $crate::cast_spell!(@expand entry: way, ui);
+        (ui, way)
+    }};
 
     (@parts win: ($combowin:expr , ipc)) => {{
         ($combowin.parts(), true)
