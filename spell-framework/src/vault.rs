@@ -25,71 +25,19 @@
 //! your widget windows on slint side in structs and then implement these traits on it.
 use crate::vault::application::desktop_entry_extracter;
 pub use mpris;
-use rust_fuzzy_search::fuzzy_search_best_n;
+pub use rust_fuzzy_search::fuzzy_search_best_n;
 use std::{
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
-    sync::Arc,
-    thread,
 };
+
 mod application;
+// //
+// fn check_for_new_apps(_app: Arc<dyn AppHandler>) {
+//     todo!()
+// }
 
-pub trait NotificationHandler: Send + Sync {}
-pub trait AppHandler: Send + Sync {
-    fn new_app_added(&mut self, app_data: AppData);
-}
-pub trait MprisHandler: Send + Sync {}
-pub trait PipeWireHandler: Send + Sync {}
-
-#[derive(Default, Clone)]
-pub struct Services {
-    notification: Option<Arc<dyn NotificationHandler>>,
-    app: Option<Arc<dyn AppHandler>>,
-    mpris: Option<Arc<dyn MprisHandler>>,
-    pipewire: Option<Arc<dyn PipeWireHandler>>,
-}
-
-impl Services {
-    pub fn add_notification_handle(
-        &mut self,
-        noti_handler: Arc<dyn NotificationHandler>,
-    ) -> &mut Self {
-        self.notification = Some(noti_handler);
-        self
-    }
-
-    pub fn add_app_handle(&mut self, app_handler: Arc<dyn AppHandler>) -> &mut Self {
-        self.app = Some(app_handler);
-        self
-    }
-
-    pub fn add_mpris_handle(&mut self, mpris_handler: Arc<dyn MprisHandler>) -> &mut Self {
-        self.mpris = Some(mpris_handler);
-        self
-    }
-
-    pub fn add_pipewire_handle(&mut self, pipewire_handler: Arc<dyn PipeWireHandler>) -> &mut Self {
-        self.pipewire = Some(pipewire_handler);
-        self
-    }
-
-    pub fn generate_serices(&mut self) {
-        if let Some(app) = &self.app {
-            let app_clone = app.clone();
-            thread::spawn(move || {
-                check_for_new_apps(app_clone);
-            });
-        }
-    }
-}
-
-fn check_for_new_apps(_app: Arc<dyn AppHandler>) {
-    todo!()
-}
-
-pub struct AudioManager;
-// TODO needs to fix the below mentioned bugs.
 /// AppSelector stores the data for each application with possible actions. Known bugs
 /// include failing to open flatpak apps in certain cases and failing to find icons
 /// of apps in certain cases both of which will be fixed in coming releases.
