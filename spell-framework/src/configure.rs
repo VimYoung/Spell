@@ -235,7 +235,7 @@ impl WindowConfBuilder {
             } else {
                 return Err("width is either not defined or set to zero".into());
             },
-            height: if self.max_width != 0 {
+            height: if self.max_height != 0 {
                 self.max_height
             } else {
                 return Err("height is either not defined or set to zero".into());

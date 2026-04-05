@@ -345,19 +345,7 @@ impl SpellWin {
     pub fn hide(&self) {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
-            // let width: u32 = self.adapter.size.get().width;
-            // let height: u32 = self.adapter.size.get().height;
-            // let width: u32 = self.adapter.size.get().width;
-            // let height: u32 = self.adapter.size.get().height;
-            // self.layer.as_ref().unwrap().wl_surface().damage_buffer(
-            //     0,
-            //     0,
-            //     width as i32,
-            //     height as i32,
-            // );
-            //
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
-            // self.layer.as_ref().unwrap().commit();
         }
     }
 
@@ -372,7 +360,7 @@ impl SpellWin {
     }
 
     /// Hides the widget if visible or shows the widget back if hidden.
-    pub fn toggle(&mut self) {
+    pub fn toggle(&self) {
         info!("Win: view toggled");
         if self.is_hidden.get() {
             self.show_again();
@@ -515,26 +503,30 @@ impl SpellWin {
     /// Grabs the focus of keyboard. Can be used in combination with other functions
     /// to make the widgets keyboard navigable.
     pub fn grab_focus(&self) {
-        self.config
-            .board_interactivity
-            .set(KeyboardInteractivity::Exclusive);
-        self.layer
-            .as_ref()
-            .unwrap()
-            .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-        self.layer.as_ref().unwrap().commit();
+        if !self.is_hidden.get() {
+            self.config
+                .board_interactivity
+                .set(KeyboardInteractivity::Exclusive);
+            self.layer
+                .as_ref()
+                .unwrap()
+                .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+            self.layer.as_ref().unwrap().commit();
+        }
     }
 
     /// Removes the focus of keyboard from window if it currently has it.
     pub fn remove_focus(&self) {
-        self.config
-            .board_interactivity
-            .set(KeyboardInteractivity::None);
-        self.layer
-            .as_ref()
-            .unwrap()
-            .set_keyboard_interactivity(KeyboardInteractivity::None);
-        self.layer.as_ref().unwrap().commit();
+        if !self.is_hidden.get() {
+            self.config
+                .board_interactivity
+                .set(KeyboardInteractivity::None);
+            self.layer
+                .as_ref()
+                .unwrap()
+                .set_keyboard_interactivity(KeyboardInteractivity::None);
+            self.layer.as_ref().unwrap().commit();
+        }
     }
 
     /// This method is used to set exclusive zone. Generally, useful when
