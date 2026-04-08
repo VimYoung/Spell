@@ -6,7 +6,7 @@
 )]
 // #![doc(html_favicon_url = "https://github.com/VimYoung/Spell/blob/bb01ae94a365d237ebb0db1df1b6eb37aea25367/spell-framework/assets/Spell.png")]
 #![doc = include_str!("../docs/entry.md")]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 mod configure;
 #[cfg(docsrs)]
 mod dummy_skia_docs;
@@ -33,6 +33,7 @@ pub mod layer_properties {
 /// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
 /// internally.
 pub mod macro_internal {
+    pub use crate::vault::set_notification;
     pub use paste::paste;
     pub use smithay_client_toolkit::reexports::calloop::{
         Interest, Mode, PostAction, generic::Generic,

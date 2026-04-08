@@ -503,7 +503,9 @@ impl SpellWin {
     /// Grabs the focus of keyboard. Can be used in combination with other functions
     /// to make the widgets keyboard navigable.
     pub fn grab_focus(&self) {
-        if !self.is_hidden.get() {
+        if !self.is_hidden.get()
+            && self.config.board_interactivity.get() != KeyboardInteractivity::Exclusive
+        {
             self.config
                 .board_interactivity
                 .set(KeyboardInteractivity::Exclusive);
@@ -517,7 +519,9 @@ impl SpellWin {
 
     /// Removes the focus of keyboard from window if it currently has it.
     pub fn remove_focus(&self) {
-        if !self.is_hidden.get() {
+        if !self.is_hidden.get()
+            && self.config.board_interactivity.get() != KeyboardInteractivity::None
+        {
             self.config
                 .board_interactivity
                 .set(KeyboardInteractivity::None);
