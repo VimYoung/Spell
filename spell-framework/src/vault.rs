@@ -23,7 +23,7 @@
 //!
 //! As a general tip, the best way to implement traits is to stores weak reference to
 //! your widget windows on slint side in structs and then implement these traits on it.
-use crate::vault::application::desktop_entry_extracter;
+use crate::vault::{application::desktop_entry_extracter, notification_manager::NotifyEvent};
 pub use mpris;
 pub use notification_manager::set_notification;
 pub use rust_fuzzy_search::fuzzy_search_best_n;
@@ -32,12 +32,24 @@ use std::{
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
+    sync::OnceLock,
 };
+use tokio::sync::mpsc::Sender;
 
 mod application;
 mod notification_manager;
 
-pub trait NotificationManager {}
+pub static NOTIFICATION_EVENT: OnceLock<Sender<NotifyEvent>> = OnceLock::new();
+pub trait NotificationManager {
+    fn new_notification(&self, notification: Notification) -> Result<(), NotiError>;
+    fn notifcation_close(&self, id: u32) -> Result<(), NotiError>;
+}
+
+#[derive(Debug)]
+pub enum NotiError {
+    MessageUnprocessed,
+    MessageCloseFailed,
+}
 pub struct Notification {
     pub appname: String,
     pub summary: String,

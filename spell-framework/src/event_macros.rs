@@ -129,7 +129,7 @@ macro_rules! cast_spell {
         let mut windows = Vec::new();
         $(
             let (ui_noti, mut way_noti) = $noti.parts();
-            $crate::cast_spell!(@notification way_noti);
+            $crate::cast_spell!(@notification &way_noti, ui_noti);
             windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
         $crate::cast_spell!(@expand entry: way, ui);
@@ -147,7 +147,7 @@ macro_rules! cast_spell {
         let mut windows = Vec::new();
         $(
             let (ui_noti, mut way_noti) = $noti.parts();
-            $crate::cast_spell!(@notification way_noti);
+            $crate::cast_spell!(@notification &way_noti, ui_noti);
             windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
         $crate::cast_spell!(@expand entry: (way, ipc), ui: ui );
@@ -166,7 +166,7 @@ macro_rules! cast_spell {
         let mut _ui_handles: Vec<Box<dyn std::any::Any>> = Vec::new();
         $(
             let (ui_noti, mut way_noti) = $noti.parts();
-            $crate::cast_spell!(@notification way_noti);
+            $crate::cast_spell!(@notification &way_noti, ui_noti);
             windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
         )?
         $(
@@ -180,18 +180,32 @@ macro_rules! cast_spell {
     // Moved to next release, only for non -ipc scenarios
     // // Multiple windows (mixed IPC / non-IPC) (Defined as non-ipc vector)
     // Older Implementation needs updation
+    // (
+    //     windows: $windows:expr
+    //     $(, windows_ipc: $windows_ipc:expr)?
+    //     $(, Notification: $noti:expr)?
+    //     $(,)?
+    // ) => {{
+    //     $(
+    //         $crate::cast_spell!(@notification $noti);
+    //     )?
+    //     $crate::cast_spells_new(windows)
+    // }};
+
     (
-        windows: $windows:expr
-        $(, windows_ipc: $windows_ipc:expr)?
-        $(, Notification: $noti:expr)?
+        notification: $noti:expr
         $(,)?
     ) => {{
-        $(
-            $crate::cast_spell!(@notification $noti);
-        )?
+        // let (ui, mut way) = $win.parts();
+        let mut windows = Vec::new();
+        let (ui_noti, mut way_noti) = $noti.parts();
+        $crate::cast_spell!(@notification &way_noti, ui_noti);
+        windows.push(Box::new(way_noti) as Box<dyn $crate::SpellAssociatedNew>);
+        // $crate::cast_spell!(@expand entry: (way, ipc), ui: ui );
+        // windows.push(Box::new(way) as Box<dyn $crate::SpellAssociatedNew>);
         $crate::cast_spells_new(windows)
+        // $crate::cast_spell!(@run x)
     }};
-
     // INTERNAL EXPANSION RULES
     // ==================================================
 
@@ -209,7 +223,7 @@ macro_rules! cast_spell {
         $way.ipc_handler = Some(listener_clone);
         let _ = $way.loop_handle.clone().insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
-            move |_, meta, data| {
+            move |_, _, data| {
                 loop {
                     match data.ipc_handler.as_ref().unwrap().accept() {
                         Ok((mut stream, _addr)) => {
@@ -325,9 +339,10 @@ macro_rules! cast_spell {
         ($combowin.parts(), false)
     }};
     // Notification Logic
-    (@notification $noti:expr) => {
+    (@notification $noti:expr, $ui_noti: expr) => {
         // runs ONCE
-        let _notification = &$noti;
+        $crate::vault::set_notification($noti, Box::new($ui_noti)as Box<dyn $crate::vault::NotificationManager>)
+        // let _notification = &$noti;
     };
 
     (@run $way:expr) => {
