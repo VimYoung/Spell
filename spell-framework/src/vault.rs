@@ -28,7 +28,7 @@ pub use mpris;
 pub use notification_manager::set_notification;
 pub use rust_fuzzy_search::fuzzy_search_best_n;
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -50,16 +50,21 @@ pub enum NotiError {
     MessageUnprocessed,
     MessageCloseFailed,
 }
+
+#[derive(Debug, Clone)]
 pub struct Notification {
+    pub id: u32,
     pub appname: String,
     pub summary: String,
     pub subtitle: Option<String>,
     pub body: String,
     pub icon: String,
-    pub hints: HashSet<Hint>,
+    pub hints: HashMap<String, Hint>,
     pub actions: Vec<String>,
     pub timeout: Timeout,
 }
+
+#[derive(Debug, Clone)]
 pub enum Hint {
     ActionIcons(bool),
     Category(String),
@@ -78,15 +83,18 @@ pub enum Hint {
     Invalid,
 }
 
+#[derive(Debug, Clone)]
 pub enum Urgency {
     Low = 0,
     Normal = 1,
     Critical = 2,
 }
+
+#[derive(Debug, Clone)]
 pub enum Timeout {
     Default,
     Never,
-    Milliseconds(u32),
+    Milliseconds(i32),
 }
 // //
 // fn check_for_new_apps(_app: Arc<dyn AppHandler>) {

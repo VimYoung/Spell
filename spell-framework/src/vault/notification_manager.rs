@@ -3,10 +3,7 @@ use crate::{
     wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
-use std::{
-    collections::{HashMap, HashSet},
-    result::Result,
-};
+use std::{cmp::Ordering, collections::HashMap, result::Result};
 use tracing::{info, warn};
 use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter};
 
@@ -62,6 +59,8 @@ async fn notification_service_enter(
             NotificationHandler {
                 sender: sender.clone(),
                 layer_name,
+                next_id: 1,
+                notifications: Vec::new(),
             },
         )
         .await?;
@@ -77,38 +76,71 @@ async fn notification_service_enter(
 struct NotificationHandler {
     sender: Sender<NotifyEvent>,
     layer_name: String,
+    next_id: u32,
+    notifications: Vec<Notification>,
 }
 
 #[interface(name = "org.freedesktop.Notifications", proxy(gen_blocking = false,))]
 impl NotificationHandler {
     async fn get_capabilities(&self) -> Result<Vec<String>, BusError> {
         info!("capabilities called");
-        Ok(Vec::new())
+        // body-markup will be implemented in the future maybe. icon-multi is not
+        // added since slint doen't yet support animated images.
+        Ok(vec![
+            "actions",
+            "body",
+            "body-images",
+            "icon-static",
+            "persistence",
+        ]
+        .iter()
+        .map(|x| x.to_string())
+        .collect())
     }
 
     async fn notify(
-        &self,
+        &mut self,
         app_name: String,
         replaces_id: u32,
         app_icon: String,
         summary: String,
         body: String,
         actions: Vec<String>,
-        hints: HashMap<String, zbus::zvariant::Value<'_>>,
+        _hints: HashMap<String, zbus::zvariant::Value<'_>>,
         expire_timeout: i32,
     ) -> Result<u32, BusError> {
+        // TODO add hints in the implementation
         info!("Notifcation event received");
-        let _ = self.sender.clone().send(NotifyEvent::Noti(Notification {
+        let notification = Notification {
+            id: replaces_id,
             appname: app_name,
             summary,
             subtitle: None,
             body,
             icon: app_icon,
-            hints: HashSet::new(),
-            actions: Vec::new(),
-            timeout: Timeout::Default,
-        }));
-        Ok(replaces_id)
+            hints: HashMap::new(),
+            actions,
+            timeout: match expire_timeout.cmp(&0) {
+                Ordering::Equal => Timeout::Never,
+                Ordering::Greater => Timeout::Milliseconds(expire_timeout),
+                Ordering::Less => Timeout::Default,
+            },
+        };
+        let _ = self
+            .sender
+            .clone()
+            .send(NotifyEvent::Noti(notification.clone()));
+        self.notifications.push(notification);
+        if replaces_id == 0 {
+            let id = self.next_id;
+            self.next_id = self.next_id.wrapping_add(1);
+            if self.next_id == 0 {
+                self.next_id = 1;
+            }
+            Ok(id)
+        } else {
+            Ok(replaces_id)
+        }
     }
 
     async fn close_notification(
@@ -126,7 +158,7 @@ impl NotificationHandler {
 
     async fn get_server_information(&self) -> Result<(String, String, String, String), BusError> {
         Ok((
-            "SpellNC".to_string(),
+            "SpellNC-".to_string() + self.layer_name.as_str(),
             "VimYoung".to_string(),
             "0.0.1".to_string(),
             "1.3".to_string(),
@@ -135,4 +167,14 @@ impl NotificationHandler {
 
     #[zbus(signal)]
     async fn notification_closed(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
+
+    #[zbus(signal)]
+    async fn action_invoked(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
 }
+
+// #[interface(name = "org.VimYoung.NC", proxy(gen_blocking = false,))]
+// impl NotificationHandler {
+//     async fn get_notifications(&self) -> zbus::Result<Vec<Notification>> {
+//         Ok(self.notifications)
+//     }
+// }
