@@ -1,9 +1,11 @@
 pub const MAIN_HELP: &str = "
-Usage: spell-cli [<argument>] [sub-command] [options] ...
+Usage: sp [<argument>] [sub-command] [options] ...
 
-spell-cli provides a convenient way to remotely handle windows made by spell-framework.
+sp provides a convenient way to remotely handle windows made by spell-framework.
 
 Sub-commands:
+    new: Used to create new rust project with spell and slint set up given the paths.
+         For more details run `sp new --help`.
     [-l] update KEY VALUE: Updates the value of given key with the provided value
                             for the specifed layer window. Final implementation
                             depends on your ForeignController trait implementation.
@@ -13,23 +15,38 @@ Sub-commands:
     new: Create a new spell project with git initialised dependencies added and a
          minimial example to run given the path/name of project.
     enable: Enable services like lockscreen, notification etc if there is a
-            provided implementation for it. Run `spell-cli enable --help` for
+            provided implementation for it. Run `sp enable --help` for
             more details.
+    fprint: Used to verify, add and list fingerprints registered to a device. Needs
+            fprint-daemnon running to work.
     log: Display the specified logs. If -l is defined defaults to the logs
-          of that layer only. Run `spell-cli [-l LAYER_NAME] logs --help` for
+          of that layer only. Run `sp [-l LAYER_NAME] logs --help` for
           more details.
-    list: Lists the running instances of windows created by spell-framework.
+    list: (WIP) Lists the running instances of windows created by spell-framework.
 
 Arguments:
     --layer | -l:   Specifies the name of layer (aka window) to be used for specific
                     commands. Use unique names of layers to avoid undefined behaviour.
                     Required by update, look, show and hide sub commands.
     --help | -h:    Shows this help message.
-    --version | -v: Displays the version of spell-cli.
+    --version | -v: Displays the version of sp.
+";
+
+pub const NEW_PROJECT_HELP: &str = "
+Usage: sp new [<argument>] [path]
+
+`new` subcommand is used for creating rust projects with spell and slint. Specification
+of pre-build component library can also be done during creation.
+
+Arguments:
+    --material: Adds official material component library.
+    --sleek : Adds sleek (ant design based) component library.
+    --vivi : Adds vivi component library.
+    --surrealism : Adds SurrealismUI component library.
 ";
 
 pub const LOGS_HELP: &str = "
-Usage: spell-cli log [<argument>] [sub-command] ...
+Usage: sp log [<argument>] [sub-command] ...
 
 `log` subcommand is used to retrieve logging information from currently running widget instances.
 
@@ -50,7 +67,7 @@ Arguments:
 ";
 
 pub const FPRINT_HELP: &str = "
-Usage: spell-cli fprint [<argument>] [sub-command]
+Usage: sp fprint [<argument>] [sub-command]
 
 `fprint` subcommand is used to enroll, verify and list fingerprints.
 
@@ -64,7 +81,7 @@ Argument:
 ";
 
 pub const ENABLE_HELP: &str = "
-Usage: spell-cli enable [<argument>] [sub-command] ...
+Usage: sp enable [<argument>] [sub-command] ...
 
 `enable` subcommand could be used in order to trigger events for vault. Complete
 implementation willl come in upcoming versions.

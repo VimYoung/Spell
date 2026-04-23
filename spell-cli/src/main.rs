@@ -1,7 +1,9 @@
 pub mod constant_files;
 pub mod constantvals;
 use constant_files::{APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, MAIN_FILE};
-use constantvals::{ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_HELP, SPELL_PAM_FPRINT};
+use constantvals::{
+    ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_HELP, NEW_PROJECT_HELP, SPELL_PAM_FPRINT,
+};
 use core::panic;
 use futures_util::stream::StreamExt;
 use include_dir::{Dir, include_dir};
@@ -94,7 +96,9 @@ async fn main() -> Result<(), SpellError> {
             "enable" => Ok(()),
             "new" => match values.next() {
                 Some(arg) => {
-                    if arg.starts_with("--") {
+                    if arg.as_str() == "--help" {
+                        show_help(Some("new"))
+                    } else if arg.starts_with("--") {
                         let external_lib: ThirdPartyComponents = match arg.as_str() {
                             "--material" => ThirdPartyComponents::Material,
                             "--surrealism" => ThirdPartyComponents::Surrealism,
@@ -453,6 +457,7 @@ fn show_help(sub_command: Option<&str>) -> Result<(), SpellError> {
                 "log" => println!("{LOGS_HELP}"),
                 "enable" => println!("{ENABLE_HELP}"),
                 "fprint" => println!("{FPRINT_HELP}"),
+                "new" => println!("{NEW_PROJECT_HELP}"),
                 _ => {}
             }
             Ok(())
