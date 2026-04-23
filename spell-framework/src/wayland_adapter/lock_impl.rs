@@ -16,8 +16,9 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        keyboard::{KeyboardHandler /*Keysym*/},
+        keyboard::KeyboardHandler,
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
+        touch::TouchHandler,
     },
     session_lock::{
         SessionLock, SessionLockHandler, SessionLockSurface, SessionLockSurfaceConfigure,
@@ -272,13 +273,21 @@ impl SeatHandler for SpellLock {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_none() {
+        if capability == Capability::Keyboard && self.keyboard_state.is_none() {
             info!("Setting keyboard capability");
             let keyboard = self
                 .seat_state
                 .get_keyboard(qh, &seat, None)
                 .expect("Failed to create keyboard");
-            self.keyboard_state.board = Some(keyboard);
+            self.keyboard_state = Some(keyboard);
+        }
+        if capability == Capability::Touch && self.touch_state.is_none() {
+            info!("Setting touch Capability");
+            let touch = self
+                .seat_state
+                .get_touch(qh, &seat)
+                .expect("Failed to create touch");
+            self.touch_state = Some(touch);
         }
         if capability == Capability::Pointer && self.pointer_state.pointer.is_none() {
             info!("Setting pointer capability");
@@ -299,13 +308,17 @@ impl SeatHandler for SpellLock {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.keyboard_state.board.is_some() {
+        if capability == Capability::Keyboard && self.keyboard_state.is_some() {
             info!("Unsettting keyboard capability");
-            self.keyboard_state.board.take().unwrap().release();
+            self.keyboard_state.take().unwrap().release();
         }
         if capability == Capability::Pointer && self.pointer_state.pointer.is_some() {
             info!("Unsetting pointer capability");
             self.pointer_state.pointer.take().unwrap().release();
+        }
+        if capability == Capability::Touch && self.touch_state.is_some() {
+            info!("Unsetting pointer capability");
+            self.touch_state.take().unwrap().release();
         }
     }
 
@@ -417,6 +430,82 @@ impl PointerHandler for SpellLock {
                 }
             }
         }
+    }
+}
+
+impl TouchHandler for SpellLock {
+    fn up(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _id: i32,
+    ) {
+        info!("Up event from touch");
+    }
+    fn down(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _surface: smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _id: i32,
+        position: (f64, f64),
+    ) {
+        info!("Down event produced with posaition: {position:?}");
+    }
+
+    fn motion(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _time: u32,
+        _id: i32,
+        position: (f64, f64),
+    ) {
+        self.slint_part.as_ref().unwrap().adapters[0]
+            .try_dispatch_event(WindowEvent::PointerMoved {
+                position: slint::LogicalPosition {
+                    x: position.0 as f32,
+                    y: position.1 as f32,
+                },
+            })
+            .unwrap_or_else(|err| warn!("Touch move event failed with error: {:?}", err));
+    }
+
+    fn shape(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _id: i32,
+        major: f64,
+        minor: f64,
+    ) {
+        info!("Shape data released. Major: {major}, Minor: {minor}");
+    }
+    fn orientation(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _id: i32,
+        orientation: f64,
+    ) {
+        info!("Orientation data released: {orientation}.")
+    }
+    fn cancel(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+    ) {
+        info!("Active touch sequence cancelled");
     }
 }
 /// It is an internal struct used by [`SpellLock`] internally.

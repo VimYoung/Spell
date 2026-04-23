@@ -14,7 +14,7 @@ use smithay_client_toolkit::{
         },
         client::{
             QueueHandle,
-            protocol::{wl_keyboard, wl_pointer, wl_region::WlRegion},
+            protocol::{wl_pointer, wl_region::WlRegion},
         },
     },
     seat::{
@@ -208,11 +208,6 @@ impl PointerState {
             self.current_wayland_cursor = mouse_cursor;
         }
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct KeyboardState {
-    pub board: Option<wl_keyboard::WlKeyboard>,
 }
 
 pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handle: HomeHandle) {

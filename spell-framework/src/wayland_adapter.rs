@@ -14,8 +14,7 @@ use crate::{
         },
         viewporter::{Viewport, ViewporterState, delegate_viewporter},
         way_helper::{
-            FingerprintInfo, KeyboardState, PointerState, UsernamePassConvo, set_config,
-            set_event_sources,
+            FingerprintInfo, PointerState, UsernamePassConvo, set_config, set_event_sources,
         },
     },
 };
@@ -30,15 +29,8 @@ use slint::{
 };
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
-    delegate_compositor,
-    delegate_keyboard,
-    delegate_layer,
-    delegate_output,
-    delegate_pointer,
-    delegate_registry,
-    delegate_seat,
-    delegate_session_lock,
-    delegate_shm, // delegate_touch,
+    delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
+    delegate_registry, delegate_seat, delegate_session_lock, delegate_shm, delegate_touch,
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
@@ -49,7 +41,7 @@ use smithay_client_toolkit::{
         client::{
             Connection, EventQueue, QueueHandle,
             globals::registry_queue_init,
-            protocol::{wl_output, wl_shm, wl_surface},
+            protocol::{wl_keyboard::WlKeyboard, wl_output, wl_shm, wl_surface, wl_touch::WlTouch},
         },
     },
     registry::RegistryState,
@@ -94,7 +86,8 @@ pub(crate) struct States {
     pub(crate) seat_state: SeatState,
     pub(crate) output_state: OutputState,
     pub(crate) pointer_state: PointerState,
-    pub(crate) keyboard_state: KeyboardState,
+    pub(crate) keyboard_state: Option<WlKeyboard>,
+    pub(crate) touch_state: Option<WlTouch>,
     pub(crate) shm: Shm,
     pub(crate) viewporter: Option<Viewport>,
 }
@@ -188,11 +181,6 @@ impl SpellWin {
             last_cursor_enter_serial: None,
         };
 
-        let keyboard_state = KeyboardState {
-            board: None,
-            // board_data: None,
-        };
-
         #[allow(clippy::type_complexity)]
         let slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>> =
             Arc::new(Mutex::new(Vec::new()));
@@ -224,7 +212,8 @@ impl SpellWin {
                 seat_state: SeatState::new(&globals, &qh),
                 output_state: OutputState::new(&globals, &qh),
                 pointer_state,
-                keyboard_state,
+                keyboard_state: None,
+                touch_state: None,
                 shm,
                 viewporter: None,
             },
@@ -564,7 +553,7 @@ delegate_shm!(SpellWin);
 delegate_seat!(SpellWin);
 delegate_keyboard!(SpellWin);
 delegate_pointer!(SpellWin);
-// delegate_touch!(SpellWin);
+delegate_touch!(SpellWin);
 delegate_layer!(SpellWin);
 delegate_fractional_scale!(SpellWin);
 delegate_viewporter!(SpellWin);
@@ -832,8 +821,9 @@ pub struct SpellLock {
     pub(crate) compositor_state: CompositorState,
     pub(crate) registry_state: RegistryState,
     pub(crate) output_state: OutputState,
-    pub(crate) keyboard_state: KeyboardState,
+    pub(crate) keyboard_state: Option<WlKeyboard>,
     pub(crate) pointer_state: PointerState,
+    pub(crate) touch_state: Option<WlTouch>,
     pub(crate) seat_state: SeatState,
     pub(crate) shm: Shm,
     pub(crate) session_lock: Option<SessionLock>,
@@ -873,10 +863,6 @@ impl SpellLock {
         let mut win_handler_vec: Vec<(String, (u32, u32))> = Vec::new();
         let lock_surfaces = Vec::new();
 
-        let keyboard_state = KeyboardState {
-            board: None,
-            // board_data: None,
-        };
         let pointer_state = PointerState {
             pointer: None,
             pointer_data: None,
@@ -889,7 +875,8 @@ impl SpellLock {
             conn: conn.clone(),
             compositor_state,
             output_state,
-            keyboard_state,
+            keyboard_state: None,
+            touch_state: None,
             pointer_state,
             registry_state,
             seat_state: SeatState::new(&globals, &qh),
@@ -1217,6 +1204,7 @@ delegate_output!(SpellLock);
 delegate_shm!(SpellLock);
 delegate_registry!(SpellLock);
 delegate_pointer!(SpellLock);
+delegate_touch!(SpellLock);
 delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
 

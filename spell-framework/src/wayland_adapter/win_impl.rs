@@ -1,8 +1,7 @@
 use crate::wayland_adapter::{SpellWin, way_helper::get_string};
-// use owo_colors::OwoColorize;
 use slint::{
     SharedString,
-    platform::{/*Key,*/ PointerEventButton, WindowEvent},
+    platform::{PointerEventButton, WindowEvent},
 };
 use smithay_client_toolkit::{
     output::OutputState,
@@ -13,83 +12,94 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
-        Capability,
-        SeatHandler,
-        SeatState,
+        Capability, SeatHandler, SeatState,
         keyboard::KeyboardHandler,
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
-        // touch::TouchHandler,
+        touch::TouchHandler,
     },
     shell::WaylandSurface,
 };
 use tracing::{info, trace, warn};
 
-// This could be implemented but slint doesn't hve very specific
+// Slint doesn't hve very specific
 // APIs for touch support (I think). I am talking with them on what
 // can be done so that things like multi-touch support, gestures etc
-// can be made possible. For now I am going to place it on standby.
-// impl TouchHandler for SpellWin {
-//     fn up(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//         serial: u32,
-//         time: u32,
-//         id: i32,
-//     ) {
-//     }
-//     fn down(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//         serial: u32,
-//         time: u32,
-//         surface: smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-//         id: i32,
-//         position: (f64, f64),
-//     ) {
-//     }
-//
-//     fn motion(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//         time: u32,
-//         id: i32,
-//         position: (f64, f64),
-//     ) {
-//     }
-//
-//     fn shape(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//         id: i32,
-//         major: f64,
-//         minor: f64,
-//     ) {
-//     }
-//     fn orientation(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//         id: i32,
-//         orientation: f64,
-//     ) {
-//     }
-//     fn cancel(
-//         &mut self,
-//         conn: &Connection,
-//         qh: &QueueHandle<Self>,
-//         touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
-//     ) {
-//     }
-// }
+// can be made possible. For now I am going to place empty value in here.
+impl TouchHandler for SpellWin {
+    fn up(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _id: i32,
+    ) {
+        info!("Up event from touch");
+    }
+    fn down(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _surface: smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _id: i32,
+        position: (f64, f64),
+    ) {
+        info!("Down event produced with posaition: {position:?}");
+    }
+
+    fn motion(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _time: u32,
+        _id: i32,
+        position: (f64, f64),
+    ) {
+        self.adapter
+            .try_dispatch_event(WindowEvent::PointerMoved {
+                position: slint::LogicalPosition {
+                    x: position.0 as f32,
+                    y: position.1 as f32,
+                },
+            })
+            .unwrap_or_else(|err| warn!("Touch move event failed with error: {:?}", err));
+    }
+
+    fn shape(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _id: i32,
+        major: f64,
+        minor: f64,
+    ) {
+        info!("Shape data released. Major: {major}, Minor: {minor}");
+    }
+    fn orientation(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+        _id: i32,
+        orientation: f64,
+    ) {
+        info!("Orientation data released: {orientation}.")
+    }
+    fn cancel(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &smithay_client_toolkit::reexports::client::protocol::wl_touch::WlTouch,
+    ) {
+        info!("Active touch sequence cancelled");
+    }
+}
 
 impl KeyboardHandler for SpellWin {
     fn enter(
@@ -207,14 +217,23 @@ impl SeatHandler for SpellWin {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.states.keyboard_state.board.is_none() {
+        if capability == Capability::Keyboard && self.states.keyboard_state.is_none() {
             info!("Setting keyboard capability");
             let keyboard = self
                 .states
                 .seat_state
                 .get_keyboard(qh, &seat, None)
                 .expect("Failed to create keyboard");
-            self.states.keyboard_state.board = Some(keyboard);
+            self.states.keyboard_state = Some(keyboard);
+        }
+        if capability == Capability::Touch && self.states.touch_state.is_none() {
+            info!("Setting touch Capability");
+            let touch = self
+                .states
+                .seat_state
+                .get_touch(qh, &seat)
+                .expect("Failed to create touch");
+            self.states.touch_state = Some(touch);
         }
         if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
             info!("Setting pointer capability");
@@ -236,14 +255,18 @@ impl SeatHandler for SpellWin {
         _: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Keyboard && self.states.keyboard_state.board.is_some() {
+        if capability == Capability::Keyboard && self.states.keyboard_state.is_some() {
             info!("Unsetting keyboard capability");
-            self.states.keyboard_state.board.take().unwrap().release();
+            self.states.keyboard_state.take().unwrap().release();
         }
 
         if capability == Capability::Pointer && self.states.pointer_state.pointer.is_some() {
             info!("Unsetting pointer capability");
             self.states.pointer_state.pointer.take().unwrap().release();
+        }
+        if capability == Capability::Touch && self.states.touch_state.is_some() {
+            info!("Unsetting pointer capability");
+            self.states.touch_state.take().unwrap().release();
         }
     }
 
