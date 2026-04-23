@@ -1,0 +1,152 @@
+import { UAppTheme } from "../app-theme.slint";
+import { ButtonInterface } from "button-interface.slint";
+import { UText } from "./text.slint";
+import { UOptionData } from "../structs/data-structs.slint";
+
+
+export enum URadioButtonVariant {
+	default,
+	primary,
+}
+
+// Used to manage the different variant styles.
+// Only the properties with differences are declared in the struct.
+struct URadionButtonTheme {
+    bg-selected: brush,
+    bg-selected-hover: brush,
+    bg-selected-active: brush,
+	bg-disabled: brush,
+	bg-selected-disabled: brush,
+    text-selected: brush,
+    text-selected-hover: brush,
+    text-selected-active: brush,
+	text-disabled: brush,
+	text-selected-disabled: brush,
+}
+
+global URadioButtonThemes {
+    out property <URadionButtonTheme> default: {
+        text-selected: UAppTheme.primary.base,
+        text-selected-hover: UAppTheme.primary.hover,
+        text-selected-active: UAppTheme.primary.active,
+        text-disabled: UAppTheme.text-disabled,
+        text-selected-disabled: UAppTheme.primary.disabled,
+    };
+    out property <URadionButtonTheme> primary: {
+        bg-selected: UAppTheme.primary.base,
+        bg-selected-hover: UAppTheme.primary.hover,
+        bg-selected-active: UAppTheme.primary.active,
+        bg-selected-disabled: UAppTheme.primary.disabled,
+        text-selected: UAppTheme.primary-text,
+        text-selected-hover: UAppTheme.primary-text,
+        text-selected-active: UAppTheme.primary-text,
+        text-disabled: UAppTheme.text-disabled,
+        text-selected-disabled: UAppTheme.primary-text.with-alpha(0.8),
+    };
+}
+
+export component URadioButton {
+    accessible-role: radio-button;
+    accessible-label: "Radio button";
+    accessible-value: selected-value;
+	// Regular properties
+	in-out property <URadioButtonVariant> variant: default;
+    private property <URadionButtonTheme> theme: {
+        if variant == URadioButtonVariant.primary {
+            return URadioButtonThemes.primary;
+        }
+        return URadioButtonThemes.default;
+    };
+    in-out property <bool> enabled: true;
+    in-out property <[UOptionData]> options;
+    in-out property <string> selected-value;
+    callback selected(value: string);
+    HorizontalLayout {
+        for option[idx] in root.options: ButtonInterface {
+            enabled: root.enabled;
+            border-width: UAppTheme.border-width-base;
+            border-color: UAppTheme.border;
+            init => {
+                if idx == 0 {
+                    self.border-top-left-radius = UAppTheme.radius-base;
+                    self.border-bottom-left-radius = UAppTheme.radius-base;
+                } else if idx == options.length - 1 {
+                    self.border-top-right-radius = UAppTheme.radius-base;
+                    self.border-bottom-right-radius = UAppTheme.radius-base;
+                }
+            }
+            clicked => {
+                selected-value = option.value;
+                root.selected(option.value);
+            }
+            HorizontalLayout {
+                alignment: center;
+                padding-top: UAppTheme.padding-vertical;
+                padding-bottom: UAppTheme.padding-vertical;
+                padding-left: UAppTheme.padding-horizontal;
+                padding-right: UAppTheme.padding-horizontal;
+                VerticalLayout {
+                    alignment: center;
+                    option-text := UText {
+                        text: option.text;
+                        color: UAppTheme.text;
+                        font-size: UAppTheme.font-size-base;
+                        animate color { duration: UAppTheme.animation-duration; }
+                    }
+                }
+            }
+
+            states [
+                disabled when !root.enabled && selected-value != option.value: {
+                    background: theme.bg-disabled;
+                    border-color: UAppTheme.border-secondary;
+                    option-text.color: theme.text-disabled;
+                }
+                disabled-selected when !root.enabled && selected-value == option.value: {
+                    background: theme.bg-selected-disabled;
+                    border-color: UAppTheme.primary.disabled;
+                    option-text.color: theme.text-selected-disabled;
+                }
+                focus-not-selected-hover when self.has-tab-focus && selected-value != option.value && self.has-hover: {
+                    border-width: UAppTheme.focus-border-width;
+                    border-color: UAppTheme.focus-color;
+                }
+                focus-selected-hover when self.has-tab-focus && selected-value == option.value && self.has-hover: {
+                    border-width: UAppTheme.focus-border-width;
+                    border-color: UAppTheme.focus-color;
+                    background: theme.bg-selected-hover;
+                    option-text.color: theme.text-selected-hover;
+                }
+                focus-selected when self.has-tab-focus && selected-value == option.value: {
+                    border-width: UAppTheme.focus-border-width;
+                    border-color: UAppTheme.focus-color;
+                    background: theme.bg-selected;
+                    option-text.color: theme.text-selected;
+                }
+                focus when self.has-tab-focus: {
+                    border-width: UAppTheme.focus-border-width;
+                    border-color: UAppTheme.focus-color;
+                }
+                active-selected when self.pressed && selected-value == option.value: {
+                    background: theme.bg-selected-active;
+                    border-color: UAppTheme.primary.active;
+                    option-text.color: theme.text-selected-active;
+                }
+                hover-not-selected when self.has-hover && selected-value != option.value: {
+                    border-color: UAppTheme.border;
+                    option-text.color: UAppTheme.primary.base;
+                }
+                hover-selected when self.has-hover && selected-value == option.value: {
+                    background: theme.bg-selected-hover;
+                    border-color: UAppTheme.primary.hover;
+                    option-text.color: theme.text-selected-hover;
+                }
+                selected when selected-value == option.value: {
+                    background: theme.bg-selected;
+                    border-color: UAppTheme.primary.base;
+                    option-text.color: theme.text-selected;
+                }
+            ]
+        }
+    }
+}

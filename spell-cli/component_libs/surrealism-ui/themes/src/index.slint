@@ -1,0 +1,34 @@
+import { UseSurrealismFn } from "../../use/src/fn.slint";
+import { ROOT-STYLES } from "./theme.slint";
+import { Themes } from "../../use/src/theme.slint";
+import { FontProps, TextAlignmentProps, TextActionProps } from "../../use/src/text.slint";
+
+
+
+export global GlobalProps {
+  /**global font style */
+  in-out property <FontProps> font : {
+    font-family : ROOT-STYLES.sur-font.font-family,
+    font-size : ROOT-STYLES.sur-font.font-size,
+    font-weight : ROOT-STYLES.sur-font.font-weight,
+    font-italic : ROOT-STYLES.sur-font.font-italic,
+    color : ROOT-STYLES.sur-theme-colors.dark.font
+  };
+  /**global theme */
+  in-out property <Themes> theme : Themes.Dark;
+  in-out property <TextActionProps> text-action : {
+    wrap : TextWrap.word-wrap,
+    overflow : TextOverflow.elide,
+    letter-spacing : 0,
+  };
+  in property <TextAlignmentProps> text-alignment : {
+    horizontal-alignment : TextHorizontalAlignment.left,
+    vertical-alignment : TextVerticalAlignment.center,
+  };
+  in-out property <length> line-height : ROOT-STYLES.sur-font.font-size * 1.5;
+  in-out property <length> standard-height : UseSurrealismFn.count-height(line-height,ROOT-STYLES.sur-padding.normal.padding-top);
+  in-out property <length> standard-width : UseSurrealismFn.count-width(ROOT-STYLES.sur-font.font-size,ROOT-STYLES.sur-padding.normal.padding-left);
+  in-out property <length> standard-icon-size : ROOT-STYLES.sur-font.font-size;
+  in-out property <bool> clip : true;
+  in-out property <brush> active-color : ROOT-STYLES.radio-active;
+}

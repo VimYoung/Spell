@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { FormElementBase } from "../foundation.slint";
+import { FontSettings, LayoutSettings } from "./styling.slint";
+import { MagicText } from "./magic_text.slint";
+
+export component FormElement inherits FormElementBase {
+    style: {
+        title_style: FontSettings.body_strong,
+    };
+
+    VerticalLayout {
+        alignment: start;
+        spacing: LayoutSettings.control_spacing;
+
+        MagicText {
+            text: root.title;
+            style: root.title_style;
+            horizontal_alignment: root.style.title_horizontal_alignment;
+            vertical_stretch: 0;
+            overflow: clip;
+        }
+
+        @children
+    }
+}

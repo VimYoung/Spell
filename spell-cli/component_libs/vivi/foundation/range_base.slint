@@ -1,0 +1,32 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export struct RangeStyle {
+    // common
+    bar_height: length,
+    border_radius: length,
+
+    // background_layer
+    background: brush,
+
+    // track_layer
+    track_background: brush,
+
+    // handle
+    handle_background: brush,
+    handle_size: length,
+}
+
+export component RangeBase {
+    // styling
+    in property <RangeStyle> style;
+
+    // value related properties
+    in_out property <float> value: root.minimum;
+    in_out property <float> minimum;
+    in_out property <float> maximum: 100;
+    out property <float> progress: (root.value - root.minimum) / root.range;
+    out property <float> range: root.maximum - root.minimum;
+
+    @children
+}

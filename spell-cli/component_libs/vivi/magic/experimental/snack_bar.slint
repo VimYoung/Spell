@@ -1,0 +1,126 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Border, BorderStyle, TextStyle, HorizontalLayoutBase, LayoutStyle } from "../../foundation.slint";
+import { Palette, LayoutSettings, BorderSettings, FontSettings, AnimationSettings } from "../styling.slint";
+import { Icons } from "../icons.slint";
+import { TextButton } from "../text_button.slint";
+import { IconButton } from "../icon_button.slint";
+import { ButtonAction } from "../magic_button_base.slint";
+import { MagicText } from "../magic_text.slint";
+
+export struct SnackBarStyle {
+    border_style: BorderStyle,
+    layout_style: LayoutStyle,
+    text_style: TextStyle,
+}
+
+export component SnackBar {
+    in property <string> message;
+    in property <string> action_text;
+    in property <bool> closeable;
+    in property <SnackBarStyle> style;
+    out property <BorderStyle> border_style: root.style.border_style;
+    out property <LayoutStyle> layout_style: root.style.layout_style;
+    out property <TextStyle> text_style: root.style.text_style;
+
+    property <bool> open;
+    property <length> content_height;
+
+    callback action();
+
+    height: !root.open ? 0 : root.content_height;
+    style: {
+        layout_style: {
+            padding_top: LayoutSettings.alternate_layout_padding,
+            padding_bottom: LayoutSettings.alternate_layout_padding,
+            padding_left: LayoutSettings.layout_padding,
+            padding_right: LayoutSettings.layout_padding,
+            spacing: LayoutSettings.layout_spacing
+        },
+        border_style: {
+            background: Palette.background,
+            border_width: BorderSettings.control_border_width,
+            border_brush: Palette.border
+        },
+        text_style: FontSettings.body
+    };
+
+    TouchArea {
+        clicked => {
+            root.close();
+        }
+    }
+
+    if root.open : Rectangle {
+        width: 100%;
+        height: root.height;
+        clip: true;
+
+        background_layer := Rectangle {
+            y: root.height;
+            width: 100%;
+            height: self.min_height;
+            background: root.border_style.background;
+            drop_shadow_color: Palette.shadow;
+            drop_shadow_blur: 16px;
+            drop_shadow_offset_y: -1px;
+
+            HorizontalLayoutBase {
+                style: root.layout_style;
+
+                MagicText {
+                    horizontal_stretch: 1;
+                    text: root.message;
+                    style: root.text_style;
+                    vertical_alignment: center;
+                }
+
+                if root.action_text != "" : TextButton {
+                    horizontal_stretch: 0;
+                    action: ButtonAction.primary;
+                    text: root.action_text;
+
+                    clicked => {
+                        root.action();
+                        root.close();
+                    }
+                }
+
+                if root.closeable : IconButton {
+                    horizontal_stretch: 0;
+                    icon: Icons.clear;
+
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+
+            init => {
+                root.content_height = self.min_height;
+                self.y = 0;
+            }
+
+        }
+
+        border := Rectangle {
+            y: 0;
+            height: root.style.border_style.border_width;
+            background: root.style.border_style.border_brush;
+        }
+    }
+
+    public function show() {
+        root.open = true;
+    }
+
+    public function close() {
+        root.open = false;
+    }
+
+    animate height {
+        duration: AnimationSettings.move_in_duration;
+        easing: AnimationSettings.move_in_easing;
+    }
+}

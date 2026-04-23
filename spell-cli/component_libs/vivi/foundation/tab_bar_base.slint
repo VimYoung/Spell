@@ -1,0 +1,44 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { BorderStyle, Border } from "./border.slint";
+import { IconStyle } from "./icon_base.slint";
+import { TextStyle } from "./text_base.slint";
+import { LayoutStyle } from "./vertical_layout_base.slint";
+
+export struct TabBarItemStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // content_layer
+    text_style: TextStyle,
+    icon_style: IconStyle,
+
+    // layout
+    layout_style: LayoutStyle
+}
+
+export struct TabBarStyle {
+    // items
+    item_style: TabBarItemStyle
+}
+
+export struct TabBarItem {
+    prefix_icon: image,
+    text: string,
+    closeable: bool
+}
+
+export component TabBarBase {
+    in property <bool> enabled: true;
+    in property <[TabBarItem]> model;
+    in property <int> current_index;
+    in property <TabBarStyle> style;
+
+    callback selected(/* index */ int);
+    callback close(/* index */ int);
+
+    accessible_role: tab-list;
+
+    @children
+}

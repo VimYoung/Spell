@@ -1,0 +1,377 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230916
+* @version:0.1.4
+* @type:interface
+* @description:
+* # STip
+* A tip provides supplemental, contextual information elevated near its target component
+* ## properties
+* - in-out property <string> font-family : tip text font family
+* - in-out property <int> font-weight :  tip text font weight
+* - in-out property <length> font-size:  tip text font size
+* - in-out property <brush> font-color :  tip text font color
+* - in-out property <bool> font-italic :  tip text font italic
+* - in-out property <Themes> theme :  tip theme
+* - in-out property <TextWrap> wrap :  tip text wrap
+* - in-out property <TextOverflow> overflow :  tip text overflow
+* - in-out property <length> letter-spacing :  tip text letter spacing
+* - in-out property <TextHorizontalAlignment> horizontal-alignment :  tip text horizontal alignment
+* - in-out property <TextVerticalAlignment> vertical-alignment : tip text vertical alignment
+* - in-out property <Position> position : the position of tip
+* - in-out property <bool> is-show : tip is show or not
+* - in-out property <string> text : tip text
+* - in property <length> tip-width : tip width
+* ## functions
+* - public function open() : open the tip
+* - public function close() : close the tip
+* - pure public function count-x(w:length) ->length : count x for angle
+* - pure public function count-y(w:length) ->length : count y for angle
+* ## callbacks
+* - callback clicked() : use to open|close the tip
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { ROOT-STYLES,DefaultSTipProps } from "../../themes/index.slint";
+import { SText } from "../text/index.slint";
+import { Themes,PaddingType,Position } from "../../use/index.slint";
+  
+
+export component LeftAngle inherits Path {
+  in property <Themes> theme;
+  in property <length> parent-height;
+  in property <length> parent-width;
+  y: parent-height / 2 - self.height / 2;
+  x: parent-width - self.width / 2;
+  stroke-width: 1px;
+  height: ROOT-STYLES.sur-font.font-size;
+  width: ROOT-STYLES.sur-font.font-size;
+  states [
+    light when theme == Themes.Light: {
+      fill : ROOT-STYLES.sur-theme-colors.light.normal;
+      stroke : transparent;
+    }
+    primary when theme == Themes.Primary: {
+      fill : ROOT-STYLES.sur-theme-colors.primary.normal;
+    }
+    success when theme == Themes.Success: {
+      fill : ROOT-STYLES.sur-theme-colors.success.normal;
+    }
+    info when theme == Themes.Info: {
+      fill : ROOT-STYLES.sur-theme-colors.info.normal;
+    }
+    warning when theme == Themes.Warning: {
+      fill : ROOT-STYLES.sur-theme-colors.warning.normal;
+    }
+    error when theme == Themes.Error: {
+      fill : ROOT-STYLES.sur-theme-colors.error.normal;
+    }
+    dark when theme == Themes.Dark: {
+      fill : ROOT-STYLES.sur-theme-colors.dark.normal;
+    }
+  ]
+  MoveTo{
+    x: 0;
+    y: 0;
+  }
+  LineTo{
+    x: 16;
+    y: 16;
+  }
+  LineTo{
+    x: 0;
+    y: 32;
+  }
+  Close{}
+}
+
+export component RightAngle inherits Path {
+  in property <Themes> theme;
+  in property <length> parent-height;
+  y: parent-height / 2 - self.height / 2;
+  x: -self.width / 1.7;
+  stroke-width: 1px;
+  height: ROOT-STYLES.sur-font.font-size;
+  width: ROOT-STYLES.sur-font.font-size;
+  states [
+    light when theme == Themes.Light: {
+      fill : ROOT-STYLES.sur-theme-colors.light.normal;
+      stroke : transparent;
+    }
+    primary when theme == Themes.Primary: {
+      fill : ROOT-STYLES.sur-theme-colors.primary.normal;
+    }
+    success when theme == Themes.Success: {
+      fill : ROOT-STYLES.sur-theme-colors.success.normal;
+    }
+    info when theme == Themes.Info: {
+      fill : ROOT-STYLES.sur-theme-colors.info.normal;
+    }
+    warning when theme == Themes.Warning: {
+      fill : ROOT-STYLES.sur-theme-colors.warning.normal;
+    }
+    error when theme == Themes.Error: {
+      fill : ROOT-STYLES.sur-theme-colors.error.normal;
+    }
+    dark when theme == Themes.Dark: {
+      fill : ROOT-STYLES.sur-theme-colors.dark.normal;
+    }
+  ]
+  MoveTo{
+    x: 16;
+    y: 0;
+  }
+  LineTo{
+    x: 8;
+    y: 8;
+  }
+  LineTo{
+    x: 16;
+    y: 16;
+  }
+  Close{}
+}
+
+export component TopAngle inherits Path {
+  in property <Themes> theme;
+  in property <length> parent-height;
+  in property <length> parent-width;
+  x: parent-width;
+  y: parent-height - self.height / 3;
+  stroke-width: 1px;
+  height: ROOT-STYLES.sur-font.font-size;
+  width: ROOT-STYLES.sur-font.font-size;
+  states [
+    light when theme == Themes.Light: {
+      fill : ROOT-STYLES.sur-theme-colors.light.normal;
+      stroke : transparent;
+    }
+    primary when theme == Themes.Primary: {
+      fill : ROOT-STYLES.sur-theme-colors.primary.normal;
+    }
+    success when theme == Themes.Success: {
+      fill : ROOT-STYLES.sur-theme-colors.success.normal;
+    }
+    info when theme == Themes.Info: {
+      fill : ROOT-STYLES.sur-theme-colors.info.normal;
+    }
+    warning when theme == Themes.Warning: {
+      fill : ROOT-STYLES.sur-theme-colors.warning.normal;
+    }
+    error when theme == Themes.Error: {
+      fill : ROOT-STYLES.sur-theme-colors.error.normal;
+    }
+    dark when theme == Themes.Dark: {
+      fill : ROOT-STYLES.sur-theme-colors.dark.normal;
+    }
+  ]
+  MoveTo{
+    x: -8;
+    y: 0;
+  }
+  LineTo{
+    x: 8;
+    y: 16;
+  }
+  LineTo{
+    x: 24;
+    y: 0;
+  }
+  Close{}
+}
+
+export component BottomAngle inherits Path {
+  in property <Themes> theme;
+  in property <length> parent-height;
+  in property <length> parent-width;
+  x: parent-width;
+  y: -self.height + self.height / 3;
+  stroke-width: 1px;
+  height: ROOT-STYLES.sur-font.font-size;
+  width: ROOT-STYLES.sur-font.font-size;
+  states [
+    light when theme == Themes.Light: {
+      fill : ROOT-STYLES.sur-theme-colors.light.normal;
+      stroke : transparent;
+    }
+    primary when theme == Themes.Primary: {
+      fill : ROOT-STYLES.sur-theme-colors.primary.normal;
+    }
+    success when theme == Themes.Success: {
+      fill : ROOT-STYLES.sur-theme-colors.success.normal;
+    }
+    info when theme == Themes.Info: {
+      fill : ROOT-STYLES.sur-theme-colors.info.normal;
+    }
+    warning when theme == Themes.Warning: {
+      fill : ROOT-STYLES.sur-theme-colors.warning.normal;
+    }
+    error when theme == Themes.Error: {
+      fill : ROOT-STYLES.sur-theme-colors.error.normal;
+    }
+    dark when theme == Themes.Dark: {
+      fill : ROOT-STYLES.sur-theme-colors.dark.normal;
+    }
+  ]
+  MoveTo{
+    x: -8;
+    y: 0;
+  }
+  LineTo{
+    x: 8;
+    y: -16;
+  }
+  LineTo{
+    x: 24;
+    y: 0;
+  }
+  Close{}
+}
+export component Tip inherits Rectangle{
+  in-out property <string> font-family : DefaultSTipProps.font-family;
+  in-out property <int> font-weight : DefaultSTipProps.font-weight;
+  in-out property <length> font-size: DefaultSTipProps.font-size;
+  in-out property <brush> font-color : DefaultSTipProps.font-color;
+  in-out property <bool> font-italic : DefaultSTipProps.font-italic;
+  //theme
+  in-out property <Themes> theme : DefaultSTipProps.theme;
+  in-out property <TextWrap> wrap : DefaultSTipProps.wrap;
+  in-out property <TextOverflow> overflow : DefaultSTipProps.overflow;
+  in-out property <length> letter-spacing : DefaultSTipProps.letter-spacing;
+  in-out property <TextHorizontalAlignment> horizontal-alignment : DefaultSTipProps.horizontal-alignment;
+  in-out property <TextVerticalAlignment> vertical-alignment : DefaultSTipProps.vertical-alignment;
+  in-out property <Position> position :DefaultSTipProps.position;
+  in-out property <bool> is-show : DefaultSTipProps.is-show;
+  in-out property <string> text : DefaultSTipProps.text;
+  in property <length> tip-width : DefaultSTipProps.tip-width;
+  public function open() {
+    is-show = true; 
+  }
+  public function close() {
+    is-show = false;
+  }
+  pure public function count-x(w:length) ->length{
+    if((root.position==Position.Right)||(root.position==Position.RightTop)||(root.position==Position.RightBottom)){
+      return root.width + ROOT-STYLES.sur-font.font-size;
+    }else if((root.position==Position.Left)||(root.position==Position.LeftTop)||(root.position==Position.LeftBottom)){
+      return -w - ROOT-STYLES.sur-font.font-size;
+    }else if((root.position==Position.TopLeft)||(root.position==Position.BottomLeft)){
+      return root.width - w;
+    }else if((root.position==Position.TopRight||(root.position==Position.BottomRight))){
+      return 0;
+    }else{
+      return root.width / 2 - w / 2;
+    }
+  }
+  pure public function count-y(h:length)->length {
+      if((root.position==Position.Top)||(root.position==Position.TopLeft)||(root.position==Position.TopRight)){
+        return -h - ROOT-STYLES.sur-font.font-size;
+      }else if(root.position==Position.Right){
+        return root.height / 2 - h / 2;
+      }else if((root.position==Position.RightTop)||(root.position==Position.LeftTop)){
+        return 0;
+      }else if((root.position==Position.RightBottom)||(root.position==Position.LeftBottom)){
+        return - root.height + ROOT-STYLES.sur-padding.tip.padding-top * 2;
+      }else if((root.position==Position.Bottom)||(root.position==Position.BottomLeft)||(root.position==Position.BottomRight)){
+        return h + ROOT-STYLES.sur-font.font-size;
+      }else{
+        return root.height / 2 - h / 2;
+      }
+  }
+  callback clicked();
+  clicked => {
+    is-show = !is-show;
+  }
+  
+  @children
+  tip:=SCard { 
+    y: count-y(self.height);
+    x: count-x(self.width);
+    clip: false;
+    card-width: txt.width;
+    card-height: txt.height;
+    padding-type: PaddingType.Tip;
+    visible: is-show;
+    theme: root.theme;
+    txt:=SText { 
+      width: tip-width==0?cheat.width+1px:tip-width;
+      theme: root.theme;
+      text: root.text;
+      font-size: root.font-size;
+      wrap: root.wrap;
+      font-family: root.font-family;
+      font-italic: root.font-italic;
+      font-weight: root.font-weight;
+      letter-spacing: root.letter-spacing;
+      overflow: root.overflow;
+      horizontal-alignment: root.horizontal-alignment;
+      vertical-alignment: root.vertical-alignment;
+     }
+     cheat:=SText{
+      height: 0;
+      visible: false;
+      text: root.text;
+      font-size: root.font-size;
+     }
+    // angle:=
+    if root.position==Position.Top: TopAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width: parent.width / 2 - self.width / 2;
+    }
+    if root.position==Position.TopLeft: TopAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width:  parent.width - self.width - 6px;
+    }
+    if root.position==Position.TopRight: TopAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width:   6px;
+    }
+    if root.position==Position.Right: RightAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+    }
+    if root.position==Position.RightTop: RightAngle{
+      theme: root.theme;
+      parent-height: 6px + self.height;
+    }
+    if root.position==Position.RightBottom: RightAngle{
+      theme: root.theme;
+      parent-height: parent.height + self.height * 2;
+    }
+    if root.position==Position.Bottom: BottomAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width: parent.width / 2 - self.width / 2;
+    }
+    if root.position==Position.BottomLeft: BottomAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width:  parent.width - self.width - 6px;
+    }
+    if root.position==Position.BottomRight: BottomAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width:  6px;
+    }
+    if root.position==Position.Left: LeftAngle{
+      theme: root.theme;
+      parent-height: parent.height;
+      parent-width: parent.width;
+    }
+    if root.position==Position.LeftTop: LeftAngle{
+      theme: root.theme;
+      parent-height: 6px + self.height;
+      parent-width: parent.width;
+    }
+    if root.position==Position.LeftBottom: LeftAngle{
+      theme: root.theme;
+      parent-height: parent.height + self.height * 2;
+      parent-width: parent.width;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { LayoutStyle } from "./vertical_layout_base.slint";
+
+export component HorizontalLayoutBase inherits HorizontalLayout {
+    in property <LayoutStyle> style;
+
+    padding_left: root.padding > 0 ? root.padding : root.style.padding_left;
+    padding_right: root.padding > 0 ? root.padding : root.style.padding_right;
+    padding_top: root.padding > 0 ? root.padding : root.style.padding_top;
+    padding_bottom: root.padding > 0 ? root.padding : root.style.padding_bottom;
+    spacing: root.style.spacing;
+    alignment: root.style.alignment;
+}

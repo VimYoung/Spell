@@ -1,0 +1,146 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230915
+* @version:0.1.3
+* @type:interface
+* @description:
+* # SPersona
+* This component is used to display simple user introduction information
+* ## properties inherits SCard
+* - in-out property <string> btn-text : button text
+* - in property <length> spacing : spacing of persona 
+* - in property <[SButtonProps]> btns : buttons slot
+* - in property <image> avatar : persona avatar image
+* - in property <length> avatar-height: persona avatar height
+* - in property <Themes> avatar-theme : persona avatar theme
+* - in-out property <string> name : persona name
+* - in-out property <length> name-height: persona name height
+* - in-out property <length> name-font-size: persona name font size
+* - in-out property <int> name-font-weight : persona name font weight
+* - in-out property <Themes> name-theme: persona name theme
+* - in-out property <string> name-font-family : persona name font family
+* - in-out property <bool> name-font-italic : persona name font italic
+* - in-out property <string> des : persona description text
+* - in-out property <length> des-height: persona description height
+* - in-out property <length> des-font-size: persona description font size
+* - in-out property <int> des-font-weight : persona description font weight
+* - in-out property <Themes> des-theme: persona description theme
+* - in-out property <string> des-font-family : persona description font family
+* - in-out property <bool> des-font-italic : persona description font italic
+* ## functions
+* ## callbacks
+* - callback clicked(SButtonProps): run if you click the buttons
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { Avatar } from "../avatar/avatar.slint";
+import { SText } from "../text/index.slint";
+import { SButton } from "../button/index.slint";
+import { ROOT_STYLES,DefaultSPersonaProps} from "../../themes/index.slint";
+import { Themes,SButtonProps,BorderType } from "../../use/index.slint";
+
+export component Persona inherits SCard { 
+  in-out property <string> btn-text : DefaultSPersonaProps.btn-text;
+  in property <length> spacing : DefaultSPersonaProps.spacing;
+  in property <[SButtonProps]> btns : DefaultSPersonaProps.btns;
+  in property <image> avatar : DefaultSPersonaProps.avatar;
+  in property <length> avatar-height: DefaultSPersonaProps.avatar-height;
+  in property <Themes> avatar-theme : DefaultSPersonaProps.avatar-theme;
+  //name
+  in-out property <string> name : DefaultSPersonaProps.name;
+  in-out property <length> name-height: DefaultSPersonaProps.name-height;
+  in-out property <length> name-font-size: DefaultSPersonaProps.name-font-size;
+  in-out property <int> name-font-weight : DefaultSPersonaProps.name-font-weight;
+  in-out property <Themes> name-theme: DefaultSPersonaProps.name-theme;
+  in-out property <string> name-font-family : DefaultSPersonaProps.name-font-family;
+  in-out property <bool> name-font-italic : DefaultSPersonaProps.name-font-italic;
+  //des
+  in-out property <string> des : DefaultSPersonaProps.des;
+  in-out property <length> des-height: DefaultSPersonaProps.des-height;
+  in-out property <length> des-font-size: DefaultSPersonaProps.des-font-size;
+  in-out property <int> des-font-weight : DefaultSPersonaProps.des-font-weight;
+  in-out property <Themes> des-theme: DefaultSPersonaProps.des-theme;
+  in-out property <string> des-font-family : DefaultSPersonaProps.des-font-family;
+  in-out property <bool> des-font-italic : DefaultSPersonaProps.des-font-italic;
+  callback clicked(SButtonProps);
+  card-width: DefaultSPersonaProps.card-width;
+  init => {
+    self.card-height = avatar-height + des-height + name-height + btn-view.height + 3 * spacing;
+  }
+  VerticalLayout {
+    avatar:=Avatar { 
+      theme: root.avatar-theme;
+      height: root.avatar-height;
+      width: 100%;
+      border-type: BorderType.None;
+      avatar: root.avatar;
+    }
+    footer-layout:=VerticalLayout {
+      spacing: root.spacing;
+      alignment: space-between;
+      padding: ROOT-STYLES.sur-padding.normal.padding-same;
+      name-view:=Rectangle{
+        height: root.name-height;
+        width: 100%;
+        name-text:=SText { 
+          theme: root.name-theme;
+          text: root.name;
+          font-size: root.name-font-size;
+          font-weight: root.name-font-weight;
+          font-family: root.name-font-family;
+          font-italic: root.name-font-italic;
+        }
+      }
+      des-view:=Rectangle{
+        width: 100%;
+        height: root.des-height;
+        des-text:=SText {
+          theme: root.des-theme;
+          height: parent.height;
+          width: parent.width;
+          font-size: root.des-font-size;
+          wrap: word-wrap;
+          text: root.des;
+          horizontal-alignment: left;
+        }
+      }
+      btn-view:=HorizontalLayout{
+        padding-top: 8px;
+        padding-bottom: 8px;
+        alignment: center;
+        spacing: root.spacing;
+        if btns.length==0:SButton  {
+          text: btn-text;
+          theme: root.theme;
+          clicked => {
+            root.clicked(btns[0]);
+          }
+        }
+        if btns.length!=0: HorizontalLayout {
+          spacing: root.spacing;
+          for btn[index] in root.btns: SButton {
+            font-family: btn.font-family;
+            font-italic: btn.font-italic;
+            font-size: btn.font-size;
+            font-weight: btn.font-weight;
+            theme: btn.theme;
+            padding-type: btn.padding-type;
+            shadow-type: btn.shadow-type;
+            border-type: btn.border-type;
+            icon : btn.icon;
+            show-icon: btn.show-icon;
+            text: btn.text;
+            letter-spacing: btn.letter-spacing;
+            clip: btn.clip;
+            round: btn.round;
+            clicked => {
+              root.clicked(btn);
+            }
+          }
+        }
+      }
+    }
+  }
+}

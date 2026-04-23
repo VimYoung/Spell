@@ -1,0 +1,111 @@
+import { UAppTheme } from "../app-theme.slint";
+import { ButtonInterface } from "button-interface.slint";
+import { IconTextPlacement } from "../structs/data-structs.slint";
+import { UText } from "text.slint";
+
+
+export component UCheckbox inherits ButtonInterface {
+	// Accessability properties
+	accessible-role: AccessibleRole.checkbox;
+    accessible-checkable: true;
+    accessible-checked: self.checked;
+    accessible-action-default => {
+        self.clicked()
+    }
+	// Regular properties
+    in-out property <bool> checked: false;
+    in-out property <string> text;
+    in-out property <IconTextPlacement> text-placement: text != "" ? start : hidden;
+    in-out property <LayoutAlignment> alignment: space-between;
+    border-radius: clamp(UAppTheme.radius-base, 0, 4px);
+    HorizontalLayout {
+        alignment: root.alignment;
+        spacing: UAppTheme.spacing-base;
+        if text-placement == IconTextPlacement.start: VerticalLayout {
+            alignment: center;
+            UText {
+                text: text;
+                color: UAppTheme.text;
+                states [
+                    disabled when !root.enabled: {
+                        color: UAppTheme.text-disabled;
+                    }
+                ]
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                border-width: UAppTheme.border-width-base;
+                border-radius: clamp(UAppTheme.radius-base, 0, 4px);
+                border-color: UAppTheme.border;
+                width: UAppTheme.icon-size-base;
+                height: UAppTheme.icon-size-base;
+                VerticalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../assets/icons/check.svg");
+                            colorize: white;
+                            width: checked ? UAppTheme.font-size-smaller : 0px;
+                            height: checked ? UAppTheme.font-size-smaller : 0px;
+                            animate width, height { duration: UAppTheme.animation-duration; }
+                            states [
+                                disabled when !root.enabled: {
+                                    colorize: white.with-alpha(0.8);
+                                }
+                            ]
+                        }
+                    }
+                }
+
+                animate background, border-color { duration: UAppTheme.animation-duration; }
+                states [
+                    disabled-checked when !root.enabled && root.checked: {
+                        border-color: UAppTheme.primary.disabled;
+                        background: UAppTheme.primary.disabled;
+                    }
+                    disabled-unchecked when !root.enabled && !root.checked: {
+                        border-color: UAppTheme.border;
+                        background: UAppTheme.color-fill-tertiary;
+                    }
+                    hover-unchecked when root.has-hover && !checked: {
+                        border-color: UAppTheme.primary.hover;
+                    }
+                    hover-checked when root.has-hover && checked: {
+                        background: UAppTheme.primary.hover;
+                        border-color: UAppTheme.primary.hover;
+                    }
+                    checked when checked: {
+                        background: UAppTheme.primary.base;
+                        border-color: UAppTheme.primary.base;
+                    }
+                ]
+            }
+        }
+
+        if text-placement == IconTextPlacement.end: VerticalLayout {
+            alignment: center;
+            UText {
+                text: text;
+                color: UAppTheme.text;
+                states [
+                    disabled when !root.enabled: {
+                        color: UAppTheme.text-disabled;
+                    }
+                ]
+            }
+        }
+    }
+
+    clicked => {
+        checked = !checked;
+    }
+    states [
+        focused when root.has-tab-focus: {
+            border-width: UAppTheme.focus-border-width;
+            border-color: UAppTheme.focus-color;
+        }
+    ]
+}

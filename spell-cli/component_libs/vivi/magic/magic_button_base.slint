@@ -1,0 +1,63 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { ButtonBase, ButtonStyle, LayoutStyle, HorizontalLayoutBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { MagicHorizontalBox } from "./magic_horizontal_box.slint";
+import {
+    SizeSettings,
+    IconSettings,
+    Palette
+} from "./styling.slint";
+
+export global MagicButtonStyles {
+    out property <ButtonStyle> icon_button_style: {
+        border_style: {
+            border_radius: SizeSettings.control_height / 2,
+        },
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.foreground,
+        },
+        layout_style: {
+            alignment: LayoutAlignment.center,
+        }
+    };
+}
+
+export enum ButtonAction {
+    default,
+    primary,
+    destructive
+}
+
+export component MagicButtonBase inherits ButtonBase {
+    in property <length> preferred_min_width;
+    in property <length> preferred_min_height;
+
+    min_width: max(root.preferred_min_width, content_layer.min_width);
+    min_height: max(root.preferred_min_height, content_layer.min_height);
+    vertical_stretch: 0;
+    mouse_cursor: root.enabled ? pointer : not-allowed;
+
+    state_layer := StateLayer {
+        width: 100%;
+        height: 100%;
+        border_radius: root.style.border_style.border_radius;
+        pressed: root.pressed || root.enter_pressed;
+        has_hover: root.has_hover;
+        has_focus: root.has_focus;
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        @children
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

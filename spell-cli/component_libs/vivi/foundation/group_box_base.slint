@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { BorderStyle } from "./border.slint";
+import { TextBase, TextStyle } from "./text_base.slint";
+
+export struct GroupBoxStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // layout
+    spacing: length,
+    padding: length,
+
+    // title
+    title_style: TextStyle,
+    title_horizontal_alignment: TextHorizontalAlignment
+}
+
+export component GroupBoxBase {
+    in property <string> title;
+    in property <GroupBoxStyle> style;
+
+    @children
+}

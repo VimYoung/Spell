@@ -1,0 +1,65 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230912
+* @version:0.1.1
+* @type:interface
+* @description:
+* # SPopup
+* A masked popup layer appears in the current window
+* And users will not be able to use the popup layer to cover the components under it. 
+* Clicking on the popup layer again will close it
+* ## properties
+* - in-out property <bool> is-show : popup is show or not
+* - in property <Themes> theme : SurrealismUI theme
+* - in property <percent> mask-opacity : popup mask opacity
+* ## functions
+* - public function open() : open the popup
+* - public function close() : close the popup
+* ## callbacks
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import {ROOT_STYLES,DefaultSPopupProps} from "../../themes/index.slint";
+import { Themes,PaddingType,PaddingProps,ShadowType,BorderType,BorderProps } from "../../use/index.slint";
+
+export component Popup inherits Window {
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+  always-on-top:true;
+  opacity: 1;
+  visible: is-show;
+  z: 1000;
+  in-out property <bool> is-show :DefaultSPopupProps.is-show;
+  in property <Themes> theme : DefaultSPopupProps.theme;
+  in property <percent> mask-opacity : DefaultSPopupProps.mask-opacity;
+  public function open() {
+    self.is-show = true;
+  }
+  public function close() {
+    self.is-show = false;
+  }
+  mask:=SCard {
+    z: 100;
+    height: 100%;
+    width: 100%;
+    theme: root.theme;
+    drop-shadow-blur: 0;
+    drop-shadow-offset-x: 0;
+    drop-shadow-offset-y: 0;
+    opacity: root.mask-opacity;
+  }
+  TouchArea {
+    z: 110;
+    clicked => {
+      root.close()
+    }
+    @children
+  }
+}

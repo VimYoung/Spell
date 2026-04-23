@@ -1,0 +1,144 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { AboutSlint } from "std-widgets.slint";
+import { ViewBase } from "./view_base.slint";
+import { Logo } from "./logo.slint";
+
+import { MagicText } from "../magic_text.slint";
+import { Icons } from "../icons.slint";
+import { FormElement } from "../form_element.slint";
+import { LayoutSettings, FontSettings, Palette } from "../styling.slint";
+import { TabBar, TabBarItem } from "../tab_bar.slint";
+import { ListView } from "../list_view.slint";
+import { TabView } from "./tab_view.slint";
+
+component About {
+    in property <string> app_name;
+    in property <string> app_version;
+    in property <image> icon;
+    in property <brush> logo_background;
+
+    VerticalLayout {
+        alignment: start;
+
+        VerticalLayout {
+            alignment: start;
+            spacing: LayoutSettings.control_spacing;
+
+            Logo {
+                x: (parent.width - self.width) / 2;
+                icon: root.icon;
+                background: root.logo_background;
+            }
+
+            VerticalLayout {
+                MagicText {
+                    text: root.app_name;
+                    horizontal_alignment: center;
+                    style: FontSettings.header_3;
+                }
+
+                MagicText {
+                    text: root.app_version;
+                    horizontal_alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Palette.border.with_alpha(0.8);
+        }
+
+        AboutSlint {}
+    }
+}
+
+component Licenses {
+    in property <[{ title: string, license: string}]> model;
+    in property <string> app_name;
+    in property <string> app_license;
+
+    VerticalLayout {
+        MagicText {
+           text: root.app_name;
+           style: FontSettings.header_3;
+        }
+
+        MagicText {
+            text: @tr("{} is licensed under {}", root.app_name, root.app_license);
+            style: FontSettings.light;
+        }
+
+        Rectangle {
+            height: LayoutSettings.layout_spacing;
+        }
+
+        MagicText {
+           text: @tr("Third-party Licenses");
+           style: FontSettings.header_3;
+        }
+
+        ListView {
+            for item in root.model: VerticalLayout {
+                padding_bottom: LayoutSettings.layout_spacing;
+
+                FormElement {
+                    x: (parent.width - self.width) / 2;
+                    title: item.title;
+
+                    MagicText {
+                       text: item.license;
+                       style: FontSettings.light;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component AboutView inherits ViewBase {
+    in property <string> app_name;
+    in property <string> app_version;
+    in property <string> app_license;
+    in property <image> icon;
+    in property <brush> logo_background;
+    in property <[{ title: string, license: string}]> licenses: [
+        { title: "vivi", license: "©2024 by Vivi developers under MIT" },
+        { title: "Material Icons", license: "©2016-2020 by Goggle Inc. under Apache-2.0" },
+    ];
+
+    title: @tr("About {}", root.app_name);
+    navigation_icon: Icons.arrow_back;
+    tabs: [
+          { text: @tr("About") },
+          { text: @tr("Licenses") },
+    ];
+
+    tab_view := TabView {
+        x: 0;
+        width: 100%;
+        tabs_count: root.tabs.length;
+        current_tab: root.current_tab;
+
+        if tab_view.tab_active(0) : About {
+            x: tab_view.tab_x(0);
+            width: tab_view.tab_width();
+            height: 100%;
+            app_name: root.app_name;
+            app_version: root.app_version;
+            icon: root.icon;
+            logo_background: root.logo_background;
+        }
+
+        if tab_view.tab_active(1) : Licenses {
+            x: tab_view.tab_x(1);
+            width: tab_view.tab_width();
+            height: 100%;
+            app_name: root.app_name;
+            app_license: root.app_license;
+            model: root.licenses;
+        }
+    }
+}

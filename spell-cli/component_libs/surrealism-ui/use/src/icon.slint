@@ -1,0 +1,85 @@
+import { Themes } from "./theme.slint";
+import { RotationProps } from "./rotation.slint";
+
+struct Icons {
+  Null:image,
+  Loading:image,
+  Avatar:image,
+  Success:image,
+  Smiling_face:image,
+  Info:image,
+  Close_one:image,
+  Attention:image,
+  Help:image,
+  Share:image,
+  Up:image,
+  Down:image,
+  Down_one:image,
+  Right:image,
+  Right_one:image,
+  Link_left:image,
+  Preview_close:image,
+  Preview_open:image,
+  Setting_two:image,
+  Folder:image,
+  Folder_filled:image,
+  FileCode:image,
+  Search:image,
+  More:image,
+  Left :image,
+}
+
+struct IconProps {
+  name:string,
+  source:image
+}
+
+global UseIcons {
+    out property <Icons> icons : {
+      Null:@image-url(""),
+      Loading:@image-url("../../icons/loading.svg"),
+      Avatar:@image-url("../../icons/avatar.svg"),
+      Success:@image-url("../../icons/success.svg"),
+      Smiling_face:@image-url("../../icons/smiling-face.svg"),
+      Info:@image-url("../../icons/info.svg"),
+      Close_one:@image-url("../../icons/close-one.svg"),
+      Attention:@image-url("../../icons/attention.svg"),
+      Help:@image-url("../../icons/help.svg"),
+      Share:@image-url("../../icons/share.svg"),
+      Up:@image-url("../../icons/up.svg"),
+      Down:@image-url("../../icons/down.svg"),
+      Down_one:@image-url("../../icons/down-one.svg"),
+      Right:@image-url("../../icons/right.svg"),
+      Right_one:@image-url("../../icons/right-one.svg"),
+      Link_left:@image-url("../../icons/link-left.svg"),
+      Preview_close:@image-url("../../icons/preview-close.svg"),
+      Preview_open:@image-url("../../icons/preview-open.svg"),
+      Setting_two:@image-url("../../icons/setting-two.svg"),
+      Folder:@image-url("../../icons/folder-open.svg"),
+      Folder_filled:@image-url("../../icons/folder-open-filled.svg"),
+      FileCode:@image-url("../../icons/file-code.svg"),
+      Search:@image-url("../../icons/search.svg"),
+      More:@image-url("../../icons/more.svg"),
+      Left:@image-url("../../icons/left.svg"),
+    };
+}
+
+struct SIconProps {
+  mouse-cursor : MouseCursor,
+  theme : Themes,
+  height : length,
+  width : length,
+  padding : length,
+  //image props
+  source : image,
+  colorize : brush,
+  image-fit : ImageFit,
+  image-rendering : ImageRendering,
+  rotation : RotationProps,
+  source-clip-x : int,
+  source-clip-y : int,
+  source-clip-height : int,
+  source-clip-width : int
+}
+
+export { Icons,IconProps,UseIcons,SIconProps }

@@ -1,0 +1,95 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230910
+* @version:0.1.0
+* @type:interface
+* @description:
+* # SLink
+* SLink is commonly used to represent text connections or sharing
+* ## properties
+* - in property <image> icon : link share icon
+* - in property <bool> funny : use funny underline
+* - in property <bool> underline : has underline or not
+* - out property <bool> has-hover : link has hover or not 
+* - in property <MouseCursor> mouse-cursor : link mouse cursor
+* - in property <Themes> theme : SurrealismUI theme
+* - in property <length> font-size : link font size
+* - in-out property <string> text : link text
+* - in property <int> font-weight : link font weight
+* - in property <bool> font-italic : link font italic
+* - in property <string> font-family : link font family
+* - private property <brush> text-color : link text color
+* ## callbacks
+* - callback clicked(string) : run if you click share icon
+* ============================================
+*/
+
+import { SText } from "../text/index.slint";
+import { SCard } from "../card/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { ROOT-STYLES,DefaultSLinkProps } from "../../themes/index.slint";
+import { Themes,ShadowType,ColorLevel,UseSurrealismFn,UseIcons,BorderType } from "../../use/index.slint";
+
+export component Link {
+  in property <image> icon : DefaultSLinkProps.icon;
+  in property <bool> funny : DefaultSLinkProps.funny;
+  in property <bool> underline : DefaultSLinkProps.underline;
+  out property <bool> has-hover <=> touch-area.has-hover;
+  in property <MouseCursor> mouse-cursor : DefaultSLinkProps.mouse-cursor;
+  in property <Themes> theme : DefaultSLinkProps.theme;
+  in property <length> font-size : DefaultSLinkProps.font-size;
+  in-out property <string> text : DefaultSLinkProps.text;
+  in property <int> font-weight : DefaultSLinkProps.font-weight;
+  in property <bool> font-italic : DefaultSLinkProps.font-italic;
+  in property <string> font-family : DefaultSLinkProps.font-family;
+  private property <brush> text-color;
+  callback clicked(string);
+  states [
+    hover when touch-area.has-hover: {
+      inner-text.color : UseSurrealismFn.deeper(root.theme,UseSurrealismFn.get-color(root.theme,ColorLevel.Font));
+      link-icon.colorize : UseSurrealismFn.deeper(root.theme,UseSurrealismFn.get-color(root.theme,ColorLevel.Font)); 
+    }
+  ]
+  touch-area:=TouchArea {
+    z: 14;
+    mouse-cursor: pointer;
+    clicked => {
+      root.clicked(root.text)
+    }
+    if touch-area.has-hover&&underline: SCard {
+      y: root.height;
+      height: 1px;
+      width: root.width;
+      theme: root.theme;
+      padding-left: 0;
+      padding-right: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-type: root.funny? BorderType.Circle-None: BorderType.None;
+    }
+    HorizontalLayout {
+      inner-text:=SText{
+        theme: root.theme;
+        text: root.text;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        font-family: root.font-family;
+        font-italic: root.font-italic;
+      }
+      Rectangle {
+        height: link-icon.width;
+        width: link-icon.width + self.padding-left;
+        padding-left: 2px;
+        link-icon:=SIcon{
+          x: 2px;
+          colorize: self.get-colorize();
+          source: root.icon;
+          theme: root.theme;
+          height: root.font-size / 1.4;
+          width: root.font-size / 1.4;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230912
+* @version:0.1.1
+* @type:interface
+* @description:
+* # SDivider
+* A divider groups sections of content to create visual rhythm and hierarchy. 
+* Use dividers along with spacing and headers to organize content in your layout. 
+* ## properties inherits SCard
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { DefaultSDividerProps } from "../../themes/index.slint";
+export component Divider inherits SCard{
+  height: DefaultSDividerProps.height;
+  shadow-type: DefaultSDividerProps.shadow-type;
+  border-type: DefaultSDividerProps.border-type;
+  padding-type: DefaultSDividerProps.padding-type; 
+  width: DefaultSDividerProps.width;
+}

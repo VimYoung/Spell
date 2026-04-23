@@ -1,0 +1,59 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Palette, AnimationSettings } from "./styling.slint";
+
+export component StateLayer {
+    // styling
+    in property <length> border_radius <=> state_layer.border_radius;
+
+    // states
+    in property <bool> pressed;
+    in property <bool> has_hover;
+    in property <bool> has_focus;
+    in property <bool> has_error;
+    in property <length> focus_padding: 2px;
+
+    focus_border := Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: root.width + 2 * root.focus_padding + self.border_width / 2;
+        height: root.height + 2 * root.focus_padding + self.border_width / 2;
+        border_radius: state_layer.border_radius + root.focus_padding;
+        border_width: 2px;
+        border_color: Palette.focus_border;
+        opacity: 0;
+
+        states [
+            error when root.has_error : {
+                opacity: 1;
+                border_color: Palette.destructive_background;
+            }
+            focused when root.has_focus : {
+                opacity: 1;
+            }
+        ]
+
+        animate opacity {
+            duration: AnimationSettings.color_duration;
+        }
+    }
+
+    state_layer := Rectangle {
+        width: 100%;
+        height: 100%;
+
+        animate background {
+            duration: AnimationSettings.color_duration;
+        }
+    }
+
+    states [
+        pressed when root.pressed : {
+            state_layer.background: Palette.state_pressed;
+        }
+        hovered when root.has_hover: {
+            state_layer.background: Palette.state_hovered;
+        }
+    ]
+}

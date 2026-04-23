@@ -1,0 +1,148 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20231105
+* @version:0.2.1
+* @type:interface
+* @description:
+* # STree
+* STree can be used to display directory structure, forming a parent-child relationship, and can be easily displayed
+* ## properties inherits SCard
+* - in property <string> item-font-family : tree item font family
+* - in property <int> item-font-weight : tree item font weight
+* - in property <length> item-font-size: tree item font size
+* - in property <bool> item-font-italic : tree item font italic
+* - in-out property <TreeData> tree-data : tree data
+* ## callbacks
+* - callback clicked(int,string,string) : run if you click an item
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { ROOT-STYLES,DefaultSTreeProps} from "../../themes/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { SText } from "../text/index.slint";
+import { ScrollView } from "std-widgets.slint";
+import {UseIcons,Themes,PaddingType,ShadowType,BorderType,TreeChildren,TreeData} from "../../use/index.slint";
+
+
+component TreeItem inherits SCard{
+  theme: Primary;
+  border-type: BorderType.None;
+  drop-shadow-blur: 0;
+  drop-shadow-offset-x: 0;
+  drop-shadow-offset-y: 0;
+  in property <int> item-index;
+  in property <image> item-icon;
+  in property <string> item-name;
+  in property <string> item-extra;
+  callback clicked(int,string,string);
+  TouchArea {
+    mouse-cursor: pointer;
+    clicked => {
+      root.clicked(item-index,item-name,item-extra);
+     
+    }
+  }
+  HorizontalLayout {
+    alignment: space-between;
+    padding-left: root.padding-left;
+    padding-right: root.padding-right;
+    HorizontalLayout {
+      spacing: 6px;
+      Rectangle {
+        width: i-icon.width;
+        i-icon:=SIcon { 
+          colorize: self.get-colorize();
+          height: root.font-size;
+          width: root.font-size;
+          theme: root.theme;
+          source: root.item-icon;
+        }
+      }
+      i-name:=SText { 
+        theme: root.theme;
+        font-size: root.font-size;
+        text: item-name;
+        font-weight: root.font-weight;
+        font-italic: root.font-italic;
+        font-family: root.font-family;
+      }
+    }
+    HorizontalLayout {
+      alignment: end;
+      i-extra:=SText {
+        theme: root.theme;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        font-italic: root.font-italic;
+        font-family: root.font-family;
+        text: root.item-extra;
+      } 
+    }
+  }
+}
+
+
+export component Tree inherits SCard{
+  height : DefaultSTreeProps.height;
+  width : DefaultSTreeProps.width;
+  clip: true;
+  //font
+  font-family: DefaultSTreeProps.font-family;
+  font-italic: DefaultSTreeProps.font-italic;
+  font-size:DefaultSTreeProps.font-size;
+  font-weight: DefaultSTreeProps.font-weight;
+  theme : DefaultSTreeProps.theme;
+  padding-type: DefaultSTreeProps.padding-type;
+  shadow-type: DefaultSTreeProps.shadow-type;
+  border-type : DefaultSTreeProps.border-type;
+  //font
+  in property <string> item-font-family : DefaultSTreeProps.item-font-family;
+  in property <int> item-font-weight : DefaultSTreeProps.item-font-weight;
+  in property <length> item-font-size: DefaultSTreeProps.item-font-size;
+  in property <bool> item-font-italic : DefaultSTreeProps.item-font-italic;
+  in-out property <TreeData> tree-data : DefaultSTreeProps.tree-data;
+  callback clicked(int,string,string);
+  view:=VerticalLayout {
+    parent-root:= TreeItem{
+      card-height: root.font-size;
+      width: 100%;
+      theme: root.theme;
+      item-index: -1;
+      item-icon: tree-data.icon;
+      item-name: tree-data.label;
+      item-extra: tree-data.extra;
+      font-size: root.font-size;
+      font-italic: root.font-italic;
+      font-family: root.font-family;
+      font-weight: root.font-weight;
+      clicked(i,n,e) => {
+        root.clicked(i,n,e);
+      }
+    }
+    children-view:= ScrollView { 
+      viewport-height: tree-data.children.length * parent-root.height;
+      VerticalLayout {
+        padding-left: root.padding-left / 2;
+        padding-right: root.padding-right / 2;
+        for item[index] in tree-data.children: TreeItem{
+          card-height: root.item-font-size;
+          width: 100%;
+          theme: root.theme;
+          item-index: index;
+          item-icon: item.icon;
+          item-name: item.label;
+          item-extra: item.extra;
+          font-size: root.item-font-size;
+          font-italic: root.item-font-italic;
+          font-family: root.item-font-family;
+          font-weight: root.item-font-weight;
+          clicked(i,n,e) => {
+            root.clicked(i,n,e);
+          }
+        }
+      }
+    }
+  }
+}

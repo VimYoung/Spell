@@ -1,0 +1,77 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230907
+* @version:0.0.1
+* @type:interface
+* @description:
+* # SHeader
+* SHeader is a simple header component that is generated based on routing information
+* ## properties inherits SCard
+* - in property <length> spacing : the spacing of header
+* - in property <[SOption]> value : route value of header
+* - in property <image> source : split icon of header
+* ## functions
+* ## callbacks
+* - callback clicked(int,SOption) : run if you click the header
+* ============================================
+*/
+import {ROOT_STYLES,DefaultSHeaderProps} from "../../themes/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { SText } from "../text/index.slint";
+import { SCard } from "../card/index.slint";
+import {Themes,UseIcons,SOption} from "../../use/index.slint";
+
+export component Header inherits SCard { 
+  width: 100%;
+  font-size: DefaultSHeaderProps.font-size;
+  font-family: DefaultSHeaderProps.font-family;
+  font-italic: DefaultSHeaderProps.font-italic;
+  font-weight: DefaultSHeaderProps.font-weight;
+  card-height: DefaultSHeaderProps.card-height;
+  theme: DefaultSHeaderProps.theme;
+  padding-type: DefaultSHeaderProps.padding-type;
+  shadow-type: DefaultSHeaderProps.shadow-type;
+  border-type: DefaultSHeaderProps.border-type;
+  in property <length> spacing : DefaultSHeaderProps.spacing;
+  in property <[SOption]> value : DefaultSHeaderProps.options;
+  in property <image> source : DefaultSHeaderProps.source;
+  callback clicked(int,SOption);
+  HorizontalLayout {
+    padding-left: parent.padding-left;
+    padding-right: parent.padding-right;
+    spacing: root.spacing;
+    for item[index] in root.value: TouchArea{
+      z: 20;
+      mouse-cursor: pointer;
+      clicked => {
+        root.clicked(index,item);
+      }
+      HorizontalLayout {
+        icon-view:=Rectangle{
+          width: icon.width;
+          icon:=SIcon{
+            colorize: self.get-colorize();
+            height: root.font-size;
+            width: root.font-size;
+            theme: root.theme;
+            source: root.source;  
+          }
+        }
+        txt-view:=Rectangle{
+          width: txt.width;
+          txt:=SText{ 
+            theme: root.theme;
+            text: item.label;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            font-italic: root.font-italic;
+            font-family: root.font-family;
+            wrap: TextWrap.no-wrap;
+            color: root.font-color;
+          }
+        }
+      }
+    }
+  }
+}

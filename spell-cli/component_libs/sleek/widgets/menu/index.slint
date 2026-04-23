@@ -1,0 +1,76 @@
+import { Palette } from "std-widgets.slint";
+
+import { UAppTheme } from "../../app-theme.slint";
+
+
+export enum UMenuVariant {
+	default,
+	light,
+	dark,
+}
+
+
+export global UMenuLogic {
+    in-out property <UMenuVariant> variant;
+    in-out property <string> current-link;
+}
+
+export struct UMenuLinkTheme {
+	text: brush,
+	text-selected: brush,
+	text-disabled: brush,
+	bg-hover: brush,
+	bg-selected: brush,
+}
+
+export global UMenuLinkThemes {
+    out property <UMenuLinkTheme> default: {
+        text: UAppTheme.text,
+        text-selected: UAppTheme.primary-text,
+        text-disabled: UAppTheme.text-disabled,
+        bg-hover: UAppTheme.color-fill-secondary,
+        bg-selected: UAppTheme.primary.base,
+    };
+    out property <UMenuLinkTheme> light: {
+        text: UAppTheme.light.text,
+        text-selected: UAppTheme.primary-text,
+        text-disabled: UAppTheme.light.text-disabled,
+        bg-hover: UAppTheme.light.color-fill-secondary,
+        bg-selected: UAppTheme.light.primary.base,
+    };
+    out property <UMenuLinkTheme> dark: {
+        text: UAppTheme.dark.text,
+        text-selected: UAppTheme.primary-text,
+        text-disabled: UAppTheme.dark.text-disabled,
+        bg-hover: UAppTheme.dark.color-fill-secondary,
+        bg-selected: UAppTheme.dark.primary.base,
+    };
+}
+
+export struct UMenuSubMenuTheme {
+	text: brush,
+	text-selected: brush,
+	text-disabled: brush,
+	bg-hover: brush,
+}
+
+export global UMenuSubMenuThemes {
+    out property <UMenuSubMenuTheme> default: {
+        text: UAppTheme.text,
+        text-selected: UAppTheme.primary.base,
+        text-disabled: UAppTheme.text-disabled,
+        bg-hover: UAppTheme.color-fill-secondary,
+    };
+    out property <UMenuSubMenuTheme> light: {
+        text: UAppTheme.light.text,
+        text-selected: UAppTheme.light.primary.base,
+        text-disabled: UAppTheme.light.text-disabled,
+        bg-hover: UAppTheme.light.color-fill-secondary,
+    };
+    out property <UMenuSubMenuTheme> dark: {
+        text: UAppTheme.dark.text,
+        text-selected: UAppTheme.dark.primary.base,
+        text-disabled: UAppTheme.dark.text-disabled,
+        bg-hover: UAppTheme.dark.color-fill-secondary,
+    };
+}

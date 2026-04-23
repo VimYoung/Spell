@@ -1,0 +1,43 @@
+import { UButton, UButtonVariant } from "button/button.slint";
+import { IconTextPlacement } from "../structs/data-structs.slint";
+
+
+export component UFloatingButton inherits VerticalLayout {
+	// Layout placement
+	in-out property <LayoutAlignment> vertical-alignment: start;
+    in-out property <LayoutAlignment> horizontal-alignment: start;
+    in-out property <length> layout-padding-top: 0px;
+    in-out property <length> layout-padding-bottom: 0px;
+    in-out property <length> layout-padding-left: 0px;
+    in-out property <length> layout-padding-right: 0px;
+	// Button's properties and callbacks
+	in-out property <UButtonVariant> variant <=> btn.variant;
+    in-out property <string> text <=> btn.text;
+    in-out property <bool> enabled <=> btn.enabled;
+    out property <bool> has-focus <=> btn.has-focus;
+    out property <bool> has-tab-focus <=> btn.has-tab-focus;
+    out property <bool> has-hover <=> btn.has-hover;
+    out property <bool> pressed <=> btn.pressed;
+    in-out property <bool> loading <=> btn.loading;
+    in-out property <image> icon <=> btn.icon;
+    in-out property <IconTextPlacement> icon-placement <=> btn.icon-placement;
+    callback clicked <=> btn.clicked;
+	// TouchArea callbacks from UButton.
+    callback double-clicked <=> btn.double-clicked;
+    callback moved <=> btn.moved;
+    callback pointer-event <=> btn.pointer-event;
+    callback scroll-event <=> btn.scroll-event;
+	// FocusScope callbacks from UButton.
+	callback key-pressed <=> btn.key-pressed;
+    callback key-released <=> btn.key-released;
+    callback focus-changed-event <=> btn.focus-changed-event;
+    alignment: vertical-alignment;
+    HorizontalLayout {
+        alignment: horizontal-alignment;
+        padding-top: layout-padding-top;
+        padding-bottom: layout-padding-bottom;
+        padding-left: layout-padding-left;
+        padding-right: layout-padding-right;
+        btn := UButton { }
+    }
+}

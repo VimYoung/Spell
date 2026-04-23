@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export component FocusTouchArea {
+    in property <bool> enabled: true;
+    out property <bool> has_focus <=> focus_scope.has_focus;
+    out property <bool> pressed <=> touch_area.pressed;
+    out property <bool> has_hover <=> touch_area.has_hover;
+    out property <bool> enter_pressed;
+
+    in property <MouseCursor> mouse-cursor <=> touch_area.mouse_cursor;
+
+    callback clicked <=> touch_area.clicked;
+    callback pointer_event <=> touch_area.pointer_event;
+    callback key_pressed(KeyEvent) -> EventResult;
+
+    forward-focus: focus-scope;
+
+    focus_scope := FocusScope {
+        x: 0;
+        width: 0px;
+        enabled: root.enabled;
+
+        key_pressed(event) => {
+            if !root.enabled {
+                return reject;
+            }
+
+            if (event.text == " " || event.text == "\n") && !root.enter_pressed {
+                root.enter_pressed = true;
+                touch_area.clicked();
+                return accept;
+            }
+
+            root.key_pressed(event)
+        }
+
+        key_released(event) => {
+            if !root.enabled {
+                return reject;
+            }
+
+            if (event.text == " " || event.text == "\n") && root.enter_pressed {
+                root.enter_pressed = false;
+                return accept;
+            }
+
+            reject
+        }
+    }
+
+    touch_area := TouchArea {
+        enabled: root.enabled;
+    }
+}

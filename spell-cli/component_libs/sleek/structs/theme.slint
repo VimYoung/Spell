@@ -1,0 +1,92 @@
+export struct UPrimaryColor {
+	base: brush,
+	hover: brush,
+	active: brush,
+	disabled: brush,
+	selected: brush,
+}
+
+export struct UAppThemeConfig {
+	// Animation duration
+	animation-duration: duration,
+
+	// Primary colors
+	primary: UPrimaryColor,
+    success: UPrimaryColor,
+    warning: UPrimaryColor,
+    danger: UPrimaryColor,
+
+    // Background colors
+    bg-layout: brush,
+    bg-container: brush,
+    bg-elevated: brush,
+    bg-spotlight: brush,
+
+    // Fill colors
+    color-fill-plus: brush,
+    color-fill: brush,
+    color-fill-secondary: brush,
+    color-fill-tertiary: brush,
+    color-fill-quaternary: brush,
+
+    // Borders
+    border-width-base: length,
+    border: brush,
+    border-secondary: brush,
+    separator: brush,
+
+    // Shadow
+    shadow-color: brush,
+    shadow-blur: length,
+    shadow-x-offset: length,
+    shadow-y-offset: length,
+
+    // Focus display
+    focus-color: brush,
+    focus-border-width: length,
+
+    // Text colors
+	// Color used for the text in widgets with a primary color as a background.
+	primary-text: brush,
+    inverse-text: brush,
+    text: brush,
+    text-secondary: brush,
+	text-tertiary: brush,
+	text-quaternary: brush,
+    text-disabled: brush,
+
+    // Font sizes
+    font-size-smaller: length,
+    font-size-small: length,
+    font-size-base: length,
+    font-size-medium: length,
+    font-size-big: length,
+    font-size-bigger: length,
+	
+    // Icons
+    icon-size-base: length,
+
+    // Padding
+    padding-vertical: length,
+    padding-horizontal: length,
+    padding-small: length,
+    padding-base: length,
+    padding-medium: length,
+    padding-big: length,
+    padding-bigger: length,
+
+    // Spacing
+    spacing-small: length,
+    spacing-base: length,
+    spacing-medium: length,
+    spacing-big: length,
+    spacing-bigger: length,
+
+    // Radius
+    radius-small: length,
+    radius-base: length,
+    radius-medium: length,
+    radius-large: length,
+    radius-round: length,
+    radius-circle: length,
+}

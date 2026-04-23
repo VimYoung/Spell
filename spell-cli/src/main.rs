@@ -1,10 +1,10 @@
+pub mod constant_files;
 pub mod constantvals;
-use constantvals::{
-    APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_FILE,
-    MAIN_HELP, SPELL_PAM_FPRINT,
-};
+use constant_files::{APP_WINDOW_SLINT, BUILD_FILE, CARGO_TOML, MAIN_FILE};
+use constantvals::{ENABLE_HELP, FPRINT_HELP, LOGS_HELP, MAIN_HELP, SPELL_PAM_FPRINT};
 use core::panic;
 use futures_util::stream::StreamExt;
+use include_dir::{Dir, include_dir};
 use std::{
     env::{self, Args},
     fs::{self, OpenOptions},
@@ -14,6 +14,16 @@ use std::{
     process::Command,
 };
 use zbus::{Connection, proxy, zvariant::OwnedObjectPath};
+
+use crate::constant_files::{
+    APP_WINDOW_SLINT_MATERIAL, APP_WINDOW_SLINT_SLEEK, APP_WINDOW_SLINT_SUI, APP_WINDOW_SLINT_VIVI,
+    BUILD_FILE_MATERIAL, BUILD_FILE_SLEEK, BUILD_FILE_SUI, BUILD_FILE_VIVI,
+};
+
+static MATERIAL_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/material-1.0/");
+static SLEEK_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/sleek/");
+static SUI_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/surrealism-ui/");
+static VIVI_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/vivi/");
 
 #[proxy(
     default_path = "/net/reactivated/Fprint/Manager",
@@ -83,8 +93,23 @@ async fn main() -> Result<(), SpellError> {
             // Used for enabling notifications, clients, lockscreen etc.
             "enable" => Ok(()),
             "new" => match values.next() {
-                Some(dest_dir) => {
-                    create_spell_project(dest_dir)
+                Some(arg) => {
+                    if arg.starts_with("--") {
+                        let external_lib: ThirdPartyComponents = match arg.as_str() {
+                            "--material" => ThirdPartyComponents::Material,
+                            "--surrealism" => ThirdPartyComponents::Surrealism,
+                            "--vivi" => ThirdPartyComponents::Vivi,
+                            "--sleek" => ThirdPartyComponents::Sleek,
+                            _ => ThirdPartyComponents::None,
+                        };
+                        match values.next() {
+                            Some(dest_dir) => create_spell_project(dest_dir, external_lib),
+                            None => Err(SpellError::CLI(Cli::UndefinedArg("Provide a destination for creating the project.".to_string())))
+                        }
+                    } else {
+                        let external_lib = ThirdPartyComponents::None;
+                        create_spell_project(arg, external_lib)
+                    }
                 }
                 None => Err(SpellError::CLI(Cli::UndefinedArg("Provide a destination for creating the project.".to_string())))
             }
@@ -273,7 +298,10 @@ pub(crate) async fn enroll_fingerprint(proxy: &FprintdClientProxy<'_>) -> Result
     Ok(())
 }
 
-fn create_spell_project(path: String, /*, lib: ThirdPartyComponents*/) -> Result<(), SpellError> {
+fn create_spell_project(
+    path: String,
+    external_lib: ThirdPartyComponents,
+) -> Result<(), SpellError> {
     if let Ok(output) = Command::new("cargo").args(["new", &path]).output() {
         io::stdout().write_all(&output.stdout)?;
         io::stderr().write_all(&output.stderr)?;
@@ -306,10 +334,54 @@ fn create_spell_project(path: String, /*, lib: ThirdPartyComponents*/) -> Result
     let mut main_rs = fs::File::create(Path::new(&main_file))?;
     let mut cargo_toml = fs::File::create(Path::new(&cargo_file))?;
 
-    app_window_slint.write_all(APP_WINDOW_SLINT.as_bytes())?;
-    println!("Writing slint file...");
-    build_rs.write_all(BUILD_FILE.as_bytes())?;
-    println!("Writing build file...");
+    match external_lib {
+        ThirdPartyComponents::Material => {
+            let lib_path = path_ui + "/material-1.0";
+            let target: &Path = Path::new(&lib_path);
+            fs::create_dir(target)?;
+            copy_dir(&MATERIAL_LIB, &target)?;
+            app_window_slint.write_all(APP_WINDOW_SLINT_MATERIAL.as_bytes())?;
+            println!("Writing slint file with material lib...");
+            build_rs.write_all(BUILD_FILE_MATERIAL.as_bytes())?;
+            println!("Writing build file with material...");
+        }
+        ThirdPartyComponents::Sleek => {
+            let lib_path = path_ui + "/sleek";
+            let target: &Path = Path::new(&lib_path);
+            fs::create_dir(target)?;
+            copy_dir(&SLEEK_LIB, &target)?;
+            app_window_slint.write_all(APP_WINDOW_SLINT_SLEEK.as_bytes())?;
+            println!("Writing slint file with sleek external lib...");
+            build_rs.write_all(BUILD_FILE_SLEEK.as_bytes())?;
+            println!("Writing build file with sleek...");
+        }
+        ThirdPartyComponents::Surrealism => {
+            let lib_path = path_ui + "/surrealism-ui";
+            let target: &Path = Path::new(&lib_path);
+            fs::create_dir(target)?;
+            copy_dir(&SUI_LIB, &target)?;
+            app_window_slint.write_all(APP_WINDOW_SLINT_SUI.as_bytes())?;
+            println!("Writing slint file surrealism lib...");
+            build_rs.write_all(BUILD_FILE_SUI.as_bytes())?;
+            println!("Writing build file surrealism...");
+        }
+        ThirdPartyComponents::Vivi => {
+            let lib_path = path_ui + "/vivi";
+            let target: &Path = Path::new(&lib_path);
+            fs::create_dir(target)?;
+            copy_dir(&VIVI_LIB, &target)?;
+            app_window_slint.write_all(APP_WINDOW_SLINT_VIVI.as_bytes())?;
+            println!("Writing slint file with vivi lib...");
+            build_rs.write_all(BUILD_FILE_VIVI.as_bytes())?;
+            println!("Writing build file with vivi...");
+        }
+        ThirdPartyComponents::None => {
+            app_window_slint.write_all(APP_WINDOW_SLINT.as_bytes())?;
+            println!("Writing slint file...");
+            build_rs.write_all(BUILD_FILE.as_bytes())?;
+            println!("Writing build file...");
+        }
+    }
     main_rs.write_all(MAIN_FILE.as_bytes())?;
     println!("Writing main file...");
     let file_name = Path::new(&path).file_name().unwrap().to_str().unwrap();
@@ -454,11 +526,12 @@ async fn update_value(layer_name: String, values: Args) -> Result<(), SpellError
     }
 }
 
-#[allow(dead_code)]
 enum ThirdPartyComponents {
     Sleek,
     Material,
     Vivi,
+    None,
+    Surrealism,
 }
 // TODO, properly implement the error type for this platform
 // Application of an error type to work across the project is must.
@@ -503,6 +576,11 @@ enum LogType {
     Debug,
     Dump,
     Dev,
+}
+
+fn copy_dir(src: &Dir<'_>, dst: impl AsRef<Path>) -> io::Result<()> {
+    src.extract(dst)?;
+    Ok(())
 }
 
 // TODO write man docs for the command line tool and its Config if expanded further.

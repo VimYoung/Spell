@@ -1,0 +1,90 @@
+import { UAppTheme } from "../app-theme.slint";
+import { UText } from "text.slint";
+import { UDivider } from "divider.slint";
+import { ButtonInterface } from "button-interface.slint";
+
+
+enum TabsAlignmentType {
+	start,
+	stretch,
+}
+
+export component UTabs inherits Rectangle {
+	// Regular properties
+    in-out property <[string]> tabs;
+    in-out property <int> current-index: 0;
+    in-out property <TabsAlignmentType> tabs-alignement: start;
+    private property <length> underline-x: 0px;
+    private property <length> underline-width: 0px;
+    VerticalLayout {
+        alignment: start;
+        HorizontalLayout {
+            alignment: tabs-alignement == TabsAlignmentType.start ? start : stretch;
+            padding-bottom: UAppTheme.padding-base;
+            for tab[idx] in tabs: ButtonInterface {
+                clicked => {
+                    current-index = idx;
+                    underline-x = self.x;
+                    underline-width = self.width;
+                }
+                border-color: UAppTheme.focus-color;
+                border-width: self.has-tab-focus ? UAppTheme.focus-border-width : 0px;
+                border-radius: UAppTheme.radius-base;
+                VerticalLayout {
+                    HorizontalLayout {
+                        alignment: center;
+                        padding-top: UAppTheme.padding-vertical;
+                        padding-bottom: UAppTheme.padding-vertical;
+                        padding-left: UAppTheme.padding-horizontal;
+                        padding-right: UAppTheme.padding-horizontal;
+                        tab-text := UText {
+                            text: tab;
+                            font-size: UAppTheme.font-size-base;
+                            color: current-index == idx ? UAppTheme.primary.base : UAppTheme.text;
+                            animate color { duration: UAppTheme.animation-duration; }
+                        }
+                    }
+                }
+
+                // Used to initialize the underline-width property.
+				// This is due to a recursion error when trying to get the ButtonInterface's 
+				// width before it being rendered.
+                Timer {
+                    interval: 1ms;
+                    running: current-index == idx;
+                    triggered => {
+                        underline-width = parent.width;
+                        self.running = false;
+                    }
+                }
+
+                states [
+                    pressed when self.pressed: {
+                        tab-text.color: UAppTheme.primary.base;
+                    }
+                    hover when self.has-hover: {
+                        tab-text.color: UAppTheme.primary.hover;
+                    }
+                ]
+            }
+        }
+
+        Rectangle {
+            height: 2px;
+            UDivider { }
+
+            Rectangle {
+                width: underline-width;
+                height: 2px;
+                x: underline-x;
+                background: UAppTheme.primary.base;
+                animate x, width { duration: UAppTheme.animation-duration; }
+            }
+        }
+
+        VerticalLayout {
+            padding-top: UAppTheme.spacing-bigger;
+            @children
+        }
+    }
+}

@@ -1,0 +1,102 @@
+// A simple component used to implement a button-like comportment.
+// This is used to manage clicking with the left mouse button, with 
+// the space and return keys and to manage focus.
+import { UAppTheme } from "../app-theme.slint";
+export component ButtonInterface inherits Rectangle {
+    in-out property <bool> enabled: true;
+    in-out property <MouseCursor> mouse-cursor: pointer;
+	// TouchArea properties
+    out property <bool> has-hover: enabled && touch.has-hover;
+    out property <bool> pressed: enabled && touch.pressed;
+    out property <length> mouse-x <=> touch.mouse-x;
+    out property <length> mouse-y <=> touch.mouse-y;
+    out property <length> pressed-x <=> touch.pressed-x;
+    out property <length> pressed-y <=> touch.pressed-y;
+    // FocusScope properties
+	out property <bool> has-tab-focus: false;
+    out property <bool> has-focus: focus-scope.has-focus;
+    in-out property <bool> focus-on-click <=> focus-scope.focus-on-click;
+    in-out property <bool> focus-on-tab-navigation <=> focus-scope.focus-on-tab-navigation;
+
+    // TouchArea callbacks
+    callback clicked();
+    callback double-clicked();
+    callback moved();
+    callback pointer-event();
+    callback scroll-event() -> EventResult;
+	// FocusScope callbacks
+	callback capture-key-pressed <=> focus-scope.capture-key-pressed;
+    callback capture-key-released <=> focus-scope.capture-key-released;
+    callback key-pressed <=> focus-scope.key-pressed;
+    callback key-released <=> focus-scope.key-released;
+    callback focus-changed-event <=> focus-scope.focus-changed-event;
+    callback focus-gained <=> focus-scope.focus-gained;
+    callback focus-lost <=> focus-scope.focus-lost;
+    public function set-focus() {
+        focus-scope.focus();
+    }
+    public function release-focus() {
+        focus-scope.clear-focus();
+    }
+    animate background, border-color { duration: UAppTheme.animation-duration; }
+    focus-scope := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Space || event.text == Key.Return {
+                root.clicked();
+                accept
+            }
+            if event.text == Key.Escape {
+                self.clear-focus();
+            }
+            reject
+        }
+        focus-changed-event(reason) => {
+            if reason == FocusReason.tab-navigation && self.has-focus {
+                has-tab-focus = true;
+            } else if !self.has-focus {
+                has-tab-focus = false;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: root.enabled || root.mouse-cursor != MouseCursor.pointer ? root.mouse-cursor : not-allowed;
+        clicked => {
+            if root.enabled {
+                if has-tab-focus {
+                    has-tab-focus = false;
+                }
+                focus-scope.focus();
+                root.clicked();
+            }
+        }
+        double-clicked => {
+            if root.enabled {
+                if has-tab-focus {
+                    has-tab-focus = false;
+                }
+                root.double-clicked();
+            }
+        }
+        moved => {
+            if root.enabled {
+                if has-tab-focus {
+                    has-tab-focus = false;
+                }
+                root.moved();
+            }
+        }
+        pointer-event => {
+            if root.enabled {
+                root.pointer-event();
+            }
+        }
+        scroll-event => {
+            if root.enabled {
+                return root.scroll-event();
+            }
+            EventResult.reject
+        }
+    }
+}

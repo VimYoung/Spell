@@ -1,0 +1,265 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export { ComboBoxItem, PopupPosition }
+import { MagicIcon } from "./magic_icon.slint";
+import { MagicText } from "./magic_text.slint";
+import { Icons } from "./icons.slint";
+import { StateLayer } from "./state_layer.slint";
+import { ListView } from "./list_view.slint";
+import {
+    Border,
+    ComboBoxBase,
+    ComboBoxItem,
+    ComboBoxItemStyle,
+    FocusTouchArea,
+    PopupPosition,
+    LayoutStyle,
+    HorizontalLayoutBase
+} from "../foundation.slint";
+import {
+    Palette,
+    BorderSettings,
+    SizeSettings,
+    LayoutSettings,
+    FontSettings,
+    IconSettings
+} from "./styling.slint";
+
+component ComboBoxItemTemplate {
+    in property <ComboBoxItemStyle> style;
+    in property <string> text;
+    in property <bool> selected;
+
+    callback clicked <=> touch_area.clicked;
+
+    min_width: content_layer.min_width;
+    height: max(SizeSettings.control_height, content_layer.min_height);
+
+    touch_area := TouchArea {
+        mouse_cursor: pointer;
+    }
+
+    background_layer := Border {
+        style: root.style.border_style;
+    }
+
+    state_layer := StateLayer {
+        width: 100%;
+        height: 100%;
+        border_radius: root.style.border_style.border_radius;
+        pressed: touch_area.pressed;
+        has_hover: touch_area.has_hover;
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        text_label := MagicText {
+            text: root.text;
+            style: root.style.text_style;
+            horizontal-alignment: left;
+            vertical_alignment: center;
+        }
+    }
+
+    states [
+        selected when root.selected : {
+            background_layer.background: Palette.accent_background;
+            text_label.color: Palette.accent_foreground;
+        }
+    ]
+}
+
+export component ComboBox inherits ComboBoxBase {
+    out property <length> popup_height: root.item_height * 6;
+
+    property <length> item_height: SizeSettings.item_height;
+    property <length> viewport_y;
+    property <int> into_view_item: root.current_index;
+    property <length> into_view_item_y: root.item_y(root.into_view_item);
+
+    min_width: max(SizeSettings.min_text_field_width, content_layer.min_width);
+    min_height: max(SizeSettings.control_height, content_layer.min_height);
+    style: {
+        layout_style: LayoutSettings.text_input_style,
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.foreground,
+        },
+        text_style: FontSettings.body,
+        placeholder_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.placeholder_foreground,
+        },
+        border_style: {
+            border_width: BorderSettings.control_border_width,
+            border_radius: BorderSettings.box_border_radius,
+            border_brush: Palette.border,
+            background: Palette.background
+        },
+        popup_border_style: BorderSettings.popup_border_style,
+        item_style: {
+            border_style: {
+                background: Palette.transparent
+            },
+            text_style: {
+                font_size: FontSettings.body.font_size,
+                font_weight: FontSettings.body.font_weight,
+                foreground: Palette.foreground,
+            },
+            layout_style: {
+                padding_left: LayoutSettings.control_padding,
+                padding_right: LayoutSettings.control_padding,
+            }
+        }
+    };
+    forward_focus: touch_area;
+
+    touch_area := FocusTouchArea {
+        enabled: root.enabled;
+        width: 100%;
+        height: 100%;
+        mouse-cursor: MouseCursor.pointer;
+
+        clicked => {
+            root.focus();
+            popup.show();
+        }
+
+        key_pressed(event) => {
+            if event.text == Key.Escape {
+                popup.close();
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                root.select(root.current_index + 1);
+                return accept;
+            }
+
+            if event.text == Key.UpArrow {
+                root.select(root.current_index - 1);
+                return accept;
+            }
+
+            reject
+        }
+    }
+
+    state_layer := StateLayer {
+        width: 100%;
+        height: 100%;
+        border_radius: root.style.border_style.border_radius;
+        pressed: touch_area.pressed || touch-area.enter_pressed;
+        has_hover: touch_area.has_hover;
+        has_focus: root.enabled && touch_area.has_focus;
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        Rectangle {
+             if root.current_index < 0 : MagicText {
+                width: parent.width;
+                text: root.placeholder_text;
+                style: root.style.placeholder_style;
+                horizontal_alignment: left;
+                vertical_alignment: center;
+            }
+
+            if root.current_index >= 0 : MagicText {
+                width: parent.width;
+                text: root.current_value.text;
+                style: root.style.text_style;
+                horizontal-alignment: left;
+                vertical_alignment: center;
+            }
+        }
+
+        MagicIcon {
+            icon: Icons.arrow_drop_down;
+            style: root.style.icon_style;
+        }
+    }
+
+    popup := PopupWindow {
+        x: -3px;
+        y: root.popup_position == PopupPosition.top
+            ? -root.popup_height + root.height + 3px
+            : -4px;
+        width: root.width + 6px;
+        height: root.popup_height;
+
+        popup_layer := Rectangle {
+            background: root.style.popup_border_style.background;
+            border_radius: root.style.popup_border_style.border_radius;
+            drop_shadow_color: Palette.shadow;
+            drop_shadow_blur: 16px;
+            drop_shadow_offset_y: 4px;
+            clip: true;
+
+            Rectangle {
+                clip: true;
+                border_radius: parent.border_radius;
+
+                list_view := ListView {
+                    viewport_y <=> root.viewport_y;
+
+                    for item[index] in root.model : ComboBoxItemTemplate {
+                        height: root.item_height;
+                        style: root.style.item_style;
+                        text: item.text;
+                        selected: index == root.current_index;
+
+                        clicked => {
+                            root.select(index);
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                border_width: root.style.popup_border_style.border_width;
+                border_color: root.style.popup_border_style.border_brush;
+                border_radius: root.style.popup_border_style.border_radius;
+            }
+        }
+   }
+
+    function select(index: int) {
+        if root.current_index == index {
+            return;
+        }
+
+        root.current_index = min(max(0, index), root.model.length - 1);
+        root.bring_into_view(root.current_index);
+        root.selected(root.current_index);
+    }
+
+    pure function item_y(index: int) -> length {
+        root.viewport_y + index * root.item_height
+    }
+
+    function bring_into_view(index: int) {
+        if index < 0 || index >= root.model.length {
+            return;
+        }
+
+        root.into_view_item = index;
+
+        if root.into_view_item_y < 0 {
+            root.viewport_y += 0 - root.into_view_item_y;
+        }
+
+        if root.into_view_item_y + item_height > root.popup_height {
+            root.viewport_y -= into-view-item_y + item_height - root.popup_height;
+        }
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

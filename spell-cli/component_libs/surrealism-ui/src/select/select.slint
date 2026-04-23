@@ -1,0 +1,145 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230907
+* @version:0.0.1
+* @type:interface
+* @description:
+* # SSelect
+* SSelect is a selector that provides three types of optional input parameter values
+* ## properties inherits SCard
+* - in property <int> item-font-weight : select item font weight
+* - in property <length> item-font-size: select item font size
+* - in property <bool> item-font-italic : select item font
+* - in property <string> item-font-family : select item font
+* - in property <[SOption]> options : select options
+* - in property <string> placeholder : select placeholder
+* - in-out property <bool> is-show : select is show or not
+* ## functions
+* - public function open() : open select
+* - public function close() : close select
+* - public function toggle() : toggle status (if open then close)
+* ## callbacks
+* - callback changed(int,string,string) : run if you choose an item of list
+* ============================================
+*/
+
+import {ROOT_STYLES,DefaultSSelectProps} from "../../themes/index.slint";
+import { SCard } from "../card/index.slint";
+import { SText } from "../text/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { ListView } from "std-widgets.slint";
+import { Themes,UseIcons,UseSurrealismFn,SOption } from "../../use/index.slint";
+
+export component Select inherits SCard {
+  card-width: DefaultSSelectProps.card-width;
+  card-height: DefaultSSelectProps.card-height;
+  theme: DefaultSSelectProps.theme;
+  clip: false;
+  font-family: DefaultSSelectProps.font-family;
+  font-italic: DefaultSSelectProps.font-italic;
+  font-size: DefaultSSelectProps.font-size;
+  font-weight: DefaultSSelectProps.font-weight;
+  padding-type: DefaultSSelectProps.padding-type;
+  shadow-type: DefaultSSelectProps.shadow-type;
+  border-type: DefaultSSelectProps.border-type;
+  in property <int> item-font-weight : DefaultSSelectProps.font-weight;
+  in property <length> item-font-size: DefaultSSelectProps.font-size;
+  in property <bool> item-font-italic : DefaultSSelectProps.font-italic;
+  in property <string> item-font-family : DefaultSSelectProps.font-family;
+  in property <[SOption]> options : DefaultSSelectProps.options;
+  in property <string> placeholder : DefaultSSelectProps.placeholder;
+  in-out property <bool> is-show : DefaultSSelectProps.is-show;
+  in-out property <int> active: -1;
+  out property <bool> has-hover <=> selector.has-hover;
+  out property <bool> expand-hover <=> expand-area.has-hover;
+  callback changed(int, SOption);
+  public function open() {
+    expand.visible=true;
+    select-icon.rotation.rotation-angle = 180deg;
+  }
+  public function close() {
+    expand.visible=false;
+    select-icon.rotation.rotation-angle = 0deg;
+  }
+  public function toggle() {
+    expand.visible=!expand.visible;
+    select-icon.rotation.rotation-angle = expand.visible? 180deg : 0deg;
+  }
+  function is-active() -> bool {
+      return root.active >= 0 && root.active <= options.length - 1;
+  }
+  selector:=TouchArea{
+    HorizontalLayout{
+      padding-left: root.padding-left;
+      padding-right: root.padding-right;
+      select-text:=SText {
+        theme: root.theme;
+        text: is-active() ? root.options[active].label : root.placeholder;
+        font-family: root.font-family;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        font-italic: root.font-italic;
+      }
+      select-icon-view:=Rectangle{
+        width: select-icon.width;
+        select-icon:=SIcon{
+          theme: root.theme;
+          colorize: self.get-colorize();
+          source: UseIcons.icons.Down;
+          rotation: {
+            rotation-angle: root.is-show ? 180deg : 0deg,
+            rotation-origin-x: self.width / 2,
+            rotation-origin-y: self.height / 2
+          };
+          clicked => {
+            selector.clicked();
+          }
+        }
+      }
+    }
+    clicked => {
+      root.toggle();
+    }
+  }
+  expand:= SCard{
+    visible: root.is-show;
+    theme: root.theme;
+    y: parent.height + 6px;
+    card-width: parent.card-width;
+    height: UseSurrealismFn.count-height(root.item-font-size,root.card-padding.padding-top) * 3;
+    expand-area:= TouchArea {
+      mouse-cursor: pointer;
+      height: parent.height;
+      width: parent.width;
+      list:=ListView {
+        padding-top: parent.padding-top;
+        padding-bottom: parent.padding-bottom;
+        for range[index] in root.options : Rectangle{
+          height: area.height;
+          background:area.has-hover?expand.background.brighter(0.1):expand.background;
+          area:=TouchArea{
+            mouse-cursor: pointer;
+            height: list-item.height;
+            clicked => {
+              root.active = index;
+              root.changed(index, range);
+            }
+            list-item:= SText {
+              height: UseSurrealismFn.count-height(root.item-font-size,root.card-padding.padding-top);
+              padding-left: root.padding-left;
+              padding-right: root.padding-right;
+              width: root.width - self.padding-left - self.padding-right;
+              theme: root.theme;
+              text: range.label;
+              font-family: item-font-family;
+              font-size: item-font-size;
+              font-weight: item-font-weight;
+              font-italic: item-font-italic;
+            }
+          }
+        }
+      }
+    }
+  }
+}

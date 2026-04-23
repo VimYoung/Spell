@@ -1,0 +1,121 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230907
+* @version:0.0.1
+* @type:interface
+* @description:
+* # SCard
+* A very simple universal card without any layout or restrictions
+* you can add anything you want to the card
+* ## properties inherits Rectangle
+* - in property <Themes> theme : Surrealism theme;
+* - in property <length> card-height: card height (not contain padding);
+* - in property <length> card-width: card width (not contain padding);
+* - in property <PaddingType> padding-type : padding type;
+* - in property <ShadowType> shadow-type : shadow type;
+* - in property <BorderType> border-type : border type;
+* - in property <int> font-weight : font weight;
+* - in property <length> font-size: font size;
+* - in property <brush> font-color : font color;
+* - in property <bool> font-italic : font italic;
+* - in property <string> font-family : font family;
+* - in-out property <PaddingProps> card-padding : inner card padding struct;
+* - in-out property <BorderProps> card-border : inner card border struct;
+* - in-out property <ShadowProps> card-shadow : inner card shadow struct;
+* ============================================
+*/
+
+
+import {ROOT_STYLES,DefaultSCardProps} from "../../themes/index.slint";
+import {Themes,PaddingType,ShadowType,BorderType,UseSurrealismFn,PaddingProps,BorderProps,ShadowProps} from "../../use/index.slint";
+
+
+export component Card inherits Rectangle{
+  in property <Themes> theme : DefaultSCardProps.theme;
+  in property <length> card-height: DefaultSCardProps.card-height;
+  in property <length> card-width: DefaultSCardProps.card-width;
+  in property <PaddingType> padding-type : DefaultSCardProps.padding-type;
+  in property <ShadowType> shadow-type : DefaultSCardProps.shadow-type;
+  in property <BorderType> border-type : DefaultSCardProps.border-type;
+  in property <int> font-weight : DefaultSCardProps.font-weight;
+  in property <length> font-size: DefaultSCardProps.font-size;
+  in property <brush> font-color : DefaultSCardProps.font-color;
+  in property <bool> font-italic : DefaultSCardProps.font-italic;
+  in property <string> font-family : DefaultSCardProps.font-family;
+  in-out property <PaddingProps> card-padding : UseSurrealismFn.get-padding(padding-type);
+  in-out property <BorderProps> card-border : UseSurrealismFn.get-border(border-type);
+  in-out property <ShadowProps> card-shadow : UseSurrealismFn.get-shadow(shadow-type);
+  height : UseSurrealismFn.count-height(self.card-height,self.padding-top);
+  width : UseSurrealismFn.count-width(self.card-width,self.padding-left);
+  border-width : self.card-border.border-width;
+  border-radius : self.card-border.border-radius;
+  padding-top : self.card-padding.padding-top;
+  padding-bottom : self.card-padding.padding-bottom;
+  padding-left : self.card-padding.padding-left;
+  padding-right : self.card-padding.padding-right;
+  drop-shadow-blur : card-shadow.blur;
+  drop-shadow-offset-x : card-shadow.x;
+  drop-shadow-offset-y : card-shadow.y;
+  clip: DefaultSCardProps.clip;
+  states [
+    light when theme == Themes.Light: {
+      root.background : ROOT-STYLES.sur-theme-colors.light.normal;
+      root.border-color : ROOT-STYLES.sur-theme-colors.light.normal;
+      root.drop-shadow-color : ROOT-STYLES.sur-theme-colors.light.deepest;
+    }
+    primary when theme == Themes.Primary: {
+      root.background : ROOT-STYLES.sur-theme-colors.primary.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.primary.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.primary.normal;
+    }
+    success when theme == Themes.Success: {
+      root.background : ROOT-STYLES.sur-theme-colors.success.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.success.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.success.normal;
+    }
+    info when theme == Themes.Info: {
+      root.background : ROOT-STYLES.sur-theme-colors.info.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.info.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.info.normal;
+    }
+    warning when theme == Themes.Warning: {
+      root.background : ROOT-STYLES.sur-theme-colors.warning.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.warning.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.warning.normal;
+    }
+    error when theme == Themes.Error: {
+      root.background : ROOT-STYLES.sur-theme-colors.error.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.error.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.error.normal;
+    }
+    dark when theme == Themes.Dark: {
+      root.background : ROOT-STYLES.sur-theme-colors.dark.normal;
+      root.drop-shadow-color: ROOT-STYLES.sur-theme-colors.dark.deepest;
+      root.border-color : ROOT-STYLES.sur-theme-colors.dark.normal;
+    }
+  ]
+  
+  // animation
+  animate background {
+    duration: ROOT-STYLES.sur-an-duration;
+    easing: ROOT-STYLES.sur-an-easing;
+  }
+  animate height {
+    duration: ROOT-STYLES.sur-an-duration;
+    easing: ROOT-STYLES.sur-an-easing;
+  }
+  animate width {
+    duration: ROOT-STYLES.sur-an-duration;
+    easing: ROOT-STYLES.sur-an-easing;
+  }
+  animate border-color {
+    duration: ROOT-STYLES.sur-an-duration;
+    easing: ROOT-STYLES.sur-an-easing;
+  }
+  animate drop-shadow-color {
+    duration: ROOT-STYLES.sur-an-duration;
+    easing: ROOT-STYLES.sur-an-easing;
+  }
+  @children
+}

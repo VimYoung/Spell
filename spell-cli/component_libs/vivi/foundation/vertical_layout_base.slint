@@ -1,0 +1,22 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export struct LayoutStyle {
+    padding_left: length,
+    padding_right: length,
+    padding_top: length,
+    padding_bottom: length,
+    spacing: length,
+    alignment: LayoutAlignment,
+}
+
+export component VerticalLayoutBase inherits VerticalLayout {
+    in property <LayoutStyle> style;
+
+    padding_left: root.padding > 0 ? root.padding : root.style.padding_left;
+    padding_right: root.padding > 0 ? root.padding : root.style.padding_right;
+    padding_top: root.padding > 0 ? root.padding : root.style.padding_top;
+    padding_bottom: root.padding > 0 ? root.padding : root.style.padding_bottom;
+    spacing: root.style.spacing;
+    alignment: root.style.alignment;
+}

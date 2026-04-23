@@ -1,0 +1,77 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { ButtonStyle } from "../foundation.slint";
+import { ButtonAction } from "./magic_button_base.slint";
+import { OutlineButton } from "./outline_button.slint";
+import { Palette, FontSettings, IconSettings, SizeSettings, LayoutSettings, BorderSettings } from "./styling.slint";
+
+export component TextButton inherits OutlineButton {
+    in property <ButtonAction> action;
+
+    property <ButtonStyle> default_style: {
+        border_style: {
+            border_radius: BorderSettings.control_border_radius,
+        },
+        text_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.foreground,
+        },
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.foreground,
+        },
+        layout_style: {
+            padding_left: LayoutSettings.control_padding,
+            padding_right: LayoutSettings.control_padding,
+            spacing: LayoutSettings.control_spacing,
+            alignment: LayoutAlignment.center,
+        }
+    };
+
+    property <ButtonStyle> primary_style: {
+        border_style: {
+            border_radius: BorderSettings.control_border_radius,
+        },
+        text_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.accent_background,
+        },
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.accent_background,
+        },
+        layout_style: {
+            padding_left: LayoutSettings.control_padding,
+            padding_right: LayoutSettings.control_padding,
+            spacing: LayoutSettings.control_spacing,
+            alignment: LayoutAlignment.center,
+        }
+    };
+
+    property <ButtonStyle> destructive_style: {
+        border_style: {
+            border_radius: BorderSettings.control_border_radius,
+        },
+        text_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.destructive_background,
+        },
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.destructive_background,
+        },
+        layout_style: {
+            padding_left: LayoutSettings.control_padding,
+            padding_right: LayoutSettings.control_padding,
+            spacing: LayoutSettings.control_spacing,
+            alignment: LayoutAlignment.center,
+        }
+    };
+
+    style: root.action == ButtonAction.default ? root.default_style :
+        root.action == ButtonAction.primary ? root.primary_style : root.destructive_style;
+}

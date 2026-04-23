@@ -1,0 +1,153 @@
+import { UAppTheme } from "../app-theme.slint";
+
+import { ButtonInterface } from "button-interface.slint";
+
+import { UPopover } from "popover.slint";
+import { UText } from "text.slint";
+import { UIcon } from "icon.slint";
+import { UScrollView } from "scrollview.slint";
+import { UOptionData } from "../structs/data-structs.slint";
+
+
+export component USelect inherits ButtonInterface {
+	// Accessability properties
+	accessible-role: combobox;
+    accessible-expandable: true;
+    accessible-value: self.selected-text;
+    accessible-item-count: self.options.length;
+    accessible-action-default => {
+        self.clicked();
+    }
+	// Regular properties
+    in-out property <int> current-index: -1;
+    in-out property <[UOptionData]> options;
+    out property <string> selected-text;
+    out property <string> selected-value;
+    private property <length> popup-max-height: 124px;
+    private property <length> option-height: 29px;
+    private property <length> full-options-height: option-height * options.length + UAppTheme.padding-base * 2;
+    callback selected-changed(new-index: int);
+    background: UAppTheme.bg-elevated;
+    border-width: self.has-tab-focus ? UAppTheme.focus-border-width : UAppTheme.border-width-base;
+    border-color: self.has-tab-focus ? UAppTheme.focus-color : UAppTheme.border;
+    border-radius: UAppTheme.radius-base;
+    preferred-width: 150px;
+    clicked => {
+        popup.show();
+    }
+    HorizontalLayout {
+        alignment: space-between;
+        spacing: UAppTheme.spacing-base;
+        padding-top: UAppTheme.padding-vertical;
+        padding-bottom: UAppTheme.padding-vertical;
+        padding-left: UAppTheme.padding-horizontal;
+        padding-right: UAppTheme.padding-horizontal / 2;
+        VerticalLayout {
+            alignment: center;
+            text-obj := UText {
+                text: current-index != -1 ? options[current-index].text : "";
+                overflow: elide;
+                font-size: UAppTheme.font-size-base;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            UIcon {
+                source: @image-url("../assets/icons/chevron-up-down.svg");
+                size: UAppTheme.icon-size-base;
+                colorize: UAppTheme.text-secondary;
+                states [
+                    disabled when !root.enabled: {
+                        colorize: UAppTheme.text-disabled;
+                    }
+                ]
+            }
+        }
+    }
+
+    popup := UPopover {
+        private property <length> y-current-option;
+        close-policy: close-on-click-outside;
+        width: root.width;
+        height: root.full-options-height > popup-max-height ? popup-max-height : root.full-options-height;
+        y: root.height + 1px;
+        inner-scrollview := UScrollView {
+            height: parent.height;
+            init => {
+                self.scroll-y-to(y-current-option + self.height / 2 - option-height / 2);
+            }
+            list-contents := VerticalLayout {
+                padding: UAppTheme.padding-base;
+                for option[index] in root.options: select-item := Rectangle {
+					// List item accessability
+					accessible-role: list-item;
+                    accessible-item-selectable: true;
+                    accessible-item-selected: options[current-index].value == option.value;
+                    accessible-value: option.text;
+                    accessible-action-default => {
+                        touch.clicked();
+                    }
+					// Item contents and properties.
+					height: option-height;
+                    border-radius: UAppTheme.radius-base;
+                    width: 100%;
+                    init => {
+                        if index == current-index {
+                            y-current-option = -self.y;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        padding-left: UAppTheme.padding-horizontal;
+                        padding-right: UAppTheme.padding-horizontal;
+                        UText {
+                            text: option.text;
+                            font-size: UAppTheme.font-size-base;
+                            overflow: elide;
+                            wrap: no-wrap;
+                            states [
+                                disabled when !option.enabled: {
+                                    color: UAppTheme.text-disabled;
+                                }
+                            ]
+                        }
+                    }
+
+                    touch := TouchArea {
+                        enabled: option.enabled;
+                        mouse-cursor: pointer;
+                        clicked => {
+                            current-index = index;
+                            selected-text = option.text;
+                            selected-value = option.value;
+                            selected-changed(index);
+                            popup.close();
+                        }
+                    }
+
+                    animate background { duration: UAppTheme.animation-duration; }
+                    states [
+                        selected when options[current-index].value == option.value && option.enabled: {
+                            background: UAppTheme.primary.base.with-alpha(0.2);
+                        }
+                        hover when touch.has-hover && option.enabled: {
+                            background: UAppTheme.color-fill-tertiary;
+                        }
+                    ]
+                }
+            }
+        }
+    }
+
+    states [
+        disabled when !self.enabled: {
+            background: UAppTheme.bg-elevated.with-alpha(0.4);
+            border-color: UAppTheme.border-secondary;
+            text-obj.color: UAppTheme.text-disabled;
+        }
+        hover when self.has-hover: {
+            border-color: self.has-tab-focus ? black : UAppTheme.primary.hover;
+        }
+    ]
+}

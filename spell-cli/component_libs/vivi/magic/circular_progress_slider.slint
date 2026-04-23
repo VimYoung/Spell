@@ -1,0 +1,125 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { MagicProgressSliderBase, DragHandle } from "./magic_progress_slider_base.slint";
+import { AnimationSettings, SizeSettings } from "styling.slint";
+
+export component CircularProgressSlider inherits MagicProgressSliderBase {
+    property <length> bar_padding: (root.style.handle_size - root.style.bar_height) / 2;
+    property <length> center: root.height / 2 - root.style.handle_size / 2;
+    property <length> radius: root.center;
+    property <angle> rotation: 90deg;
+    property <angle> value_angle: clamp(root.progress * 1turn, 0, 0.9999turn) - root.rotation;
+    property <length> value_x: root.center + (root.radius / 1px * cos(root.value_angle)) * 1px;
+    property <length> value_y: root.center + (root.radius / 1px * sin(root.value_angle)) * 1px;
+    property <angle> let_angle;
+
+    width: self.height;
+    min_height: 2 * SizeSettings.control_height;
+
+    background_layer := Rectangle {
+        width: root.width - 2 * root.bar_padding;
+        height: root.height - 2 * root.bar_padding;
+        border_width: root.style.bar_height;
+        border_color: root.progress == 1 ? root.style.track_background : root.style.background;
+        border_radius: max(self.width, self.height) / 2;
+    }
+
+    track := Path {
+        property <float> radius: min(self.viewbox_width, self.viewbox_height) / 2;
+        property <float> start_x: self.viewbox_width / 2;
+        property <float> start_y: self.viewbox_height / 2;
+        property <float> inner_radius: self.radius - (root.style.bar_height * (self.viewbox_height / self.height));
+        property <float> start: !root.indeterminate ? 0 : 1 * mod(animation-tick(), 1.5s) / 1.5s;
+        property <float> progress: !root.indeterminate ? root.progress : 0.5;
+
+        x: background_layer.x;
+        y: background_layer.y;
+        viewbox_width: 100;
+        viewbox_height: 100;
+        width: background_layer.width;
+        height: background_layer.height;
+        fill: root.style.track_background;
+        visible: self.progress > 0 && self.progress < 1;
+
+        MoveTo {
+            x: !root.indeterminate ? track.start_x : track.start_x - track.radius * sin(-track.start * 360deg);
+            y: !root.indeterminate ? 0 : track.start_y - track.radius * cos(-track.start * 360deg);
+        }
+
+        ArcTo {
+            radius_x: 1;
+            radius_y: 1;
+            x: !root.indeterminate ? track.start_x : track.start_x - track.inner-radius * sin(-track.start * 360deg);
+            y: !root.indeterminate ? root.style.bar_height * (track.viewbox_height / track.height) : track.start_y - track.inner_radius * cos(-track.start * 360deg);
+        }
+
+        ArcTo {
+            radius_x: track.inner_radius;
+            radius_y: track.inner_radius;
+            x: start_x - track.inner_radius * sin(-(track.start + track.progress) * 360deg);
+            y: start_y - track.inner_radius * cos(-(track.start + track.progress) * 360deg);
+            sweep: track.progress > 0;
+            large-arc: track.progress > 0.5;
+        }
+
+        ArcTo {
+            radius_x: 1;
+            radius_y: 1;
+            x: start_x - radius * sin(-(track.start + track.progress) * 360deg);
+            y: start_y - radius * cos(-(track.start + track.progress) * 360deg);
+        }
+
+        ArcTo {
+            radius_x: radius;
+            radius_y: radius;
+            x: start_x - radius * sin(-track.start * 360deg);
+            y: start_y - radius * cos(-track.start * 360deg);
+            sweep: track.progress < 0;
+            large-arc: track.progress > 0.5;
+        }
+
+        LineTo {
+            x: start_x - radius * sin(-track.start * 360deg);
+            y: start_y - radius * cos(-track.start * 360deg);
+        }
+
+        animate fill { duration: AnimationSettings.color_duration; }
+    }
+
+    DragHandle {
+        property <float> let_new_value;
+
+        x: root.value_x;
+        y: root.value_y;
+        height: root.style.handle_size;
+        background: root.style.handle_background;
+        enabled: false;
+        has_focus: root.has_focus;
+        opacity: 0;
+
+         moved => {
+            self.let_new_value = (root.pos_to_angle(self.y + self.mouse_y, root.height / 2, self.x + self.mouse_x, root.width / 2) / 360deg * root.range) + root.minimum;
+            root.set_value(self.let_new_value);
+        }
+
+        states [
+            active when root.interactive && !root.indeterminate : {
+                enabled: root.enabled;
+                opacity: 1;
+            }
+        ]
+
+        animate opacity { duration: AnimationSettings.fast_resize_duration; }
+    }
+
+    function pos_to_angle(y: length, y_center: length, x: length, x_center: length) -> angle {
+        self.let_angle = atan((y - y_center) / (x - x_center));
+
+        if x >= x_center {
+            return self.let_angle + 90deg;
+        }
+
+        self.let_angle + 270deg
+    }
+}

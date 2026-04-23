@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export struct BorderStyle {
+    background: brush,
+    border_brush: brush,
+    border_radius: length,
+    border_width: length,
+}
+
+export component Border inherits Rectangle {
+    in property <BorderStyle> style;
+
+    background: root.style.background;
+    border_color: root.style.border_brush;
+    border_radius: root.style.border_radius;
+    border_width: root.style.border_width;
+}

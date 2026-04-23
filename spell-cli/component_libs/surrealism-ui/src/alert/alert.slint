@@ -1,0 +1,174 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20231018
+* @version:0.3.0
+* @type:interface
+* @description:
+* # SAlert
+* SAlert is used to display important prompt information on the page
+* ## properties
+* - in property <int> font-weight :font weight;
+* - in property <length> font-size: font size;
+* - in property <brush> font-color : font color;
+* - in property <bool> font-italic : font italic;
+* - in property <string> font-family : font family;
+* - in property <TextOverflow> overflow : text overflow;
+* - in property <length> spacing : spacing among icons and text in alert;
+* - in-out property <string> text : display text in alert;
+* - in-out property <bool> is-show : is alert show or not;
+* - in property <length> alert-height : alert height;
+* - in-out property <ResultType> result-type: the result type of the alert;
+* - in property <image> close-icon : close icon;
+* - in property <length> icon-size : icon size;
+* ## functions
+* - public function open() : open alert
+* - public function close() : close alert
+* - public function success(text:string) : open success alert
+* - public function warning(text:string) : open warning alert
+* - public function error(text:string) : open error alert
+* - public function info(text:string) : open info alert
+* - public function help(text:string) : open help alert
+* - public function primary(text:string) : open primary alert 
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { SText } from "../text/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { DefaultSAlertProps } from "../../themes/index.slint";
+import { Themes,ResultType,UseIcons } from "../../use/index.slint";
+export component Alert inherits Window{
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+  always-on-top:true;
+  opacity: 1;
+  visible: is-show;
+  z: 1111;
+  in property <int> font-weight : DefaultSAlertProps.font-weight;
+  in property <length> font-size: DefaultSAlertProps.font-size;
+  in property <brush> font-color <=> content-text.color;
+  in property <bool> font-italic : DefaultSAlertProps.font-italic;
+  in property <string> font-family : DefaultSAlertProps.font-family;
+  in property <TextOverflow> overflow : DefaultSAlertProps.overflow;
+  in property <length> spacing : DefaultSAlertProps.spacing;
+  in-out property <string> text : DefaultSAlertProps.text;
+  in-out property <bool> is-show : DefaultSAlertProps.is-show;
+  in property <length> alert-height : DefaultSAlertProps.alert-height;
+  in-out property <ResultType> result-type: DefaultSAlertProps.result-type;
+  in property <image> close-icon : DefaultSAlertProps.close-icon;
+  in property <length> icon-size : DefaultSAlertProps.icon-size;
+  private property <Themes> theme : Success;
+  public function open() {
+      root.is-show = true;
+  }
+  public function close() {
+    root.is-show = false;
+  }
+  public function success(text:string) {
+    root.result-type = ResultType.Success;
+    root.text = text;
+    root.open(); 
+  }
+  public function warning(text:string) {
+    root.result-type = ResultType.Warning;
+    root.text = text;
+    root.open(); 
+  }
+  public function error(text:string) {
+    root.result-type = ResultType.Error;
+    root.text = text;
+    root.open(); 
+  }
+  public function info(text:string) {
+    root.result-type = ResultType.Info;
+    root.text = text;
+    root.open(); 
+  }
+  public function help(text:string) {
+    root.result-type = ResultType.Help;
+    root.text = text;
+    root.open(); 
+  }
+  public function primary(text:string) {
+    root.result-type = ResultType.Primary;
+    root.text = text;
+    root.open(); 
+  }
+  
+  states [
+    primary when result-type==ResultType.Primary: {
+      root.theme : Themes.Primary;
+      root.icon : UseIcons.icons.Smiling-face;
+    }
+    success when result-type==ResultType.Success: {
+      root.theme : Themes.Success;
+      root.icon : UseIcons.icons.Success;
+    }
+    info when result-type==ResultType.Info: {
+      root.theme : Themes.Info;
+      root.icon : UseIcons.icons.Info;
+    }
+    warning when result-type==ResultType.Warning: {
+      root.theme : Themes.Warning;
+      root.icon : UseIcons.icons.Attention;
+    }
+    error when result-type==ResultType.Error: {
+      root.theme : Themes.Error;
+      root.icon : UseIcons.icons.Close-one;
+    }
+    help when result-type==ResultType.Help: {
+      root.theme : Themes.Light;
+      root.icon : UseIcons.icons.Help;
+    }
+  ]
+  alert:=SCard { 
+    y: 6px;
+    clip: true;
+    card-width: parent.width * 0.8;
+    card-height: root.alert-height;
+    theme: root.theme;
+    layuot := HorizontalLayout {
+      padding-left: root.spacing;
+      spacing: root.spacing;
+      padding-right: root.spacing;
+      Rectangle {
+        width: type-icon.width;
+        type-icon:=SIcon {
+          theme: root.theme;
+          colorize: self.get-colorize();
+          source: root.icon;
+          height: root.icon-size;
+          width: root.icon-size;
+        }
+      }
+      content-text:=SText {
+        theme: root.theme;
+        text: root.text;
+        font-family: root.font-family;
+        font-size: root.font-size;
+        font-italic: root.font-italic;
+        font-weight: root.font-weight;
+        overflow: root.overflow;
+      }
+      Rectangle {
+        width: close-icon.width;
+        close-icon:=SIcon {
+          theme: root.theme;
+          colorize: self.get-colorize();
+          source: root.close-icon;
+          height: root.icon-size;
+          width: root.icon-size;
+          clicked => {
+            root.close()
+          }
+        }
+      }
+    }
+  }
+}

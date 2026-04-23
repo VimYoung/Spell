@@ -1,0 +1,146 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { TextInputBaste, HorizontalLayoutBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { MagicText } from "./magic_text.slint";
+import {
+    Palette,
+    BorderSettings,
+    SizeSettings,
+    LayoutSettings,
+    FontSettings,
+    IconSettings
+} from "./styling.slint";
+
+export component TextField inherits TextInputBaste {
+    out property <bool> has_focus: input.has_focus;
+    in property <image> prefix_icon;
+    in property <InputType> input_type <=> input.input_type;
+    in property <bool> read_only <=> input.read-only;
+    in property <TextHorizontalAlignment> horizontal_alignment <=> input.horizontal_alignment;
+
+    min_width: max(SizeSettings.min_text_field_width, content_layer.min_width);
+    min_height: max(SizeSettings.control_height, content_layer.min_height);
+    style: {
+        layout_style: LayoutSettings.text_input_style,
+        selection_background: Palette.selection_background,
+        selection_foreground: Palette.foreground,
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.foreground,
+        },
+        text_style: FontSettings.body,
+        placeholder_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.placeholder_foreground,
+        },
+        border_style: {
+            border_width: BorderSettings.control_border_width,
+            border_radius: BorderSettings.box_border_radius,
+            border_brush: Palette.border,
+            background: Palette.background
+        }
+    };
+
+    accessible_role: text_input;
+    accessible_value <=> root.text;
+    accessible_placeholder_text: root.text == "" ? root.placeholder_text : "";
+    accessible_action_set_value(v) => { root.text = v; root.edited(v); }
+    forward_focus: input;
+
+    StateLayer {
+        width: 100%;
+        height: 100%;
+        border_radius: root.style.border_style.border_radius;
+        has_focus: root.enabled && root.has_focus;
+        has_error: root.enabled && root.has_error;
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        if root.prefix_icon.width > 0 && root.prefix_icon.height > 0 : MagicIcon {
+            icon: root.prefix_icon;
+            style: root.style.icon_style;
+            horizontal_stretch: 0;
+        }
+
+        Rectangle {
+            clip: true;
+
+            if root.text == "" && root.placeholder_text != "" : MagicText {
+                x: 0;
+                text: root.placeholder_text;
+                style: root.style.placeholder_style;
+                vertical_alignment: center;
+                horizontal-alignment: left;
+            }
+
+            input := TextInput {
+                property <length> computed_x;
+
+                x: min(0px, max(parent.width - self.width - self.text_cursor_width, self.computed_x));
+                width: max(parent.width - self.text_cursor_width, self.preferred_width);
+                enabled: root.enabled;
+                text <=> root.text;
+                font_size: root.style.text_style.font_size;
+                font_weight: root.style.text_style.font_weight;
+                vertical_alignment: center;
+                color: root.style.text_style.foreground;
+                selection_background_color: root.style.selection_background;
+                selection_foreground_color: root.style.selection_foreground;
+                single_line: true;
+
+                cursor-position-changed(cpos) => {
+                    if cpos.x + self.computed_x < 0 {
+                        self.computed_x = - cpos.x;
+                    } else if cpos.x + self.computed_x > parent.width - self.text_cursor_width {
+                        self.computed_x = parent.width - cpos.x - self.text_cursor_width;
+                    }
+                }
+
+                accepted => {
+                    root.accepted(self.text);
+                }
+                edited => {
+                    root.edited(self.text);
+                }
+            }
+        }
+
+        @children
+    }
+
+    public function set_selection_offsets(start: int, end: int) {
+        input.set_selection_offsets(start, end);
+    }
+
+    public function select_all() {
+        input.select_all();
+    }
+
+    public function clear_selection() {
+        input.clear_selection();
+    }
+
+    public function cut() {
+        input.cut();
+    }
+
+    public function copy() {
+        input.copy();
+    }
+
+    public function paste() {
+        input.paste();
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

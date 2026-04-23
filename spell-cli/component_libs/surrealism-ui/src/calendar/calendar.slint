@@ -1,0 +1,232 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20240418
+* @version:0.4.3
+* @type:interface
+* @description:
+* # Calendar
+* A calendar component that inherits from SCard. It is designed to display a month view with the ability to navigate and select dates.
+* ## Properties
+* - in-out property <SDate> today: Represents today's date.
+* - in property <bool> bg-visible: Linked with the visibility of the background (`bg.visible`).
+* - in-out property <SDate> active-date: Currently active date, synchronized with today's date by default.
+* - in-out property <SDate> current-date: The date currently displayed on the calendar, also synchronized with today's date by default.
+* - in-out property <[string]> months: List of month names, default values fetched from `DefaultSCalendarProps.months`.
+* - in-out property <[string]> weekdays: List of weekday names, default values fetched from `DefaultSCalendarProps.weekdays`.
+* 
+* ## Functions
+* - pure function fmt(v: int): Formats a given integer to a string, adding a leading zero if the integer is less than 10.
+* - pure function get-line-length(index: int): Calculates the number of days to display in a given week row of the calendar view.
+* - pure function get-day(item: int, index: int): Calculates the actual day number to be displayed for a given position in the calendar.
+* - pure function get-line-num(): Computes the total number of lines (weeks) required to display the current month in the calendar view.
+* - function update(): Updates the leap year status, the number of days in the current month, and adjusts the weekdays for start and end of the month based on any change in the current date.
+* 
+* ## Callbacks
+* - callback up(SDate): Triggered when the user navigates to the previous month or year.
+* - callback down(SDate): Triggered when the user navigates to the next month or year.
+* - callback change(SDate): Called when a new date is selected or changed in the calendar.
+* ============================================
+*/
+import { SText } from "../text/index.slint";
+import { SCard } from "../card/index.slint";
+import { UseSurrealismFn, UseIcons, ColorLevel, SDate } from "../../use/index.slint";
+import {ROOT-STYLES,DefaultSCalendarProps} from "../../themes/index.slint";
+import { SIcon } from "../icon/index.slint";
+
+export component Calendar inherits SCard {
+    width: 300px;
+    height: 320px;
+    in-out property <SDate> today : {
+        year: 2024,
+        month: 4,
+        day: 15,
+    };
+    // zeller algorithm
+    // https://en.wikipedia.org/wiki/Zeller%27s_congruence
+    in property <bool> bg-visible <=> bg.visible;
+    in-out property <SDate> active-date: today;
+    in-out property <SDate> current-date: today;
+    in-out property <[string]> months: DefaultSCalendarProps.months;
+    in-out property <[string]> weekdays : DefaultSCalendarProps.weekdays;
+    private property <int> is_leap_year: UseSurrealismFn.is-leap-year(self.today.year) ? 1 : 0;
+    private property <[int]> days_in_month : [31, 28 + self.is_leap_year, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    private property <int> current-weekday : UseSurrealismFn.get-weekday(self.today.year, self.today.month, self.today.day);
+    private property <int> current-month-days: root.days_in_month[today.month - 1];
+    private property <int> end-day: UseSurrealismFn.get-weekday(self.today.year, self.today.month, current-month-days);
+    private property <int> start-day: UseSurrealismFn.get-weekday(self.today.year, self.today.month, 1);
+    
+    pure function fmt(v: int)-> string {
+        if v < 10 {
+            return "0" + v;
+        }
+        return v;
+    }
+    pure function get-line-length(index: int) -> int{
+        if index == 0 {
+            return 7 - root.start-day;
+        }
+       
+        return ((current-month-days - (7 - root.start-day)) / 7 / index) >= 1 ? 7 : (end-day + 1);
+    }
+    pure function get-day(item: int, index:int) -> int {
+        return ((item + 1) + index * 7) - (index == 0 ? 0 : root.start-day);
+    }
+    pure function get-line-num() -> int {
+        return ceil((root.current-month-days + root.start-day ) / 7);
+    }
+    function update() {
+        root.is_leap_year = UseSurrealismFn.is-leap-year(self.current-date.year) ? 1 : 0;
+        root.current-weekday = UseSurrealismFn.get-weekday(root.current-date.year, self.current-date.month, self.current-date.day);
+        root.current-month-days = root.days_in_month[current-date.month - 1];
+        root.end-day = UseSurrealismFn.get-weekday(self.current-date.year, self.current-date.month, current-month-days);
+        root.start-day = UseSurrealismFn.get-weekday(self.current-date.year, self.current-date.month, 1);
+    }
+    callback up(SDate);
+    callback down(SDate);
+    callback change(SDate);
+    bg:= SText{
+        visible: false;
+        theme: root.theme;
+        font-weight: 700;
+        font-size: root.width / 2.8;
+        text: @tr("{}", root.current-date.year);
+        
+    }
+    VerticalLayout {
+        padding: 12px;
+        header:= HorizontalLayout{
+
+            alignment: space-between;
+            height: root.font-size * 3;
+            Rectangle {
+                SText {
+                    theme: root.theme;
+                    font-weight: 700;
+                    font-size: root.font-size * 1.5;
+                    color: ROOT-STYLES.radio-active;
+                    text: @tr("{}", root.current-date.year);
+                }
+            }
+            Rectangle {
+                SText {
+                    font-size: root.font-size * 0.9;
+                    theme: root.theme;
+                    horizontal-alignment: center;
+                    text: @tr("{}\n{}", months[root.current-date.month - 1], fmt(root.current-date.day));
+                }
+            }
+        }
+        body:= VerticalLayout{
+            up-wrap:= Rectangle {
+                height: 30px;
+                background: up-area.has-hover ? ROOT-STYLES.radio-active : UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+                animate background {
+                    duration:ROOT-STYLES.sur-an-duration;
+                    easing: ROOT-STYLES.sur-an-easing;
+                }
+                up-area:= TouchArea {
+                    z:111;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        current-date.day = 1;
+                        current-date.month = current-date.month - 1;
+                        if current-date.month < 1 {
+                            current-date.month = 12;
+                            current-date.year = current-date.year - 1;
+                        }
+                        
+                        root.update();
+                        root.up(current-date);
+                    }
+                    
+                }
+                SIcon {
+                    theme: root.theme;
+                    colorize: self.get-colorize();
+                    z: 1;
+                    source: UseIcons.icons.Up;
+                }
+            }
+            week-layout:=HorizontalLayout {
+                for weakItem in root.weekdays : Rectangle {
+                    width: parent.width / 7;
+                    SText {
+                        wrap: no-wrap;
+                        theme: root.theme;
+                        text: weakItem;
+                        font-size: 16px;
+                        font-weight: 700;
+                    }
+                }
+            }
+            for item[index] in root.get-line-num() : HorizontalLayout{
+                if index == 0: Rectangle {
+                    width: parent.width / 7 * root.start-day;
+                }
+                for wItem[wIndex] in get-line-length(index) : Rectangle{
+                    width: parent.width / 7;
+                    SCard {
+                        private property <bool> is-today: get-day(wItem, index) == root.today.day && root.today.year == root.current-date.year && root.today.month == root.current-date.month;
+                        in-out property <bool> is-active : root.active-date.day == get-day(wItem, index) && root.active-date.year == root.current-date.year && root.active-date.month == root.current-date.month;
+                        theme: root.theme;
+                        width: inner-text.font-size * 2;
+                        height: inner-text.font-size * 2;
+                        border-radius: self.height / 2;
+                        background: is-today ? ROOT-STYLES.radio-active : UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+                        border-color: is-active ? ROOT-STYLES.radio-active : UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+                        area:= TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.active-date.year = root.current-date.year;
+                                root.active-date.month = root.current-date.month;
+                                root.current-date.day = get-day(wItem, index);
+                                root.active-date.day = root.current-date.day;
+                                root.change(active-date);
+                            }
+                            inner-text:= SText {
+                                theme: root.theme;
+                                text: get-day(wItem, index);
+                                font-weight: 700;
+                                font-size: root.font-size;
+                                font-family: root.font-family;
+                                font-italic: root.font-italic;
+                            }
+                        }
+                    }
+                }
+            }
+            down-wrap:= Rectangle {
+                height: 30px;
+                background: down-area.has-hover ? ROOT-STYLES.radio-active : UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+                animate background {
+                    duration:ROOT-STYLES.sur-an-duration;
+                    easing: ROOT-STYLES.sur-an-easing;
+                }
+                down-area:= TouchArea {
+                    z:111;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        current-date.day = 1;
+                        current-date.month = current-date.month + 1;
+                        if current-date.month > 12 {
+                            current-date.month = 1;
+                            current-date.year = current-date.year + 1;
+                        }
+                        root.update();
+                        root.down(current-date);
+                    }
+                    
+                }
+                SIcon {
+                    theme: root.theme;
+                    colorize: self.get-colorize();
+                    z: 1;
+                    source: UseIcons.icons.Down;
+                }
+            }    
+        }
+        
+    }
+}
+

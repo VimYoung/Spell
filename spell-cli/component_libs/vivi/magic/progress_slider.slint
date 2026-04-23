@@ -1,0 +1,68 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { SizeSettings, AnimationSettings } from "./styling.slint";
+import { MagicProgressSliderBase, DragHandle } from "./magic_progress_slider_base.slint";
+import { StyleMetrics } from "std-widgets.slint";
+
+export component ProgressSlider inherits MagicProgressSliderBase {
+    property <length> value_x: root.progress * root.width;
+
+    min_height: root.style.handle_size;
+
+    background_layer := Rectangle {
+        x: 0;
+        width: 100%;
+        height: root.style.bar_height;
+        background: root.progress == 1 ? root.style.track_background : root.style.background;
+        border_radius: root.style.border_radius;
+        clip: true;
+
+        track := Rectangle {
+            x: !root.indeterminate ? 0 : -root.width / 2 + 1.5 * root.width * mod(animation-tick(), 1.5s) / 1.5s;
+            width: !root.indeterminate ? root.value_x : root.width / 2;
+            height: 100%;
+            background: root.style.track_background;
+            border_radius: root.style.border_radius;
+
+            animate background { duration: AnimationSettings.color_duration; }
+        }
+
+        if root.interactive && !root.indeterminate : TouchArea {
+            enabled: root.enabled;
+            mouse_cursor: MouseCursor.pointer;
+
+            pointer_event(event) => {
+                if event.button != PointerEventButton.left && event.kind != PointerEventKind.down {
+                    return;
+                }
+
+                root.set_value((self.mouse_x / self.width * root.range) + root.minimum);
+            }
+        }
+    }
+
+    DragHandle {
+        property <angle> let_angle;
+
+        x: root.value_x - self.width / 2;
+        height: root.style.handle_size;
+        background: root.style.handle_background;
+        enabled: false;
+        has_focus: root.has_focus;
+        opacity: 0;
+
+        moved => {
+            root.set_value(((self.x + self.mouse_x) / root.width * root.range) + root.minimum);
+        }
+
+        states [
+            active when root.interactive && !root.indeterminate : {
+                enabled: root.enabled;
+                opacity: 1;
+            }
+        ]
+
+        animate opacity { duration: AnimationSettings.fast_resize_duration; }
+    }
+}

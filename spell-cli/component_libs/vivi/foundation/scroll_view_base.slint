@@ -1,0 +1,37 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Border, BorderStyle } from "./border.slint";
+
+export struct ScrollBarStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // handle
+    handle_style: BorderStyle,
+}
+
+export struct ScrollViewStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // scroll_bars
+    scroll_bar_style: ScrollBarStyle
+}
+
+export component ScrollViewBase {
+    in property <bool> enabled: true;
+    in_out property <length> viewport_width;
+    in_out property <length> viewport_height;
+    in_out property <length> viewport_x;
+    in_out property <length> viewport_y;
+
+    // styling
+    in property <ScrollViewStyle> style;
+
+    background_layer := Border {
+        style: root.style.border_style;
+    }
+
+    @children
+}

@@ -1,0 +1,48 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { AppBarBase, HorizontalLayoutBase } from "../foundation.slint";
+import { MagicButtonStyles } from "./magic_button_base.slint";
+import { IconButton } from "./icon_button.slint";
+import { MagicText } from "./magic_text.slint";
+import {
+    FontSettings,
+    LayoutSettings,
+    BorderSettings,
+    SizeSettings
+} from "./styling.slint";
+
+export component AppBar inherits AppBarBase {
+    min_width: content_layer.min_width;
+    min_height: max(SizeSettings.app_bar_height, content_layer.min_height);
+    vertical_stretch: 0;
+    style: {
+        border_style: BorderSettings.alternate_border_style,
+        layout_style: LayoutSettings.bar_style,
+        text_style: FontSettings.header_3,
+        leading_button_style: MagicButtonStyles.icon_button_style
+    };
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        if root.leading_button_icon.width > 0 && root.leading_button_icon.height > 0 : IconButton {
+            icon: root.leading_button_icon;
+            style: root.style.leading_button_style;
+            horizontal_stretch: 0;
+
+            clicked => {
+                root.leading_button_clicked();
+            }
+        }
+
+        if root.title != "" : MagicText {
+            text: root.title;
+            style: root.style.text_style;
+            vertical_alignment: center;
+            horizontal_stretch: 1;
+        }
+
+         @children
+     }
+}

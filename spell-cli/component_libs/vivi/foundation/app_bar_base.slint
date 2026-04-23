@@ -1,0 +1,37 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Border, BorderStyle } from "./border.slint";
+import { TextStyle } from "./text_base.slint";
+import { ButtonStyle } from "./button_base.slint";
+import { LayoutStyle } from "./vertical_layout_base.slint";
+import { ButtonStyle } from "./button_base.slint";
+
+export struct AppBarStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // content_layer
+    text_style: TextStyle,
+    leading_button_style: ButtonStyle,
+
+    // layout
+    layout_style: LayoutStyle
+}
+
+export component AppBarBase {
+    in property <string> title;
+    in property <image> leading_button_icon;
+
+    // styling
+    in property <AppBarStyle> style;
+
+    callback leading_button_clicked();
+
+    background_layer := Border {
+        style: root.style.border_style;
+    }
+
+
+    @children
+}

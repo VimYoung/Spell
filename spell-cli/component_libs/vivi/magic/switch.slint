@@ -1,0 +1,129 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { CheckBoxBase, FocusTouchArea, Border, HorizontalLayoutBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { MagicText } from "./magic_text.slint";
+import {
+    Palette,
+    FontSettings,
+    IconSettings,
+    AnimationSettings,
+    SizeSettings,
+    IconSettings,
+    BorderSettings,
+    LayoutSettings
+} from "./styling.slint";
+
+export component Switch inherits CheckBoxBase {
+    in property <string> text;
+    in property <image> checked_icon;
+    in property <image> unchecked_icon;
+
+    property <length> indicator_padding: 2px;
+
+    style: {
+        border_style: {
+            background: !root.checked ? Palette.background : Palette.accent_background,
+            border_brush: Palette.border,
+            border_width: BorderSettings.control_border_width,
+        },
+        box_style: {
+            background: Palette.foreground,
+            border_width: BorderSettings.control_border_width,
+            border_brush: Palette.border,
+        },
+        box_icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.accent_foreground,
+        },
+        text_style: FontSettings.body,
+        layout_style: {
+            spacing: LayoutSettings.control_spacing,
+        }
+    };
+    min_width: content_layer.min_width;
+    forward_focus: touch_area;
+    accessible_role: switch;
+    accessible_action_default => {
+        touch_area.clicked();
+    }
+
+    touch_area := FocusTouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        mouse_cursor: root.enabled ? pointer : not-allowed;
+
+        clicked => {
+            root.toggle();
+        }
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        track := Border {
+            width: 2 * self.height;
+            min_height: SizeSettings.box_height;
+            horizontal_stretch: 0;
+            style: root.style.border_style;
+            border_radius: self.height / 2;
+
+            state_layer := StateLayer {
+                width: 100%;
+                height: 100%;
+                border_radius: track.border-radius;
+                pressed: touch_area.pressed || touch_area.enter_pressed;
+                has_hover: touch_area.has_hover;
+                has_focus: touch_area.has_focus;
+            }
+
+            if root.checked_icon.width > 0 && root.checked_icon.height > 0 : MagicIcon {
+                x: root.indicator_padding + (indicator.width - self.width) / 2;
+                icon: root.checked_icon;
+                style: root.style.box_icon_style;
+            }
+
+
+            if root.unchecked_icon.width > 0 && root.unchecked_icon.height > 0 : MagicIcon {
+                x: parent.width - root.indicator_padding - (indicator.width - self.width) / 2 - self.width;
+                icon: root.unchecked_icon;
+                style: root.style.box_icon_style;
+                colorize: root.style.text_style.foreground;
+            }
+
+            indicator := Border {
+                x: root.indicator_padding;
+                width: self.height;
+                height: parent.height - 2 * root.indicator_padding;
+                style: root.style.box_style;
+                border_radius: self.height / 2;
+
+                states [
+                    checked when root.checked : {
+                        x: parent.width - self.width - root.indicator_padding;
+                        background: Palette.background;
+                    }
+                ]
+
+                animate x { duration: AnimationSettings.fast_resize_duration; }
+            }
+
+            animate background { duration: AnimationSettings.color_duration; }
+        }
+
+        if root.text != "" : MagicText {
+            text: root.text;
+            style: root.style.text_style;
+            vertical_alignment: center;
+        }
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

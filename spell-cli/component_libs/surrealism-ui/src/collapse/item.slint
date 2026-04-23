@@ -1,0 +1,166 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230907
+* @version:0.0.1
+* @type:interface
+* @description:
+* # SCollapseItem
+* SCollapseItem is a component of SCollapse, without which SCollapse will not work
+* You can customize the components or use the default text display method in it
+* ## properties
+* - in-out property <int> font-weight : font weight
+* - in-out property <length> font-size: font size
+* - in-out property <brush> font-color : font color
+* - in-out property <bool> font-italic : font italic
+* - in-out property <string> font-family : font family
+* - in-out property <Themes> theme : SurrealismUI theme
+* - in-out property <length> header-height : collapse header height
+* - in-out property <string> header-title : collapse header title
+* - in-out property <PaddingType> header-padding-type: collapse header padding type
+* - in-out property <ShadowType> header-shadow-type: collapse header shadow type
+* - in-out property <BorderType> header-border-type : collapse header border type
+* - in-out property <length> details-height : collapse detail height
+* - in-out property <PaddingType> details-padding-type: collapse detail padding type
+* - in-out property <ShadowType> details-shadow-type: collapse detail shadow type
+* - in-out property <BorderType> details-border-type : collapse detail border type
+* - in-out property <bool> is-show : the collapse detail is show or not;
+* - in-out property <image> collapse-icon : collapse header expand icon
+* ## functions
+* - pure public function get-height()->length : get collapse header height
+* ## callbacks
+* - callback clicked() : run if you show collapse detail
+* ============================================
+*/
+
+import { SCard } from "../card/index.slint";
+import { SText } from "../text/index.slint";
+import {ROOT_STYLES,DefaultSCollapseProps} from "../../themes/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { Themes,UseIcons,PaddingType,ShadowType,BorderType } from "../../use/index.slint";
+
+export component CollapseItem inherits Rectangle{
+  height: is-show?details-height:header.height;
+  background: transparent;
+  in-out property <int> font-weight : DefaultSCollapseProps.font-weight;
+  in-out property <length> font-size: DefaultSCollapseProps.font-size;
+  in-out property <brush> font-color : DefaultSCollapseProps.font-color;
+  in-out property <bool> font-italic : DefaultSCollapseProps.font-italic;
+  in-out property <string> font-family : DefaultSCollapseProps.font-family;
+  //theme
+  in-out property <Themes> theme : DefaultSCollapseProps.theme;
+  //header
+  in-out property <length> header-height : DefaultSCollapseProps.header-height;
+  in-out property <string> header-title : DefaultSCollapseProps.header-title;
+  in-out property <PaddingType> header-padding-type:DefaultSCollapseProps.header-padding-type;
+  in-out property <ShadowType> header-shadow-type: DefaultSCollapseProps.header-shadow-type;
+  in-out property <BorderType> header-border-type : DefaultSCollapseProps.header-border-type;
+  //details
+  in-out property <length> details-height : DefaultSCollapseProps.details-height;
+  in-out property <PaddingType> details-padding-type:DefaultSCollapseProps.details-padding-type;
+  in-out property <ShadowType> details-shadow-type: DefaultSCollapseProps.details-shadow-type;
+  in-out property <BorderType> details-border-type : DefaultSCollapseProps.details-border-type;
+  in-out property <bool> is-show : DefaultSCollapseProps.is-show;
+  in-out property <image> collapse-icon : DefaultSCollapseProps.collapse-icon;
+  pure public function get-height()->length {
+      header.height
+  }
+  callback clicked();
+  // init => {
+  //   details-view.height = 0;
+  // }
+  view:=VerticalLayout {
+    height: root.height;
+    width: header.width;
+    spacing: 0;
+    header:=SCard{
+      z: 11;
+      theme: root.theme;
+      width: root.width;
+      card-height: root.header-height;
+      border-radius: 0;
+      padding-type: header-padding-type;
+      border-type: header-border-type;
+      shadow-type: header-shadow-type;
+      area:=TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+          root.is-show=!root.is-show;
+          if(is-show){
+            icon.rotation = {
+              rotation-angle: 90deg,
+              rotation-origin-x: icon.width / 2,
+              rotation-origin-y: icon.height / 2,
+            };
+            root.height = root.details-height;
+            details-view.height = root.height - header.height;
+            details-view.visible = true;
+            
+          }else{
+            icon.rotation = {
+              rotation-angle: 0deg,
+              rotation-origin-x: icon.width / 2,
+              rotation-origin-y: icon.height / 2,
+            };
+            root.height = header.height;
+            details-view.height = 0;
+            details-view.visible = false;
+          }
+          root.clicked();
+        }
+      }
+      HorizontalLayout {
+        alignment: space-between;
+        width: parent.width;
+        padding-left: parent.padding-left;
+        padding-right: parent.padding-right;
+        title:=SText { 
+          theme: root.theme;
+          text: root.header-title;
+          font-weight: root.font-weight;
+          font-family: root.font-family;
+          font-italic: root.font-italic;
+          font-size: root.font-size;
+        }
+        icon-view:= Rectangle{
+          width:icon.width ;
+          icon:= SIcon { 
+            colorize: self.get-colorize();
+            theme: root.theme;
+            height: 16px;
+            width: 16px;
+            rotation: is-show?{
+              rotation-angle: 90deg,
+              rotation-origin-x: icon.width / 2,
+              rotation-origin-y: icon.height / 2,
+            }:{
+              rotation-angle: 0deg,
+              rotation-origin-x: icon.width / 2,
+              rotation-origin-y: icon.height / 2,
+            };
+            source: root.collapse-icon;
+            clicked => {
+              area.clicked()
+            }
+          }
+        }
+      }
+    }
+    details-view:= SCard{
+      height: root.is-show ? root.height - header.height : 0;
+      width: header.width;
+      visible: root.is-show;
+      border-radius: 0;
+      drop-shadow-blur: 0;
+      theme: root.theme;
+      padding-type: details-padding-type;
+      shadow-type: details-shadow-type;
+      border-type: details-border-type;
+      animate height {
+        easing: ROOT-STYLES.sur-an-easing;
+        duration: ROOT-STYLES.sur-an-duration;
+      }
+      @children
+    }
+  }
+}

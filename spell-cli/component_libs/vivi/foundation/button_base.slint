@@ -1,0 +1,56 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { BorderStyle, Border } from "./border.slint";
+import { IconStyle } from "./icon_base.slint";
+import { TextStyle } from "./text_base.slint";
+import { FocusTouchArea } from "./focus_touch_area.slint";
+import { LayoutStyle } from "./vertical_layout_base.slint";
+
+export struct ButtonStyle {
+    // background_layer
+    border_style: BorderStyle,
+
+    // content_layer
+    icon_style: IconStyle,
+    text_style: TextStyle,
+    placeholder_style: TextStyle,
+
+    // layout
+    layout_style: LayoutStyle
+}
+
+export component ButtonBase {
+    // states
+    in property <bool> enabled <=> touch_area.enabled;
+    out property <bool> has_hover <=> touch_area.has_hover;
+    out property <bool> has_focus <=> touch_area.has_focus;
+    out property <bool> pressed <=> touch_area.pressed;
+    out property <bool> enter_pressed <=> touch_area.enter_pressed;
+
+    // styling
+    in property <ButtonStyle> style;
+    in property <MouseCursor> mouse_cursor <=> touch_area.mouse_cursor;
+
+    // callbacks
+    callback clicked <=> touch_area.clicked;
+    callback pointer_event <=> touch_area.pointer_event;
+
+    forward_focus: touch_area;
+
+    accessible_role: button;
+    accessible_action_default => {
+        touch_area.clicked();
+    }
+
+    touch_area := FocusTouchArea {
+        width: 100%;
+        height: 100%;
+    }
+
+    background_layer := Border {
+        style: root.style.border_style;
+    }
+
+    @children
+}

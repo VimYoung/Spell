@@ -1,0 +1,11 @@
+import {Themes, UseSurrealismFn, ColorLevel} from "../../use/index.slint";
+import {DefaultSProgressProps} from "./progress.slint";
+
+export global DefaultSSliderProps {
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <Themes> theme :DefaultSProgressProps.theme;
+    in-out property <float> progress : 0;
+    in-out property <length> stroke-width: DefaultSProgressProps.stroke-width;
+    in-out property <brush> stroke-color: UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+    in property <length> border-radius: 6px;
+}

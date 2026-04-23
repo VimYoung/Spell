@@ -1,0 +1,71 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230912
+* @version:0.1.1
+* @type:interface
+* @description:
+* # SCollection
+* SCollection is an expandable box that can be zoomed in or out by clicking (internal can also be used)
+* ## properties (card)
+* - in property <float> scale : collection scale size;
+* - in-out property <bool> is-scale : collection is scale or not;
+* - in property <easing> easing : animation easing type;
+* - in property <duration> duration : animation duration;
+* ## functions
+* - pure public function toggle-default(target:length)->length
+* - pure public function toggle(target:length,scale-size:float)->length
+* ## callbacks
+* - clicked() : run if you click item in SCollection
+* ============================================
+*/
+import { ROOT_STYLES,DefaultSCollectionProps} from "../../themes/index.slint";
+import { Themes,BorderType,UseSurrealismFn } from "../../use/index.slint";
+
+
+export component Collection{
+  in property <float> scale : DefaultSCollectionProps.scale;
+  in-out property <bool> is-scale : DefaultSCollectionProps.is-scale;
+  in property <easing> easing : DefaultSCollectionProps.easing;
+  in property <duration> duration : DefaultSCollectionProps.duration;
+  pure public function toggle-default(target:length)->length {
+    return is-scale?target / scale : target * scale;
+  }
+  pure public function toggle(target:length,scale-size:float)->length {
+    return is-scale?target / scale-size : target * scale-size;
+  }
+  callback clicked();
+  main-view:=Rectangle {
+    height: root.height;
+    width: root.width;
+    // animation
+    animate background {
+      duration: root.duration;
+      easing: root.easing;
+    }
+    animate height {
+      duration: root.duration;
+      easing: root.easing;
+    }
+    animate width {
+      duration: root.duration;
+      easing: root.easing;
+    }
+    TouchArea {
+      mouse-cursor: pointer;
+      clicked => {
+        if(is-scale){
+          main-view.height /= scale;
+          main-view.width /= scale;
+        }else{
+          main-view.height *= scale;
+          main-view.width *= scale;
+        }
+        root.clicked();
+        is-scale=!is-scale;
+        
+      }
+      @children
+    }
+  }
+}

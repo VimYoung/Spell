@@ -1,0 +1,106 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20240522
+* @version:0.4.5
+* @type:interface
+* # Catalog
+* The Catalog component is used to display a series of catalog items, each of which can contain labels and icons, and has click interaction functionality.
+* ## properties
+* - in property <PaddingType> padding-type :  catalog padding type
+* - in property <Themes> theme :  SurrealismUI theme
+* - in property <[CatalogItem]> items :  catalog items see `CatalogItem`
+* - in property <length> font-size :  catalog label font size, which affect the height of the catalog item
+* - in property <int> font-wight :  catalog label font weight
+* - in property <string> font-family :  catalog label font family
+* - in property <bool> font-italic : catalog label font italic
+* - in property <length> spacing :  spacing between left icon and label
+* - in property <brush> active-color :  catalog item active color
+* - out property <length> real-height :  real height of the catalog, you can use it to set the height of the catalog (recommend)
+* - in-out property <length> item-height :  height of the catalog item
+* - private property <length> icon-size :  size of the icon (include left and right icon)
+* ## functions
+* - pure function has-active(hover: bool, pressed: bool) -> bool : judge whether the catalog item is active
+* ## callbacks
+* - callback clicked(int, CatalogItem): click event callback, return the index of the clicked item and the item object
+* ============================================
+*/
+
+import { Themes,CatalogItem, PaddingType, PaddingProps, UseSurrealismFn, ColorLevel } from "../../use/index.slint";
+import { ROOT_STYLES, DefaultSCatalogProps } from "../../themes/index.slint";
+import { SIcon } from "../icon/index.slint";
+import { SText } from "../text/index.slint";
+
+export component Catalog {
+    height: 100%;
+    width: 100%;
+    in property <PaddingType> padding-type: DefaultSCatalogProps.padding-type;
+    in property <Themes> theme: DefaultSCatalogProps.theme;
+    in property <[CatalogItem]> items;
+    in property <length> font-size: DefaultSCatalogProps.font-size;
+    in property <int> font-wight: DefaultSCatalogProps.font-wight;
+    in property <string> font-family: DefaultSCatalogProps.font-family;
+    in property <bool> font-italic: DefaultSCatalogProps.font-italic;
+    in property <length> spacing: UseSurrealismFn.get-space(root.width / 3);
+    in property <brush> active-color: UseSurrealismFn.get-color(root.theme, ColorLevel.Normal);
+    out property <length> real-height: items.length * root.item-height;
+    in-out property <length> item-height:  UseSurrealismFn.count-height(root.font-size,  padding-props.padding-same);
+    private property <length> icon-size: root.font-size + 2px;
+    private property <PaddingProps> padding-props: UseSurrealismFn.get-padding(root.padding-type);
+    pure function has-active(hover: bool, pressed: bool)-> bool {
+        return hover || pressed;
+    }
+    callback clicked(int, CatalogItem);
+    VerticalLayout {
+        for item[index] in root.items: catalog-item-wrap:= Rectangle{
+            height: catalog-item-layout.height;
+            background: root.has-active(catalog-item-area.has-hover, catalog-item-area.pressed) ? root.active-color : transparent;
+            animate background {
+                easing: ROOT-STYLES.sur-an-easing;
+                duration: ROOT-STYLES.sur-an-duration;
+            }
+            catalog-item-area:= TouchArea{
+                mouse-cursor: pointer;
+                clicked => {
+                    root.clicked(index, item);
+                }
+                catalog-item-layout:= HorizontalLayout {
+                    height: root.item-height;
+                    alignment: item.align;
+                    padding-left: padding-props.padding-left;
+                        padding-right: padding-props.padding-right;
+                    HorizontalLayout {
+                        spacing: root.spacing;
+                        if item.show-left-icon: Rectangle {
+                            left-icon:= SIcon {
+                                theme: root.theme;
+                                colorize: self.get-colorize();
+                                height: root.icon-size;
+                                width: root.icon-size;
+                                source: item.left-icon;
+                            }
+                        }
+                        if item.show-label: SText {
+                            theme: root.theme;
+                            font-size: root.font-size;
+                            text: item.label;
+                            font-weight: root.font-wight;
+                            font-family: root.font-family;
+                            font-italic: root.font-italic;
+                            wrap: TextWrap.no-wrap;
+                        }
+                    }
+                    if item.show-right-icon: Rectangle {
+                        right-icon:= SIcon {
+                            theme: root.theme;
+                            colorize: self.get-colorize();
+                            height: root.icon-size;
+                            width: root.icon-size;
+                            source: item.right-icon;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

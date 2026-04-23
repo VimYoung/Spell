@@ -1,0 +1,102 @@
+import { UAppTheme } from "../app-theme.slint";
+import { ButtonInterface } from "button-interface.slint";
+
+import { UIcon } from "icon.slint";
+import { UText } from "text.slint";
+import { UIconButton, UIconButtonVariant } from "icon-button/icon-button.slint";
+
+
+export enum UAlertVariant {
+	info,
+	success,
+	warning,
+	danger,
+}
+
+export component UAlert inherits Rectangle {
+	// Regular properties
+	in-out property <UAlertVariant> variant: info;
+    in-out property <string> message;
+    in-out property <bool> display-close-button: false;
+    in-out property <brush> text-color: UAppTheme.text;
+    in-out property <image> icon;
+    in-out property <brush> icon-color;
+    callback close();
+    min-width: 300px;
+    border-radius: UAppTheme.radius-base;
+    border-width: UAppTheme.border-width-base;
+    VerticalLayout {
+        padding-top: UAppTheme.padding-vertical;
+        padding-bottom: UAppTheme.padding-vertical;
+        padding-left: UAppTheme.padding-horizontal;
+        padding-right: UAppTheme.padding-horizontal;
+        HorizontalLayout {
+            VerticalLayout {
+                alignment: center;
+                padding-right: UAppTheme.padding-big;
+                UIcon {
+                    source: icon;
+                    colorize: icon-color;
+                    size: UAppTheme.icon-size-base;
+                    accessible-role: none;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                padding-top: UAppTheme.padding-vertical + 1px;
+                padding-bottom: UAppTheme.padding-vertical - 1px;
+                UText {
+                    color: text-color;
+                    text: message;
+                    wrap: no-wrap;
+                    overflow: elide;
+                    font-size: UAppTheme.font-size-base;
+                }
+            }
+
+            if display-close-button: VerticalLayout {
+                alignment: center;
+                close-button := UIconButton {
+                    variant: UIconButtonVariant.text-stripped;
+                    icon: @image-url("../assets/icons/x.svg");
+                    accessible-label: @tr("Close button for alert");
+                    accessible-action-default => {
+                        self.clicked();
+                    }
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+
+    states [
+        info when variant == UAlertVariant.info: {
+            background: UAppTheme.primary.selected;
+            border-color: UAppTheme.primary.base;
+            icon: @image-url("../assets/icons/info.svg");
+            icon-color: UAppTheme.primary.base;
+        }
+        success when variant == UAlertVariant.success: {
+            background: UAppTheme.success.selected;
+            border-color: UAppTheme.success.base;
+            icon: @image-url("../assets/icons/circle-check.svg");
+            icon-color: UAppTheme.success.base;
+        }
+        warning when variant == UAlertVariant.warning: {
+            background: UAppTheme.warning.selected;
+            border-color: UAppTheme.warning.base;
+            icon: @image-url("../assets/icons/info.svg");
+            icon-color: UAppTheme.warning.base;
+        }
+        danger when variant == UAlertVariant.danger: {
+            background: UAppTheme.danger.selected;
+            border-color: UAppTheme.danger.base;
+            icon: @image-url("../assets/icons/triangle-alert.svg");
+            icon-color: UAppTheme.danger.base;
+        }
+    ]
+}

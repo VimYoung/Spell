@@ -1,0 +1,118 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20231018
+* @version:0.1.7
+* @type:interface
+* @description:
+* # SSwitch
+* SSwitch is a switch used for simple judgment scenarios
+* ## properties
+* - in-out property <bool> active : is actived or not
+* - in property <brush> switch-background-color : switch background color
+* - in property <brush> switch-border-color : switch border color
+* - in property <color> switch-drop-shadow-color switch drop shadow color
+* - in property <length> switch-height : switch height
+* - in property <length> switch-width : switch width
+* - in property <PaddingType> switch-padding-type: switch padding type
+* - in property <ShadowType> switch-shadow-type: switch shadow type
+* - in property <BorderType> switch-border-type : switch border type
+* ## callbacks
+* - callback clicked(bool) : run if you click the switch
+* ============================================
+*/
+import { SCard } from "../card/index.slint";
+import { ROOT-STYLES,DefaultSSwitchProps } from "../../themes/index.slint";
+import { Themes,PaddingType,BorderType,ShadowType } from "../../use/index.slint";
+
+export component Switch inherits SCard{
+  in-out property <bool> active : DefaultSSwitchProps.active;
+  in property <brush> switch-background-color <=> switch-circle.background;
+  in property <brush> switch-border-color <=> switch-circle.border-color;
+  in property <color> switch-drop-shadow-color <=> switch-circle.drop-shadow-color;
+  in property <length> switch-height : DefaultSSwitchProps.switch-height;
+  in property <length> switch-width : DefaultSSwitchProps.switch-width;
+  in property <PaddingType> switch-padding-type: DefaultSSwitchProps.switch-padding-type;
+  in property <ShadowType> switch-shadow-type: DefaultSSwitchProps.switch-shadow-type;
+  in property <BorderType> switch-border-type : DefaultSSwitchProps.switch-border-type;
+  callback clicked(bool);
+  theme:DefaultSSwitchProps.theme;
+  card-height: DefaultSSwitchProps.card-height;
+  card-width: DefaultSSwitchProps.card-width;
+  border-type: DefaultSSwitchProps.border-type;
+  border-radius: self.height / 2;
+  padding-type: DefaultSSwitchProps.padding-type;
+  
+  switch-circle:=SCard{
+    x: 2px;
+    theme: root.theme;
+    card-height:root.switch-height;
+    card-width: root.switch-width;
+    // border: None;
+    border-radius: self.height / 2;
+    padding-type: root.switch-padding-type;
+    border-type: root.switch-border-type;
+    shadow-type: root.switch-shadow-type;
+    animate  x{
+       duration: 300ms;
+       easing: ease-in-out-back;
+    }
+    states [
+      light when self.theme == Themes.Light: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.light.deepest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.light.deepest;
+        switch-circle.drop-shadow-color : ROOT-STYLES.sur-theme-colors.light.weakest;
+        
+      }
+      primary when self.theme == Themes.Primary: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.primary.deepest;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.primary.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.primary.deepest;
+      }
+      success when self.theme == Themes.Success: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.success.deepest;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.success.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.success.deepest;
+      }
+      info when self.theme == Themes.Info: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.info.deepest;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.info.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.info.deepest;
+      }
+      warning when self.theme == Themes.Warning: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.warning.deepest;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.warning.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.warning.deepest;
+      }
+      error when self.theme == Themes.Error: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.error.deepest;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.error.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.error.deepest;
+      }
+      dark when self.theme == Themes.Dark: {
+        switch-circle.background : ROOT-STYLES.sur-theme-colors.dark.deeper;
+        switch-circle.drop-shadow-color: ROOT-STYLES.sur-theme-colors.dark.weakest;
+        switch-circle.border-color : ROOT-STYLES.sur-theme-colors.dark.deeper;
+      }
+    ]
+    TouchArea {
+      mouse-cursor: pointer;
+      init => {
+        if(root.active){
+          parent.x = root.width - parent.width - 2px
+        }else{
+          parent.x = 2px
+        }
+      }
+      clicked => {
+        root.active = !root.active;
+        root.clicked(root.active);
+        if(root.active){
+          parent.x = root.width - parent.width - 2px
+        }else{
+          parent.x = 2px
+        }
+      }
+    }
+  }
+}

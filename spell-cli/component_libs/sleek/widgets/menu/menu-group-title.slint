@@ -1,0 +1,27 @@
+import { UAppTheme } from "../../app-theme.slint";
+import { UText } from "../text.slint";
+
+import { UMenuLogic, UMenuVariant } from "index.slint";
+
+
+export component UMenuGroupTitle inherits HorizontalLayout {
+    in-out property <string> title;
+    in-out property <int> level;
+    alignment: start;
+    padding-top: UAppTheme.padding-big;
+    padding-bottom: UAppTheme.padding-base;
+    padding-left: UAppTheme.padding-horizontal;
+    padding-right: UAppTheme.padding-horizontal;
+    UText {
+        text: title;
+        font-size: UAppTheme.font-size-small;
+        color: {
+            if UMenuLogic.variant == UMenuVariant.light {
+                return UAppTheme.light.text-secondary;
+            } else if UMenuLogic.variant == UMenuVariant.dark {
+                return UAppTheme.dark.text-secondary;
+            }
+            return UAppTheme.text-secondary;
+        };
+    }
+}

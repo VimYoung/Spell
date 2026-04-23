@@ -1,0 +1,363 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Palette as StdPalette } from "std-widgets.slint";
+import { TextStyle, IconStyle, LayoutStyle, BorderStyle } from "../foundation.slint";
+
+export struct MagicPalette {
+    background: brush,
+    foreground: brush,
+    placeholder_foreground: brush,
+    alternate_background: brush,
+    control_background: brush,
+    control_foreground: brush,
+    accent_background: brush,
+    accent_foreground: brush,
+    destructive_background: brush,
+    destructive_foreground: brush,
+    border: brush,
+    focus_border: brush,
+    state_pressed: brush,
+    state_hovered: brush,
+    selection_background: brush,
+}
+
+export enum Flavor {
+    Latte,
+    Frappe,
+    Macchiato,
+    Mocha
+}
+
+export struct CatppuccinPalette {
+    rosewater: brush,
+    flamingo: brush,
+    pink: brush,
+    mauve: brush,
+    red: brush,
+    maroon: brush,
+    peach: brush,
+    yellow: brush,
+    green: brush,
+    teal: brush,
+    sky: brush,
+    sapphire: brush,
+    blue: brush,
+    lavender: brush,
+    text: brush,
+    subtext_1: brush,
+    subtext_0: brush,
+    overlay_2: brush,
+    overlay_1: brush,
+    overlay_0: brush,
+    surface_2: brush,
+    surface_1: brush,
+    surface_0: brush,
+    base: brush,
+    mantle: brush,
+    crust: brush,
+}
+
+export global Catppuccin {
+    out property <CatppuccinPalette> latte: {
+        rosewater: #dc8a78,
+        flamingo: #dd7878,
+        pink: #ea76cb,
+        mauve: #8839ef,
+        red: #d20f39,
+        maroon: #e64553,
+        peach: #fe640b,
+        yellow: #df8e1d,
+        green: #40a02b,
+        teal: #179299,
+        sky: #04a5e5,
+        sapphire: #209fb5,
+        blue: #1e66f5,
+        lavender: #7287fd,
+        text: #4c4f69,
+        subtext_1: #5c5f77,
+        subtext_0: #6c6f85,
+        overlay_2: #7c7f93,
+        overlay_1: #8c8fa1,
+        overlay_0: #9ca0b0,
+        surface_2: #acb0be,
+        surface_1: #bcc0cc,
+        surface_0: #ccd0da,
+        base: #eff1f5,
+        mantle: #e6e9ef,
+        crust: #dce0e8
+    };
+
+    out property <CatppuccinPalette> frappe: {
+        rosewater: #f2d5cf,
+        flamingo: #eebebe,
+        pink: #f4b8e4,
+        mauve: #ca9ee6,
+        red: #e78284,
+        maroon: #ea999c,
+        peach: #ef9f76,
+        yellow: #e5c890,
+        green: #a6d189,
+        teal: #81c8be,
+        sky: #99d1db,
+        sapphire: #85c1dc,
+        blue: #8caaee,
+        lavender: #babbf1,
+        text: #c6d0f5,
+        subtext_1: #b5bfe2,
+        subtext_0: #a5adce,
+        overlay_2: #949cbb,
+        overlay_1: #838ba7,
+        overlay_0: #737994,
+        surface_2: #626880,
+        surface_1: #51576d,
+        surface_0: #414559,
+        base: #303446,
+        mantle: #292c3c,
+        crust: #232634
+    };
+
+    out property <CatppuccinPalette> macchiato: {
+        rosewater: #f4dbd6,
+        flamingo: #f0c6c6,
+        pink: #f5bde6,
+        mauve: #c6a0f6,
+        red: #ed8796,
+        maroon: #ee99a0,
+        peach: #f5a97f,
+        yellow: #eed49f,
+        green: #a6da95,
+        teal: #8bd5ca,
+        sky: #91d7e3,
+        sapphire: #7dc4e4,
+        blue: #8aadf4,
+        lavender: #b7bdf8,
+        text: #cad3f5,
+        subtext_1: #b8c0e0,
+        subtext_0: #a5adcb,
+        overlay_2: #939ab7,
+        overlay_1: #8087a2,
+        overlay_0: #6e738d,
+        surface_2: #5b6078,
+        surface_1: #494d64,
+        surface_0: #363a4f,
+        base: #24273a,
+        mantle: #1e2030,
+        crust: #181926
+    };
+
+  out property <CatppuccinPalette> mocha: {
+        rosewater: #f5e0dc,
+        flamingo: #f2cdcd,
+        pink: #f5c2e7,
+        mauve: #cba6f7,
+        red: #f38ba8,
+        maroon: #eba0ac,
+        peach: #fab387,
+        yellow: #f9e2af,
+        green: #a6e3a1,
+        teal: #94e2d5,
+        sky: #89dceb,
+        sapphire: #74c7ec,
+        blue: #89b4fa,
+        lavender: #b4befe,
+        text: #cdd6f4,
+        subtext_1: #bac2de,
+        subtext_0: #a6adc8,
+        overlay_2: #9399b2,
+        overlay_1: #7f849c,
+        overlay_0: #6c7086,
+        surface_2: #585b70,
+        surface_1: #45475a,
+        surface_0: #313244,
+        base: #1e1e2e,
+        mantle: #181825,
+        crust: #11111b
+    };
+    in property <Flavor> current_flavor: StdPalette.color_scheme == ColorScheme.light ? Flavor.Latte : Flavor.Macchiato;
+    out property <CatppuccinPalette> current_palette: root.flavor_palette(root.current_flavor);
+    out property <MagicPalette> current_magic_palette: root.magic_palette(root.current_flavor);
+
+    pure function flavor_palette(flavor: Flavor) -> CatppuccinPalette {
+        if flavor == Flavor.Latte {
+            return root.latte;
+        }
+
+        if flavor == Flavor.Frappe {
+            return root.frappe;
+        }
+
+        if flavor == Flavor.Macchiato {
+            return root.macchiato;
+        }
+
+        root.mocha
+    }
+
+    pure function palette_to_magic_palette(catppuccin: CatppuccinPalette, dark: bool) -> MagicPalette {
+        {
+            background: catppuccin.base,
+            foreground: catppuccin.text,
+            placeholder_foreground: catppuccin.subtext_0,
+            alternate_background: dark ? catppuccin.surface_1 : catppuccin.base,
+            control_background: catppuccin.surface_0,
+            control_foreground: catppuccin.text,
+            accent_background: catppuccin.mauve,
+            accent_foreground: catppuccin.base,
+            destructive_background: catppuccin.red,
+            destructive_foreground: catppuccin.base,
+            border: catppuccin.surface_2,
+            focus_border: catppuccin.lavender,
+            state_pressed: dark ? #000000.with_alpha(0.4) : #000000.with_alpha(0.3),
+            state_hovered: dark ? #ffffff.with_alpha(0.2) : #000000.with_alpha(0.2),
+            selection_background: catppuccin.surface_0
+        }
+    }
+
+    pure function magic_palette(flavor: Flavor) -> MagicPalette {
+        root.palette_to_magic_palette(root.flavor_palette(flavor), flavor != Flavor.Latte)
+    }
+}
+
+export global Palette {
+    in property <MagicPalette> current_palette: Catppuccin.current_magic_palette;
+    out property <brush> transparent: #000000.with_alpha(0);
+    out property <brush> background: root.current_palette.background;
+    out property <brush> foreground: root.current_palette.foreground;
+    out property <brush> placeholder_foreground: root.current_palette.placeholder_foreground;
+    out property <brush> alternate_background: root.current_palette.alternate_background;
+    out property <brush> control_background: root.current_palette.control_background;
+    out property <brush> control_foreground: root.current_palette.control_foreground;
+    in_out property <brush> accent_background: root.current_palette.accent_background;
+    out property <brush> accent_foreground: root.current_palette.accent_foreground;
+    out property <brush> destructive_background: root.current_palette.destructive_background;
+    out property <brush> destructive_foreground: root.current_palette.destructive_foreground;
+    out property <brush> border: root.current_palette.border;
+    out property <brush> focus_border: root.current_palette.focus_border;
+    out property <brush> state_pressed: root.current_palette.state_pressed;
+    out property <brush> state_hovered: root.current_palette.state_hovered;
+    out property <brush> selection_background: root.current_palette.selection_background;
+    out property <brush> shadow: #00000026;
+}
+
+export global SizeSettings {
+    in property <float> scale_factor: 1;
+    in_out property <bool> mobile_size;
+    out property <length> bar_height: root.scale_factor * 6px;
+    out property <length> box_height: root.scale_factor * 20px;
+    out property <length> item_height: root.scale_factor * (root.mobile_size ? 40px : 32px);
+    out property <length> control_height: root.scale_factor * (root.mobile_size ? 40px : 32px);
+    out property <length> app_bar_height: root.scale_factor * (root.mobile_size ? 48px : 40px);
+    out property <length> min_text_field_width: root.scale_factor * 160px;
+    out property <length> min_text_area_height: root.scale_factor * 64px;
+}
+
+export global FontSettings {
+    out property <int> light_font_weight: 300;
+    out property <int> regular_font_weight: 500;
+    out property <int> semi_bold_font_weight: 600;
+    out property <TextStyle> light: {
+        font_size: 14 * 0.0769rem,
+        font_weight: root.light_font_weight,
+        foreground: Palette.placeholder_foreground
+    };
+    out property <TextStyle> supporting: {
+        font_size: 16 * 0.0769rem,
+        font_weight: root.light_font_weight,
+        foreground: Palette.foreground.with_alpha(0.9)
+    };
+    out property <TextStyle> body: {
+        font_size: 16 * 0.0769rem,
+        font_weight: root.regular_font_weight,
+        foreground: Palette.foreground
+    };
+    out property <TextStyle> body_strong: {
+        font_size: 16 * 0.0769rem,
+        font_weight: root.semi_bold_font_weight,
+        foreground: Palette.foreground
+    };
+    out property <TextStyle> header_1: {
+        font_size: 72 * 0.0769rem,
+        font_weight: root.semi_bold_font_weight,
+        foreground: Palette.foreground
+    };
+    out property <TextStyle> header_2: {
+        font_size: 32 * 0.0769rem,
+        font_weight: root.semi_bold_font_weight,
+        foreground: Palette.foreground
+    };
+    out property <TextStyle> header_3: {
+        font_size: 18 * 0.0769rem,
+        font_weight: root.semi_bold_font_weight,
+        foreground: Palette.foreground
+    };
+}
+
+export global IconSettings {
+    out property <IconStyle> body: {
+          icon_size: 16 * 0.0769rem,
+          foreground: Palette.foreground
+    };
+}
+
+export global AnimationSettings {
+    out property <duration> fast_resize_duration: 100ms;
+    out property <duration> color_duration: 125ms;
+    out property <duration> resize_duration: 250ms;
+    out property <duration> move_in_duration: 250ms;
+    out property <duration> move_out_duration: 200ms;
+    out property <easing> move_in_easing: cubic-bezier(0, 0, 0, 1);
+    out property <easing> move_out_easing: cubic-bezier(0.3, 0, 1, 1);
+}
+
+export global LayoutSettings {
+    out property <length> layout_spacing: SizeSettings.scale_factor * 8px;
+    out property <length> layout_padding: SizeSettings.scale_factor * 8px;
+    out property <length> alternate_layout_padding: SizeSettings.scale_factor * 4px;
+    out property <length> control_spacing: SizeSettings.scale_factor * 4px;
+    out property <length> control_padding: SizeSettings.scale_factor * 16px;
+    out property <length> text_input_horizontal_padding: SizeSettings.scale_factor * 8px;
+    out property <length> text_input_vertical_padding: SizeSettings.scale_factor * 4px;
+
+    out property <LayoutStyle> control_style: {
+        padding_left: root.control_padding,
+        padding_right: root.control_padding,
+        spacing: root.control_spacing,
+        alignment: LayoutAlignment.center
+    };
+
+    out property <LayoutStyle> bar_style: {
+        padding_top: root.alternate_layout_padding,
+        padding_bottom: root.alternate_layout_padding,
+        padding_left: root.layout_padding,
+        padding_right: root.layout_padding,
+        spacing: root.layout_spacing,
+        alignment: LayoutAlignment.stretch
+    };
+
+    out property <LayoutStyle> text_input_style: {
+        padding_left: root.text_input_horizontal_padding,
+        padding_right: root.text_input_horizontal_padding,
+        padding_top: root.text_input_vertical_padding,
+        padding_bottom: root.text_input_vertical_padding,
+        spacing: root.control_spacing,
+    };
+}
+
+export global BorderSettings {
+    out property <length> bar_border_radius: SizeSettings.scale_factor * 4px;
+    out property <length> box_border_radius: SizeSettings.scale_factor * 4px;
+    out property <length> control_border_radius: SizeSettings.scale_factor * (SizeSettings.mobile_size ? 20px : 16px);
+    out property <length> control_border_width: SizeSettings.scale_factor * 1px;
+
+    out property <BorderStyle> alternate_border_style: {
+        background: Palette.alternate_background,
+    };
+
+    out property <BorderStyle> popup_border_style: {
+        border_width: root.control_border_width,
+        border_radius: root.bar_border_radius,
+        border_brush: Palette.border,
+        background: Palette.background
+    };
+}

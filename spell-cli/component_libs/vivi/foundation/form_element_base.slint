@@ -1,0 +1,17 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { TextStyle } from "./text_base.slint";
+
+export struct FormElementStyle {
+    title_style: TextStyle,
+    title_horizontal_alignment: TextHorizontalAlignment
+}
+
+export component FormElementBase {
+    in property <FormElementStyle> style;
+    in property <string> title;
+    out property <TextStyle> title_style: root.style.title_style;
+
+    @children
+}

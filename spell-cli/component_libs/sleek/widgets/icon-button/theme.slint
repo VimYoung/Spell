@@ -1,0 +1,104 @@
+import { UAppTheme } from "../../app-theme.slint";
+
+export struct UIconButtonThemeColor {
+	base: brush,
+	danger: brush,
+}
+
+export struct UIconButtonTheme {
+	border-width: length,
+    bg: UIconButtonThemeColor,
+    bg-hover: UIconButtonThemeColor,
+    bg-active: UIconButtonThemeColor,
+    bg-checked: UIconButtonThemeColor,
+    bg-disabled: UIconButtonThemeColor,
+	bg-loading: UIconButtonThemeColor,
+    text: UIconButtonThemeColor,
+    text-hover: UIconButtonThemeColor,
+    text-active: UIconButtonThemeColor,
+    text-checked: UIconButtonThemeColor,
+    text-disabled: UIconButtonThemeColor,
+    border: UIconButtonThemeColor,
+    border-hover: UIconButtonThemeColor,
+    border-active: UIconButtonThemeColor,
+    border-checked: UIconButtonThemeColor,
+    border-disabled: UIconButtonThemeColor,
+}
+
+
+export global UIconButtonThemes {
+    out property <UIconButtonTheme> primary: {
+        border-width: UAppTheme.border-width-base,
+        bg: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        bg-hover: { base: UAppTheme.primary.hover, danger: UAppTheme.danger.hover },
+        bg-active: { base: UAppTheme.primary.active, danger: UAppTheme.danger.active },
+        bg-checked: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        bg-disabled: { base: UAppTheme.primary.disabled, danger: UAppTheme.danger.disabled },
+        bg-loading: { base: UAppTheme.primary.disabled, danger: UAppTheme.danger.disabled },
+        text: { base: UAppTheme.primary-text, danger: UAppTheme.primary-text },
+        text-hover: { base: UAppTheme.primary-text, danger: UAppTheme.primary-text },
+        text-active: { base: UAppTheme.primary-text, danger: UAppTheme.primary-text },
+        text-checked: { base: UAppTheme.primary-text, danger: UAppTheme.primary-text },
+        text-disabled: {
+            base: UAppTheme.primary-text.with-alpha(0.8),
+            danger: UAppTheme.primary-text.with-alpha(0.8)
+        },
+    };
+    out property <UIconButtonTheme> default: {
+        border-width: UAppTheme.border-width-base,
+        bg-hover: { base: UAppTheme.color-fill-secondary, danger: Colors.transparent },
+        bg-active: { base: UAppTheme.color-fill, danger: UAppTheme.danger.selected },
+        bg-checked: { base: UAppTheme.primary.selected, danger: UAppTheme.danger.selected },
+        bg-loading: { base: UAppTheme.color-fill-secondary, danger: Colors.transparent },
+        text: { base: UAppTheme.text, danger: UAppTheme.danger.base },
+        text-hover: { base: UAppTheme.text, danger: UAppTheme.danger.hover },
+        text-active: { base: UAppTheme.text, danger: UAppTheme.danger.active },
+        text-checked: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        text-disabled: { base: UAppTheme.text-disabled, danger: UAppTheme.text-disabled },
+        border: { base: UAppTheme.border, danger: UAppTheme.danger.base },
+        border-hover: { base: UAppTheme.border, danger: UAppTheme.danger.hover },
+        border-active: { base: UAppTheme.border, danger: UAppTheme.danger.active },
+        border-checked: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        border-disabled: { base: UAppTheme.border, danger: UAppTheme.border },
+    };
+    out property <UIconButtonTheme> filled: {
+        bg: { base: UAppTheme.color-fill-tertiary, danger: UAppTheme.danger.base.with-alpha(0.1) },
+        bg-hover: {
+            base: UAppTheme.color-fill-secondary,
+            danger: UAppTheme.danger.hover.with-alpha(0.3)
+        },
+        bg-active: { base: UAppTheme.color-fill, danger: UAppTheme.danger.active.with-alpha(0.4) },
+        bg-checked: { base: UAppTheme.primary.selected, danger: UAppTheme.danger.selected },
+        bg-loading: {
+            base: UAppTheme.color-fill-secondary,
+            danger: UAppTheme.danger.hover.with-alpha(0.3)
+        },
+        text: { base: UAppTheme.text, danger: UAppTheme.danger.base },
+        text-hover: { base: UAppTheme.text, danger: UAppTheme.danger.hover },
+        text-active: { base: UAppTheme.text, danger: UAppTheme.danger.active },
+        text-checked: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        text-disabled: { base: UAppTheme.text-disabled, danger: UAppTheme.text-disabled },
+    };
+    out property <UIconButtonTheme> text: {
+        bg-hover: {
+            base: UAppTheme.color-fill-secondary,
+            danger: UAppTheme.danger.hover.with-alpha(0.1)
+        },
+        bg-active: { base: UAppTheme.color-fill, danger: UAppTheme.danger.active.with-alpha(0.3) },
+        bg-loading: {
+            base: UAppTheme.color-fill-secondary,
+            danger: UAppTheme.danger.hover.with-alpha(0.1)
+        },
+        text: { base: UAppTheme.text, danger: UAppTheme.danger.base },
+        text-hover: { base: UAppTheme.text, danger: UAppTheme.danger.hover },
+        text-active: { base: UAppTheme.text, danger: UAppTheme.danger.active },
+        text-checked: { base: UAppTheme.primary.base, danger: UAppTheme.danger.base },
+        text-disabled: { base: UAppTheme.text-disabled, danger: UAppTheme.text-disabled },
+    };
+    out property <UIconButtonTheme> text-stripped: {
+        text: { base: UAppTheme.text-secondary, danger: UAppTheme.text-secondary },
+        text-hover: { base: UAppTheme.text, danger: UAppTheme.text },
+        text-active: { base: UAppTheme.text, danger: UAppTheme.text },
+        text-disabled: { base: UAppTheme.text-disabled, danger: UAppTheme.text-disabled },
+    };
+}

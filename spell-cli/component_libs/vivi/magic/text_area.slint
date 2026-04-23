@@ -1,0 +1,146 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { TextInputBaste, HorizontalLayoutBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { MagicText } from "./magic_text.slint";
+import { ScrollView } from "./scroll_view.slint";
+import {
+    Palette,
+    BorderSettings,
+    SizeSettings,
+    LayoutSettings,
+    FontSettings,
+    IconSettings
+} from "./styling.slint";
+
+export component TextArea inherits TextInputBaste {
+    out property <bool> has_focus: input.has_focus;
+    in property <TextWrap> wrap <=> input.wrap;
+    in property <InputType> input_type <=> input.input_type;
+    in property <TextHorizontalAlignment> horizontal_alignment <=> input.horizontal_alignment;
+
+    min_width: SizeSettings.min_text_field_width;
+    min_height: SizeSettings.min_text_area_height;
+    style: {
+        layout_style: LayoutSettings.text_input_style,
+        selection_background: Palette.selection_background,
+        selection_foreground: Palette.foreground,
+        icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.foreground,
+        },
+        text_style: FontSettings.body,
+        placeholder_style: {
+            font_size: FontSettings.body.font_size,
+            font_weight: FontSettings.body.font_weight,
+            foreground: Palette.placeholder_foreground,
+        },
+        border_style: {
+            border_width: BorderSettings.control_border_width,
+            border_radius: BorderSettings.box_border_radius,
+            border_brush: Palette.border,
+            background: Palette.background
+        }
+    };
+
+    accessible_role: text_input;
+    accessible_value <=> root.text;
+    accessible_placeholder_text: root.text == "" ? root.placeholder_text : "";
+    accessible_action_set_value(v) => { root.text = v; root.edited(v); }
+    forward_focus: input;
+
+    StateLayer {
+        width: 100%;
+        height: 100%;
+        border_radius: root.style.border_style.border_radius;
+        has_focus: root.enabled && root.has_focus;
+        has_error: root.enabled && root.has_error;
+    }
+
+    scroll_view := ScrollView {
+        x: root.style.layout_style.padding_left;
+        y: root.style.layout_style.padding_top;
+        width: root.width - root.style.layout_style.padding_left - root.style.layout_style.padding_right;
+        height: root.height - root.style.layout_style.padding_top - root.style.layout_style.padding_bottom;
+        viewport_width: root.wrap == TextWrap.no_wrap ? max(self.visible-width, input.preferred_width) : self.visible_width;
+        viewport_height: max(self.visible_height, input.preferred_height);
+
+        input := TextInput {
+            property <length> computed_x;
+
+            enabled: root.enabled;
+            text <=> root.text;
+            font_size: root.style.text_style.font_size;
+            font_weight: root.style.text_style.font_weight;
+            color: root.style.text_style.foreground;
+            selection_background_color: root.style.selection_background;
+            selection_foreground_color: root.style.selection_foreground;
+            wrap: word_wrap;
+
+             cursor-position-changed(cpos) => {
+                if cpos.x + scroll_view.viewport_x < self.font_size {
+                    scroll_view.viewport_x = min(0px, max(scroll_view.visible_width - self.width, -cpos.x + self.font_size));
+                } else if cpos.x + scroll_view.viewport-x > parent.visible_width - self.font_size {
+                    scroll_view.viewport_x = min(0px, max(parent.visible-width - self.width,  parent.visible-width - cpos.x - self.font_size));
+                }
+
+                if cpos.y + scroll_view.viewport_y < self.font_size {
+                    scroll_view.viewport-y = min(0px, max(scroll_view.visible-height - self.height, -cpos.y + self.font_size));
+                } else if cpos.y + scroll_view.viewport_y > scroll_view.visible_height - self.font_size - 20px {
+                    // FIXME: font-height hardcoded to 20px
+                    scroll_view.viewport-y = min(0px, max(scroll_view.visible-height - self.height,  scroll_view.visible_height - cpos.y - self.font_size - 20px));
+                }
+            }
+
+            accepted => {
+                root.accepted(self.text);
+            }
+
+            edited => {
+                root.edited(self.text);
+            }
+        }
+    }
+
+    if root.text == "" && root.placeholder_text != "" : MagicText {
+        x: scroll_view.x;
+        y: scroll_view.y;
+        text: root.placeholder_text;
+        style: root.style.placeholder_style;
+        vertical_alignment: center;
+        horizontal-alignment: left;
+        accessible-role: none;
+    }
+
+    public function set_selection_offsets(start: int, end: int) {
+        input.set_selection_offsets(start, end);
+    }
+
+    public function select_all() {
+        input.select_all();
+    }
+
+    public function clear_selection() {
+        input.clear_selection();
+    }
+
+    public function cut() {
+        input.cut();
+    }
+
+    public function copy() {
+        input.copy();
+    }
+
+    public function paste() {
+        input.paste();
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

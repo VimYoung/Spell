@@ -1,0 +1,17 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export struct TextStyle {
+    foreground: brush,
+    font_size: relative_font_size,
+    font_weight: int,
+}
+
+export component TextBase inherits Text {
+    in property <TextStyle> style;
+
+    font_size: root.style.font_size;
+    font_weight: root.style.font_weight;
+    color: root.style.foreground;
+    overflow: elide;
+}

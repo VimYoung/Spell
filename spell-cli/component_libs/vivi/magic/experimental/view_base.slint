@@ -1,0 +1,52 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { AppBar } from "../app_bar.slint";
+import { ScrollView } from "../scroll_view.slint";
+import { MagicVerticalBox } from "../magic_vertical_box.slint";
+import { Palette } from "../styling.slint";
+import { TabBar, TabBarItem } from "../tab_bar.slint";
+
+export component ViewBase {
+    in property <image> navigation_icon;
+    in property <LayoutAlignment> alignment;
+    in property <string> title;
+    in property <[TabBarItem]> tabs;
+    in_out property <int> current_tab;
+
+    callback navigate <=> app_bar.leading_button_clicked;
+
+    min_width: content_layer.min_width;
+    min_height: content_layer.min_height;
+
+    background_layer := Rectangle {
+        background: Palette.background;
+    }
+
+    content_layer := VerticalLayout {
+        app_bar := AppBar {
+            leading_button_icon: root.navigation_icon;
+            title: root.title;
+        }
+
+        if root.tabs.length > 0 : Rectangle {
+            background: Palette.alternate_background;
+
+            tab_bar := TabBar {
+                width: 100%;
+                model: root.tabs;
+                current_index <=> root.current_tab;
+            }
+        }
+
+        ScrollView {
+            vertical_stretch: 1;
+
+            layout := MagicVerticalBox {
+                alignment: root.alignment;
+
+                @children
+            }
+        }
+    }
+}

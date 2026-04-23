@@ -1,0 +1,80 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230905
+* @version:0.0.1
+* @type:interface
+* @description: 
+* # SText
+* It is the simplest and most common component in SurrealismUI
+* It can display text , SText inherits Text and add theme property
+* ## properties inherits Text
+* - in property <Themes> theme : Surrealism themes
+* ## callbacks: 
+* ## functions:
+* - pure public function get()->string : get content
+* - public function set(content:string) : set content
+* ============================================
+*/
+
+import {ROOT_STYLES,DefaultSTextProps} from "../../themes/index.slint";
+import {Themes} from "../../use/index.slint";
+
+export component Span inherits Text{
+  //normal
+  text: "";
+  color: DefaultSTextProps.color;
+  // font styles:
+  font-weight: DefaultSTextProps.font-weight;
+  font-size: DefaultSTextProps.font-size;
+  font-family: DefaultSTextProps.font-family;
+  font-italic: DefaultSTextProps.font-italic;
+  letter-spacing: DefaultSTextProps.letter-spacing;
+  //alignment: 
+  horizontal-alignment: DefaultSTextProps.horizontal-alignment;
+  vertical-alignment:DefaultSTextProps.vertical-alignment;
+  //wrap
+  wrap: DefaultSTextProps.wrap;
+  overflow: DefaultSTextProps.overflow;
+  //props
+  in property <Themes> theme : DefaultSTextProps.theme;
+  
+  //functions
+  public function set(value:string) {
+    self.text = value;
+  }
+  pure public function get()->string {
+    self.text
+  }
+  states [
+    light when theme == Themes.Light: {
+      root.color : ROOT-STYLES.sur-theme-colors.light.font;
+    }
+    primary when theme == Themes.Primary: {
+      root.color : ROOT-STYLES.sur-theme-colors.primary.font;
+    }
+    success when theme == Themes.Success: {
+      root.color : ROOT-STYLES.sur-theme-colors.success.font;
+    }
+    info when theme == Themes.Info: {
+      root.color : ROOT-STYLES.sur-theme-colors.info.font;
+    }
+    warning when theme == Themes.Warning: {
+      root.color : ROOT-STYLES.sur-theme-colors.warning.font;
+    }
+    error when theme == Themes.Error: {
+      root.color : ROOT-STYLES.sur-theme-colors.error.font;
+    }
+    dark when theme == Themes.Dark: {
+      root.color : ROOT-STYLES.sur-theme-colors.dark.font;
+    }
+  ]
+  animate font-size {
+    easing: ROOT-STYLES.sur-an-easing;
+    duration: ROOT-STYLES.sur-an-duration;
+  }
+  animate font-weight {
+    easing: ROOT-STYLES.sur-an-easing;
+    duration: ROOT-STYLES.sur-an-duration;
+  }
+}

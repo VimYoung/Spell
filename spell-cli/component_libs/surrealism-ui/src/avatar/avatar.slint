@@ -1,0 +1,51 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230910
+* @version:0.1.0
+* @type:interface
+* @description:
+* # SAvatar
+* SAvatar is a avatar component that defaults to Icons.Avatar when there are no images available
+* ## properties inherits SCard
+* - in property <length> avatar-size : avatar image size;
+* - in property <image> avatar : avatar image;
+* - in-out property <image> alt : if the image can be displayed the default alt will instead;
+* - in property <ImageFit> image-fit : image fit;
+* ============================================
+*/
+import { SCard } from "../card/index.slint";
+import { SIcon } from "../icon/index.slint";
+import {ROOT_STYLES,DefaultSAvatarProps} from "../../themes/index.slint";
+import { Themes,PaddingType,PaddingProps,ShadowType,BorderType,BorderProps,UseSurrealismFn,UseIcons } from "../../use/index.slint";
+
+export component Avatar inherits SCard { 
+  in property <length> avatar-size : DefaultSAvatarProps.avatar-size;
+  in property <image> avatar : DefaultSAvatarProps.avatar;
+  in-out property <image> alt :DefaultSAvatarProps.alt;
+  in property <ImageFit> image-fit : DefaultSAvatarProps.image-fit;
+  card-height:DefaultSAvatarProps.card-height;
+  card-width:DefaultSAvatarProps.card-width; 
+  padding-type: DefaultSAvatarProps.padding-type;
+  shadow-type: DefaultSAvatarProps.shadow-type;
+  border-type:DefaultSAvatarProps.border-type;
+  clip: true;
+  padding-left: self.card-padding.padding-same;
+  padding-right: self.card-padding.padding-same;
+  padding-top: self.card-padding.padding-same;
+  padding-bottom: self.card-padding.padding-same;
+  SIcon {
+    z: 13;
+    height: root.avatar-size;
+    width: root.avatar-size;
+    source: root.alt;
+    theme: root.theme;
+  }
+  Image {
+    z: 15;
+    height: root.height;
+    width: root.width;
+    source: avatar;
+    image-fit: root.image-fit;
+  }
+}

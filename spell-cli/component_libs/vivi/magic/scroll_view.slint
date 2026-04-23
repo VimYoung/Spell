@@ -1,0 +1,167 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Border, BorderStyle, ScrollBarStyle, ScrollViewBase } from "../foundation.slint";
+import { Palette, SizeSettings, LayoutSettings, AnimationSettings, BorderSettings } from "./styling.slint";
+import { StateLayer } from "state_layer.slint";
+
+component ScrollBar {
+    in property <bool> enabled <=> touch_area.enabled;
+    in_out property <length> value;
+    in property <length> maximum;
+    in property <length> content_size;
+    in property <ScrollBarStyle> style;
+    in property <bool> horizontal;
+    out property <bool> has_hover: touch_area.has_hover;
+
+    property <length> offset: LayoutSettings.control_spacing / 2;
+    property <length> handle_padding: LayoutSettings.control_spacing / 2;
+    property <length> available_size: root.horizontal ? root.width - 2 * root.offset : root.height - 2 * offset;
+
+    touch_area := TouchArea {
+        property <length> pressed_value;
+
+        pointer_event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                self.pressed_value = -root.value;
+            }
+        }
+
+        moved => {
+            if !self.enabled || !self.pressed {
+                return;
+            }
+
+            root.value = -max(0px, min(root.maximum, self.pressed_value + (
+                 root.horizontal ? (self.mouse_x - self.pressed_x) * (root.maximum / (root.available_size - handle.width))
+                                 : (self.mouse_y - self.pressed_y) * (root.maximum / (root.available_size - handle.height))
+            )));
+        }
+
+        scroll_event(event) => {
+            if root.horizontal && event.delta_x != 0 {
+                root.value = max(-root.maximum, min(0px, root.value + event.delta_x));
+                return accept;
+            } else if !root.horizontal && event.delta_y != 0 {
+                root.value = max(-root.maximum, min(0px, root.value + event.delta_y));
+                return accept;
+            }
+
+            reject
+        }
+    }
+
+    background_layer := Rectangle {
+        background: transparent;
+        border_width: 0;
+
+        animate background { duration: AnimationSettings.color_duration; }
+    }
+
+    border := Rectangle {
+        x: 0;
+        y: 0;
+        width: root.horizontal ? root.width : root.style.border_style.border_width;
+        height: root.horizontal ? root.style.border_style.border_width : root.height;
+        background: root.style.border_style.border_brush;
+        opacity: 0;
+
+        animate background { duration: AnimationSettings.color_duration; }
+    }
+
+    handle := Border {
+        x: !root.horizontal ? (parent.width - self.width) / 2 : root.offset + (root.available_size - self.width) * (-root.value / root.maximum);
+        y: root.horizontal ? (parent.height - self.height) / 2 : root.offset + (root.available_size - self.height) * (-root.value / root.maximum);
+        width: !root.horizontal ? parent.width - 2 * root.handle_padding : root.maximum <= 0 ? 0 : max(SizeSettings.control_height, root.available_size * (root.content_size / (root.maximum + root.content_size)));
+        height: root.horizontal ? parent.height - 2 * root.handle_padding : root.maximum <= 0 ? 0 : max(SizeSettings.control_height, root.available_size * (root.content_size / (root.maximum + root.content_size)));
+        style: root.style.handle_style;
+        border_radius: max(root.style.handle_style.border_radius, root.horizontal ? self.height / 2 : self.width / 2);
+        opacity: 0.6;
+
+        animate width, height { duration: AnimationSettings.fast_resize_duration; }
+    }
+
+    state_layer := StateLayer {
+        x: handle.x;
+        y: handle.y;
+        width: handle.width;
+        height: handle.height;
+        border_radius: handle.border_radius;
+        pressed: touch_area.pressed;
+        has_hover: touch_area.has_hover;
+    }
+
+    states [
+        hover when touch_area.has_hover : {
+            background_layer.background: root.style.border_style.background;
+            handle_padding: LayoutSettings.control_spacing;
+            border.opacity: 1;
+        }
+    ]
+
+    animate width, height, handle_padding { duration: AnimationSettings.fast_resize_duration; }
+}
+
+export component ScrollView inherits ScrollViewBase {
+    out property <length> visible_width <=> flickable.width;
+    out property <length> visible_height <=> flickable.height;
+    in_out property <bool> has_focus;
+
+    min_width: 2 * SizeSettings.control_height;
+    min_height: self.min_width;
+    preferred_width: 100%;
+    preferred_height: 100%;
+    viewport_x <=> flickable.viewport_x;
+    viewport_y <=> flickable.viewport_y;
+    viewport_width <=> flickable.viewport_width;
+    viewport_height <=> flickable.viewport_height;
+    style: {
+        border_style: {
+            background: Palette.transparent,
+        },
+        scroll_bar_style: {
+            border_style: {
+                background: Palette.foreground.with_alpha(0.2),
+                border_width: BorderSettings.control_border_width,
+                border_brush: Palette.border
+            },
+            handle_style: {
+                background: Palette.control_background,
+                border_width: 0,
+                border_brush: Palette.transparent
+            }
+        }
+    };
+
+    flickable := Flickable {
+        viewport_x <=> horizontal_scroll_bar.value;
+        viewport_y <=> vertical_scroll_bar.value;
+
+        @children
+    }
+
+    vertical_scroll_bar := ScrollBar {
+        x: parent.width - self.width;
+        y: 0;
+        width: self.has_hover ? SizeSettings.box_height : SizeSettings.box_height / 2;
+        height: horizontal_scroll_bar.visible ? parent.height - horizontal_scroll_bar.height : parent.height;
+        style: root.style.scroll_bar_style;
+        enabled: root.enabled;
+        visible: flickable.viewport_height > flickable.height;
+        maximum: flickable.viewport_height - flickable.height;
+        content_size: flickable.height;
+    }
+
+    horizontal_scroll_bar := ScrollBar {
+        x: 0;
+        y: parent.height - self.height;
+        width: vertical_scroll_bar.visible ? parent.width - vertical_scroll_bar.width : parent.width;
+        height: self.has_hover ? SizeSettings.box_height : SizeSettings.box_height / 2;
+        style: root.style.scroll_bar_style;
+        enabled: root.enabled;
+        visible: flickable.viewport_width > flickable.width;
+        horizontal: true;
+        maximum: flickable.viewport_width - flickable.width;
+        content_size: flickable.width;
+    }
+}

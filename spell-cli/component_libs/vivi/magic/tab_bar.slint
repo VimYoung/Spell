@@ -1,0 +1,246 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { TabBarItemStyle, TabBarStyle, TabBarItem, TabBarBase, Border, HorizontalLayoutBase } from "../foundation.slint";
+export { TabBarItem }
+
+import { MagicText } from "./magic_text.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { StateLayer } from "./state_layer.slint";
+import { IconButton } from "./icon_button.slint";
+import { Icons } from "./icons.slint";
+import {
+    SizeSettings,
+    Palette,
+    FontSettings,
+    LayoutSettings,
+    IconSettings,
+    BorderSettings,
+    AnimationSettings
+} from "./styling.slint";
+
+component TabBarItemTemplate {
+    in property <TabBarItemStyle> style;
+    in property <image> prefix_icon;
+    in property <string> text;
+    in property <bool> closeable;
+    in property <bool> selected;
+    in property <bool> has_focus;
+    in property <bool> enabled: true;
+
+    property <brush> icon_foreground: root.style.icon_style.foreground;
+    property <bool> icon_visible: root.prefix_icon.width > 0 && root.prefix_icon.height > 0;
+
+    callback clicked <=> touch_area.clicked;
+    callback close();
+
+    horizontal_stretch: 1;
+    min_width: content_layer.min_width;
+    height: max(SizeSettings.item_height, content_layer.min_height);
+
+    touch_area := TouchArea {
+        width: background_layer.width;
+        height: background_layer.height;
+        mouse_cursor: MouseCursor.pointer;
+        enabled: root.enabled;
+    }
+
+    background_layer := Rectangle {
+        border_top_left_radius: root.style.border_style.border_radius;
+        border_top_right_radius: root.style.border_style.border_radius;
+        border_bottom_left_radius: 0;
+        border_bottom_right_radius: 0;
+        clip: true;
+
+        state_layer := StateLayer {
+            width: background_layer.width;
+            height: background_layer.height;
+            pressed: touch_area.pressed;
+            has_hover: touch_area.has_hover;
+            has_focus: root.enabled && root.has_focus;
+            focus_padding: 0;
+        }
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: parent.spacing;
+
+            if root.icon_visible : MagicIcon {
+                y: (parent.height - self.height) / 2;
+                icon: root.prefix_icon;
+                style: root.style.icon_style;
+                colorize: root.icon_foreground;
+                horizontal_stretch: 0;
+            }
+
+            text_label := MagicText {
+                text: root.text;
+                style: root.style.text_style;
+                horizontal_alignment: !root.icon_visible && !root.closeable ? center : left;
+                vertical_alignment: center;
+                horizontal_stretch: 1;
+            }
+        }
+
+        if root.closeable : IconButton {
+            icon: Icons.clear;
+            horizontal_stretch: 0;
+            inline: true;
+
+            clicked => {
+                root.close();
+            }
+
+            states [
+                selected when root.selected : {
+                    style: {
+                        border_style: {
+                            border_radius: SizeSettings.control_height / 2,
+                        },
+                        icon_style: {
+                            icon_size: IconSettings.body.icon_size,
+                            foreground: Palette.control_foreground,
+                        },
+                        layout_style: {
+                            alignment: LayoutAlignment.center,
+                        }
+                    };
+                }
+            ]
+        }
+    }
+
+    selection_border := Rectangle {
+        y: parent.height - self.height;
+        width: parent.width / 3;
+        height: 4px;
+        background: Palette.accent_background;
+        opacity: 0;
+
+        animate width, opacity { duration: AnimationSettings.move_in_duration; }
+    }
+
+    states [
+        selected when root.selected : {
+            background_layer.background: Palette.control_background;
+            text_label.color: Palette.control_foreground;
+            root.icon_foreground: Palette.control_foreground;
+            selection_border.width: root.width;
+            selection_border.opacity: 1;
+        }
+    ]
+}
+
+export component TabBar inherits TabBarBase {
+    vertical_stretch: 0;
+    style: {
+        item_style: {
+            border_style: {
+                background: Palette.transparent,
+                border_radius: BorderSettings.box_border_radius,
+            },
+            text_style: FontSettings.body,
+            icon_style: {
+                icon_size: IconSettings.body.icon_size,
+                foreground: Palette.foreground,
+            },
+            layout_style: {
+                padding_left: LayoutSettings.control_padding,
+                padding_right: LayoutSettings.control_padding,
+                spacing: LayoutSettings.control_spacing,
+            }
+        }
+    };
+
+    property <int> focus_index: 0;
+
+    focus_scope := FocusScope {
+        x: 0;
+        width: 0;
+        enabled: root.enabled;
+
+        focus_changed_event => {
+            root.focus_current_item();
+        }
+
+        key_pressed(event) => {
+            if event.text == Key.LeftArrow {
+                root.focus_left();
+                return accept;
+            } else if event.text == Key.RightArrow {
+                root.focus_right();
+                return accept;
+            } else if event.text == Key.Return {
+                root.select_focus_index();
+                return accept;
+            }
+            reject
+        }
+    }
+    content_layer := HorizontalLayout {
+        for item[index] in root.model : TabBarItemTemplate {
+            style: root.style.item_style;
+            prefix_icon: item.prefix_icon;
+            text: item.text;
+            closeable: item.closeable;
+            selected: index == root.current_index;
+            enabled: root.enabled;
+            has_focus: index == root.focus_index && focus_scope.has_focus;
+
+            clicked => {
+                root.select(index);
+            }
+
+            close => {
+                root.close(index);
+            }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - self.height;
+        height: 1px;
+        background: Palette.accent_background;
+    }
+
+
+    function focus_current_item() {
+        root.focus_index = max(0, root.current_index);
+    }
+
+    function select(index: int) {
+        if root.current_index == index {
+            return;
+        }
+
+        root.current_index = min(max(0, index), root.model.length - 1);
+        root.selected(root.current_index);
+    }
+
+
+    function set_focus_index(index: int) {
+        root.focus_index = min(root.model.length - 1, max(0, index));
+    }
+
+    function select_focus_index() {
+        root.select(root.focus_index);
+    }
+
+    function focus_left() {
+        root.set_focus_index(root.focus_index - 1);
+    }
+
+    function focus_right() {
+       root.set_focus_index(root.focus_index + 1);
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

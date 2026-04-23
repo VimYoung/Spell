@@ -1,0 +1,134 @@
+import { UAppTheme } from "../app-theme.slint";
+
+
+enum ProgressDirection {
+	start,
+	end,
+}
+
+export enum ULinearProgressVariant {
+	primary,
+	success,
+	warning,
+	danger,
+}
+
+export component ULinearProgress inherits Rectangle {
+	// Accessability properties
+	accessible-role: progress-indicator;
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 100;
+	// Regular properties
+    private property <brush> progress-color;
+    in-out property <ULinearProgressVariant> variant: primary;
+    in property <length> default-size: 10px;
+    in property <length> default-radius: UAppTheme.radius-round;
+    in property <Orientation> orientation: horizontal;
+    in property <ProgressDirection> direction: start;
+    in-out property <percent> progress: indeterminate ? 30% : 0%;
+    in-out property <bool> indeterminate: false;
+    callback reset-x();
+    background: UAppTheme.color-fill-secondary;
+    border-radius: default-radius;
+    clip: true;
+    height: default-size;
+    width: default-size;
+    changed progress => {
+        if indeterminate {
+            progress = 30%;
+        }
+    }
+    changed indeterminate => {
+        if indeterminate {
+            progress = 30%;
+        }
+    }
+    if orientation == Orientation.horizontal: Rectangle {
+        private property <length> x-pos: 0;
+        function get-x-pos() -> length {
+            if indeterminate {
+                return x-pos;
+            }
+            if direction == ProgressDirection.end {
+                return root.width - self.width;
+            }
+            return 0;
+        }
+        x: get-x-pos();
+        background: progress-color;
+        border-radius: default-radius;
+        width: clamp(progress, 0%, 100%);
+        animate width {
+            easing: ease-in-out;
+            duration: 350ms;
+        }
+        Timer {
+            running: indeterminate;
+            interval: 5ms;
+            triggered => {
+                if direction == ProgressDirection.start {
+                    parent.x-pos += 1px;
+                    if parent.x-pos > root.width {
+                        parent.x-pos = -parent.width;
+                    }
+                } else {
+                    parent.x-pos -= 1px;
+                    if parent.x-pos < -parent.width {
+                        parent.x-pos = root.width - parent.width;
+                    }
+                }
+            }
+        }
+    }
+    if orientation == Orientation.vertical: Rectangle {
+        private property <length> y-pos: 0;
+        function get-y-pos() -> length {
+            if indeterminate {
+                return y-pos;
+            }
+            if direction == ProgressDirection.end {
+                return root.height - self.height;
+            }
+            return 0;
+        }
+        y: get-y-pos();
+        background: progress-color;
+        border-radius: default-radius;
+        height: clamp(progress, 0%, 100%);
+        animate height {
+            easing: ease-in-out;
+            duration: 350ms;
+        }
+        Timer {
+            running: indeterminate;
+            interval: 10ms;
+            triggered => {
+                if direction == ProgressDirection.start {
+                    parent.y-pos += 1px;
+                    if parent.y-pos > root.height {
+                        parent.y-pos = -parent.height;
+                    }
+                } else {
+                    parent.y-pos -= 1px;
+                    if parent.y-pos < -parent.height {
+                        parent.y-pos = root.height;
+                    }
+                }
+            }
+        }
+    }
+    states [
+        primary when variant == ULinearProgressVariant.primary: {
+            progress-color: UAppTheme.primary.base;
+        }
+        success when variant == ULinearProgressVariant.success: {
+            progress-color: UAppTheme.success.base;
+        }
+        warning when variant == ULinearProgressVariant.warning: {
+            progress-color: UAppTheme.warning.base;
+        }
+        danger when variant == ULinearProgressVariant.danger: {
+            progress-color: UAppTheme.danger.base;
+        }
+    ]
+}

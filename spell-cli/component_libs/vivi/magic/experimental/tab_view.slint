@@ -1,0 +1,35 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { AnimationSettings } from "../styling.slint";
+
+export component TabView {
+    in property <int> tabs_count;
+    in property <int> current_tab;
+
+    public pure function tab_x(index: int) -> length {
+        index * root.width
+    }
+
+    public pure function tab_width() -> length {
+        root.width
+    }
+
+    public pure function tab_active(index: int) -> bool {
+        root.translated_tab_x(index) < root.width && root.translated_tab_x(index) + root.tab_width() > 0
+    }
+
+    pure function translated_tab_x(index: int) -> length {
+        tab_container.x + root.tab_x(index)
+    }
+
+    tab_container := Rectangle {
+        x: -(parent.width * root.current_tab);
+        width: root.tabs_count * parent.width;
+        height: 100%;
+
+        @children
+
+        animate x { duration: AnimationSettings.move_in_duration; easing: AnimationSettings.move_in_easing; }
+    }
+}

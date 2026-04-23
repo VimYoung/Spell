@@ -1,0 +1,21 @@
+export enum ShadowType{
+  Low1,
+  Low2,
+  Low3,
+  High1,
+  High2,
+  High-empty
+}
+
+export struct ShadowProps{
+  x:length,y:length,blur:length
+}
+
+export struct ThemeShadow {
+  low1 : ShadowProps,
+  low2 : ShadowProps,
+  low3 : ShadowProps,
+  high1 : ShadowProps,
+  high2 : ShadowProps,
+  high-empty:ShadowProps
+}

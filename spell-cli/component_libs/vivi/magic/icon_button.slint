@@ -1,0 +1,29 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+
+import { ButtonStyle } from "../foundation.slint";
+import { MagicButtonBase, MagicButtonStyles } from "./magic_button_base.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { Palette, FontSettings, IconSettings, SizeSettings, LayoutSettings, BorderSettings } from "./styling.slint";
+
+export component IconButton inherits MagicButtonBase {
+    in property <image> icon;
+    in property <bool> inline;
+
+    width: self.height;
+    preferred_min_height: root.inline ? icon.min_height : SizeSettings.control_height;
+    horizontal_stretch: 0;
+
+    style: MagicButtonStyles.icon_button_style;
+
+    Rectangle {}
+
+    icon := MagicIcon {
+        y: (root.height - self.height) / 2;
+        icon: root.icon;
+        style: root.style.icon_style;
+    }
+
+    Rectangle {}
+}

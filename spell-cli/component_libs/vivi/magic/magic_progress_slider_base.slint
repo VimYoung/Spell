@@ -1,0 +1,133 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { RangeBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { Palette, SizeSettings, BorderSettings, AnimationSettings } from "./styling.slint";
+import { ProgressIndicator } from "std-widgets.slint";
+
+export component DragHandle {
+    in property <bool> enabled: true;
+    in property <brush> background <=> background_layer.background;
+    in property <bool> has_focus;
+    out property <length> mouse_x <=> touch_area.mouse_x;
+    out property <length> mouse_y <=> touch_area.mouse_y;
+    out property <length> pressed_x <=> touch_area.pressed_x;
+    out property <length> pressed_y <=> touch_area.pressed_y;
+
+    callback moved <=> touch_area.moved;
+    callback pointer_event <=> touch_area.pointer-event;
+
+    width: root.height;
+
+    touch_area := TouchArea {
+        width: root.width + 8px;
+        height: root.height + 8px;
+        enabled: root.enabled;
+        mouse_cursor: pointer;
+    }
+
+    background_layer := Rectangle {
+        height: root.height;
+        width: self.height;
+        border_radius: self.height / 2;
+        background: Palette.foreground;
+    }
+
+    state_layer := StateLayer {
+        width: background_layer.width;
+        height: background_layer.height;
+        border_radius: background_layer.border_radius;
+        pressed: touch_area.pressed;
+        has_hover: touch_area.has_hover;
+        has_focus: root.has_focus && root.enabled;
+    }
+
+    states [
+        disabled when !root.enabled : {
+            touch_area.mouse_cursor: not_allowed;
+        }
+        pressed when touch_area.pressed : {
+            background_layer.height: root.height * 0.9;
+        }
+    ]
+}
+
+export component MagicProgressSliderBase inherits RangeBase {
+    // states
+    in property <bool> indeterminate;
+    in property <bool> interactive;
+    in property <bool> enabled: true;
+    out property <bool> has_focus: root.interactive && focus-scope.has_focus;
+
+    // value
+    in property <float> step-size: 1;
+
+    property <bool> vertical_arrows;
+
+    callback edited(/* value */ float);
+
+    accessible_role: slider;
+    accessible_value: root.value;
+    accessible_value_minimum: root.minimum;
+    accessible_value_maximum: root.maximum;
+    accessible_value_step: root.step-size;
+    forward_focus: focus_scope;
+
+    style: {
+        bar_height: SizeSettings.bar_height,
+        background: Palette.control_background,
+        border_radius: SizeSettings.bar_height / 2,
+        track_background: root.interactive ? Palette.accent_background.with_alpha(0.8) : Palette.accent_background,
+        handle_background: Palette.accent_background,
+        handle_size: SizeSettings.box_height
+    };
+
+    focus_scope := FocusScope {
+        enabled: root.enabled && root.interactive && !root.indeterminate;
+
+        key_pressed(event) => {
+            if !self.enabled {
+                return reject;
+            }
+
+            if (root.vertical_arrows && event.text == Key.DownArrow) || (!root.vertical_arrows && event.text == Key.RightArrow) {
+                root.increment();
+                return accept;
+            }
+
+            if (root.vertical_arrows && event.text == Key.UpArrow) || (!root.vertical_arrows && event.text == Key.LeftArrow) {
+                root.decrement();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    protected function set_vertical_arrows(vertical: bool) {
+        root.vertical_arrows = vertical;
+    }
+
+    protected function set_value(value: int) {
+        if root.value == value {
+            return;
+        }
+
+        root.value = max(root.minimum, min(root.maximum, value));
+        root.edited(root.value);
+    }
+
+    function increment() {
+        root.set_value(root.value + root.step-size);
+    }
+
+    function decrement() {
+        root.set_value(root.value - root.step-size);
+    }
+
+    states [
+        disabled when !root.enabled: {
+            root.opacity: 0.5;
+        }
+    ]
+}

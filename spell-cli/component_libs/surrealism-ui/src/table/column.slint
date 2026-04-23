@@ -1,0 +1,78 @@
+/**
+* ============================================
+* @author:syf20020816@outlook.com
+* @since:20230907
+* @version:0.0.1
+* @type:interface
+* @description:
+* # STableColumn
+*  STableColumn is table body , it covers the data of the table
+* ## properties inherits SCard
+* - in-out property <int> index : column index
+* - in property <[string]> datas : column datas
+* - in property <TextHorizontalAlignment> alignment : row text horizontal alignment
+* ## functions
+* - pure public function count-column-height()->length : count column height
+* ## callbacks
+* - callback clicked(int,int,string) : run if click the row item
+* ============================================
+*/
+
+import {ROOT_STYLES,DefaultSTableColumnProps} from "../../themes/index.slint";
+import { SCard } from "../card/index.slint";
+import { SText } from "../text/index.slint";
+import { Themes,SOption,UseSurrealismFn,PaddingType,BorderType} from "../../use/index.slint";
+
+
+export component TableColumn inherits SCard{
+    theme: DefaultSTableColumnProps.theme;
+    border-type: DefaultSTableColumnProps.border-type;
+    height: count-column-height();
+    padding-type : DefaultSTableColumnProps.padding-type;
+    font-family: DefaultSTableColumnProps.font-family;
+    font-size: DefaultSTableColumnProps.font-size;
+    font-weight: DefaultSTableColumnProps.font-weight;
+    font-italic: DefaultSTableColumnProps.font-italic;
+    in-out property <int> index : DefaultSTableColumnProps.index;
+    in property <[string]> datas : DefaultSTableColumnProps.datas;
+    in property <TextHorizontalAlignment> alignment : DefaultSTableColumnProps.alignment;
+    pure public function count-column-height()->length {
+       return datas.length * UseSurrealismFn.count-height(root.font-size,UseSurrealismFn.get-padding(root.padding-type).padding-top);
+    }
+    callback clicked(int,int,string);
+    layout:=VerticalLayout {
+        
+        for item[i-index] in datas: TouchArea{
+            height: root.height / datas.length;
+            mouse-cursor: pointer;
+            clicked => {
+                root.clicked(index,i-index,item);
+            }
+            SCard {
+                width: root.width;
+                card-height: root.font-size;
+                border-type: BorderType.None;
+                padding-type: root.padding-type;
+                theme: root.theme;
+                drop-shadow-offset-x: 0;
+                drop-shadow-offset-y: 0;
+                drop-shadow-color: transparent;
+                HorizontalLayout {
+                    padding-left: parent.card-padding.padding-left;
+                    padding-right: parent.card-padding.padding-right;
+                    SText{
+                        font-family: root.font-family;
+                        font-weight: root.font-weight;
+                        font-size: root.font-size;
+                        font-italic: root.font-italic;
+                        theme: root.theme;
+                        height: parent.height;
+                        text:item;
+                        horizontal-alignment: root.alignment;
+                    }
+                }
+            }
+        } 
+    }
+}
+

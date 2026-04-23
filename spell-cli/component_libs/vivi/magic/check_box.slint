@@ -1,0 +1,105 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+import { Border, CheckBoxBase, FocusTouchArea, HorizontalLayoutBase } from "../foundation.slint";
+import { StateLayer } from "./state_layer.slint";
+import { MagicIcon } from "./magic_icon.slint";
+import { MagicText } from "./magic_text.slint";
+import { Icons } from "icons.slint";
+import {
+    Palette,
+    FontSettings,
+    IconSettings,
+    AnimationSettings,
+    SizeSettings,
+    IconSettings,
+    BorderSettings,
+    LayoutSettings
+} from "./styling.slint";
+
+export component CheckBox inherits CheckBoxBase {
+    in property <string> text;
+
+    min_width: content_layer.min_width;
+    forward_focus: touch_area;
+    style: {
+        box_style: {
+            background: !root.checked ? Palette.background : Palette.accent_background,
+            border_radius: BorderSettings.box_border_radius,
+            border_brush: Palette.border,
+            border_width: BorderSettings.control_border_width,
+        },
+        box_icon_style: {
+            icon_size: IconSettings.body.icon_size,
+            foreground: Palette.accent_foreground,
+        },
+        text_style: FontSettings.body,
+        layout_style: {
+            spacing: LayoutSettings.control_spacing,
+        }
+    };
+
+    accessible_label: root.text;
+    accessible_action_default => {
+        touch_area.clicked();
+    }
+
+    touch_area := FocusTouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        mouse_cursor: root.enabled ? pointer : not-allowed;
+
+        clicked => {
+            root.toggle();
+        }
+    }
+
+    content_layer := HorizontalLayoutBase {
+        style: root.style.layout_style;
+
+        box := Border {
+            width: self.height;
+            min_height: SizeSettings.box_height;
+            horizontal_stretch: 0;
+            style: root.style.box_style;
+
+            state_layer := StateLayer {
+                width: 100%;
+                height: 100%;
+                border_radius: box.border-radius;
+                pressed: touch_area.pressed || touch_area.enter_pressed;
+                has_hover: touch_area.has_hover;
+                has_focus: touch_area.has_focus;
+            }
+
+            check_icon := MagicIcon {
+                icon: Icons.check;
+                style: root.style.box_icon_style;
+                opacity: 0;
+
+                animate opacity { duration: AnimationSettings.color_duration; }
+            }
+
+            animate background { duration: AnimationSettings.color_duration; }
+
+            states [
+                checked when root.checked : {
+                    check_icon.opacity: 1;
+                }
+            ]
+        }
+
+        if root.text != "" : MagicText {
+            text: root.text;
+            style: root.style.text_style;
+            vertical_alignment: center;
+        }
+    }
+
+    states [
+        disabled when !root.enabled : {
+            root.opacity: 0.5;
+        }
+    ]
+}

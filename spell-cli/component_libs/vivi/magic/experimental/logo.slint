@@ -1,0 +1,24 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { MagicIcon } from "../magic_icon.slint";
+import { BorderSettings, Palette } from "../styling.slint";
+
+export component Logo {
+    in property <image> icon;
+    in property <brush> background;
+
+    width: 128px;
+    height: 128px;
+
+    Rectangle {
+        border_radius: BorderSettings.box_border_radius;
+        background: root.background;
+
+        MagicIcon {
+            icon: root.icon;
+            colorize: Palette.accent_foreground;
+            width: 80%;
+        }
+    }
+}

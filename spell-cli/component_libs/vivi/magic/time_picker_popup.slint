@@ -1,0 +1,292 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+
+import { Border, BorderStyle, TextStyle, VerticalLayoutBase, LayoutStyle, TextInputStyle, ButtonStyle } from "../foundation.slint";
+import { MagicText } from "./magic_text.slint";
+import { Icons } from "./icons.slint";
+import { BorderSettings, Palette, FontSettings, LayoutSettings, SizeSettings } from "./styling.slint";
+import { CircularProgressSlider } from "./circular_progress_slider.slint";
+import { TextButton } from "./text_button.slint";
+import { ButtonAction } from "./magic_button_base.slint";
+import { TextField } from "./text_field.slint";
+import { MagicText } from "./magic_text.slint";
+import { Switch } from "./switch.slint";
+
+export struct TimePickerStyle {
+    border_style: BorderStyle,
+    layout_style: LayoutStyle,
+    text_style: TextStyle,
+    text_input_style: TextInputStyle,
+}
+
+export struct Time {
+    hour: int,
+    minute: int,
+    second: int
+}
+
+export component TimePickerPopup inherits PopupWindow {
+    in property <string> title: @tr("Select time");
+    in property <bool> use_24_time_format: true;
+    in property <Time> initial_time;
+    in property <TimePickerStyle> style: {
+        border_style: BorderSettings.popup_border_style,
+        layout_style: {
+            padding_top: LayoutSettings.control_padding,
+            padding_bottom: LayoutSettings.control_padding,
+            padding_left: LayoutSettings.control_padding,
+            padding_right: LayoutSettings.control_padding,
+            spacing: LayoutSettings.control_spacing,
+            alignment: LayoutAlignment.stretch
+        },
+        text_style: FontSettings.header_3,
+        text_input_style: {
+            layout_style: LayoutSettings.text_input_style,
+            selection_background: Palette.selection_background,
+            selection_foreground: Palette.foreground,
+            text_style: FontSettings.body,
+            placeholder_style: {
+                font_size: FontSettings.body.font_size,
+                font_weight: FontSettings.body.font_weight,
+                foreground: Palette.placeholder_foreground,
+            },
+            border_style: {
+                border_width: BorderSettings.control_border_width,
+                border_radius: BorderSettings.box_border_radius,
+                border_brush: Palette.border,
+                background: Palette.background
+            }
+        }
+    };
+    out property <BorderStyle> border_style: root.style.border_style;
+    out property <LayoutStyle> layout_style: root.style.layout_style;
+    out property <TextStyle> text_style: root.style.text_style;
+    out property <TextInputStyle> text_input_style: root.style.text_input_style;
+
+    callback canceled();
+    callback accepted(/* time */ Time);
+
+    property <Time> current_time: root.initial_time;
+    property <bool> hour_selected: hour_input.has_focus;
+    property <int> minimum_hour: 0;
+    property <int> maximum_hour: root.use_24_time_format ? 23 : 12;
+    property <int> minimum_minute: 0;
+    property <int> maximum_minute: 59;
+    property <bool> pm_selected;
+
+    close_on_click: false;
+    forward_focus: hour_input;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        Border {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: self.min_width;
+            height: self.min_height;
+            style: root.border_style;
+            drop_shadow_color: Palette.shadow;
+            drop_shadow_blur: 16px;
+            drop_shadow_offset_y: 4px;
+            clip: true;
+
+            VerticalLayoutBase {
+                style: root.style.layout_style;
+
+                if root.title != "" : MagicText {
+                    text: root.title;
+                    style: root.text_style;
+                    vertical_stretch: 0;
+                    overflow: clip;
+                }
+
+                Rectangle {
+                    min_width: progress_slider.width;
+                    min_height: progress_slider.height;
+
+                    progress_slider := CircularProgressSlider {
+                        width: input_layout.min-width * 1.4;
+                        height: self.width;
+                        minimum: root.minimum_hour;
+                        maximum: root.maximum_hour;
+                        value: root.hour_selected ? root.current_time.hour : root.current_time.minute;
+                        interactive: hour_input.has_focus || minute-input.has_focus;
+
+                        edited(value) => {
+                            root.update_current_time(value);
+                        }
+
+                        states [
+                            minute_selected when !root.hour_selected : {
+                                minimum: root.minimum_minute;
+                                maximum: root.maximum_minute;
+                                value: root.current_time.minute;
+                            }
+                        ]
+                    }
+
+                    input_layout := VerticalLayout {
+                        alignment: center;
+                        spacing: LayoutSettings.layout_spacing;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: LayoutSettings.layout_spacing;
+
+                            Rectangle {
+                                min_width: hour_input.min_width;
+                                min_height: hour_input.min_height;
+
+                                hour_input := TextField {
+                                    min_width: SizeSettings.min_text_area_height;
+                                    text: root.current_time.hour;
+                                    input_type: number;
+                                    horizontal_alignment: center;
+                                    accessible_label: @tr("Hour");
+                                    style: root.text_input_style;
+
+                                    edited => {
+                                        if self.text == "" {
+                                            return;
+                                        }
+
+                                        root.update_current_time(self.text.to_float())
+                                    }
+                                }
+
+                                if !hour-input.has_focus : TouchArea {
+                                    clicked => {
+                                        root.select_hour_input();
+                                    }
+                                }
+                            }
+
+                            MagicText {
+                                text: ":";
+                                vertical-alignment: center;
+                                color: root.text_input_style.text_style.foreground;
+                                font_size: root.text_input_style.text_style.font_size;
+                                font_weight: root.text_input_style.text_style.font_weight;
+                            }
+
+                            Rectangle {
+                                min_width: minute_input.min_width;
+                                min_height: minute_input.min_height;
+
+                                minute_input := TextField {
+                                    min_width: SizeSettings.min_text_area_height;
+                                    text: root.current_time.minute;
+                                    input_type: number;
+                                    horizontal_alignment: center;
+                                    accessible_label: @tr("Minute");
+                                    style: root.text_input_style;
+
+                                    edited => {
+                                        if self.text == "" {
+                                            return;
+                                        }
+
+                                        root.update_current_time(self.text.to_float())
+                                    }
+                                }
+
+                                if !minute_input.has_focus : TouchArea {
+                                    clicked => {
+                                        root.select_minute_input();
+                                    }
+                                }
+                            }
+                        }
+
+                        if !root.use_24_time_format : HorizontalLayout {
+                            alignment: center;
+                            spacing: LayoutSettings.control_spacing;
+
+                            MagicText {
+                                text: @tr("AM");
+                                vertical_alignment: center;
+                            }
+
+                            Switch {
+                                height: self.min_height;
+                                text: @tr("PM");
+                                checked <=> root.pm_selected;
+                            }
+                        }
+                  }
+                }
+
+                HorizontalLayout {
+                    spacing: root.layout_style.spacing;
+                    alignment: end;
+
+                    TextButton {
+                        text: @tr("Cancel");
+                        horizontal_stretch: 0;
+                        action: ButtonAction.primary;
+
+                        clicked => {
+                            root.canceled();
+                            root.close();
+                        }
+                    }
+
+                    TextButton {
+                        text: @tr("Ok");
+                        horizontal_stretch: 0;
+                        action: ButtonAction.primary;
+
+                        clicked => {
+                            root.invoke_accepted();
+                        }
+                    }
+                }
+            }
+        }
+
+        init => {
+            self.background = #000000.with_alpha(0.6);
+            hour_input.focus();
+
+            if !root.use_24_time_format && root.initial_time.hour > 11 {
+                root.pm_selected = true;
+            }
+        }
+    }
+
+    function update_current_time(value: int) {
+        if root.hour_selected {
+            root.current_time = { hour: max(min(value, root.maximum_hour), root.minimum_hour), minute: root.current_time.minute };
+            hour_input.text = root.current_time.hour;
+            progress_slider.value = root.current_time.hour;
+            return;
+        }
+
+        root.current_time = { hour: root.current_time.hour, minute: max(min(value, root.maximum_minute), root.minimum_minute) };
+        minute_input.text = root.current_time.minute;
+        progress_slider.value = root.current_time.minute;
+    }
+
+    function select_hour_input() {
+        progress_slider.value = root.current_time.hour;
+        hour_input.focus();
+    }
+
+    function select_minute_input() {
+        progress_slider.value = root.current_time.minute;
+        minute_input.focus();
+    }
+
+    function invoke_accepted() {
+        if !root.use_24_time_format && root.pm_selected && root.current_time.hour < 11 {
+            root.accepted({ hour: root.current_time.hour + 12, minute: root.current_time.minute });
+        } else {
+            root.accepted(root.current_time);
+        }
+
+        root.close();
+    }
+}

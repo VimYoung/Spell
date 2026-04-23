@@ -1,0 +1,16 @@
+// SPDX-FileCopyrightText: 2024 vivi developers <vivi-ui@tuta.io>
+// SPDX-License-Identifier: MIT
+
+export struct IconStyle {
+    foreground: brush,
+    icon_size: relative-font-size,
+}
+
+export component IconBase inherits Image {
+    in property <image> icon <=> root.source;
+    in property <IconStyle> style;
+
+    width: root.style.icon_size;
+    colorize: root.style.foreground;
+    image-fit: contain;
+}
