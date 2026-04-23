@@ -10,7 +10,7 @@ use std::error::Error;
 
 use spell_framework::{
     cast_spell,
-    layer_properties::{BoardType, LayerAnchor, LayerType, WindowConf},
+    layer_properties::{LayerAnchor, LayerType, WindowConf},
 };
 
 slint::slint! {
@@ -140,16 +140,14 @@ slint::slint! {
 spell_framework::generate_widgets![CursorTest];
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let window_conf = WindowConf::new(
-        560,                            // width
-        520,                            // height
-        (Some(LayerAnchor::TOP), None), // centered at top
-        (50, 0, 0, 0),                  // margins
-        LayerType::Top,
-        BoardType::None,
-        None,
-    );
-
+    let window_conf = WindowConf::builder()
+        .width(560u32)
+        .height(520u32)
+        .anchor_1(LayerAnchor::TOP)
+        .margins(50, 0, 0, 0)
+        .layer_type(LayerType::Top)
+        .build()
+        .unwrap();
     let ui = CursorTestSpell::invoke_spell("cursor-test", window_conf);
 
     println!("Cursor Test Started!");

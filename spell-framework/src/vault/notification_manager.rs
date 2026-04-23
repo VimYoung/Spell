@@ -1,5 +1,5 @@
 use crate::{
-    vault::{NOTIFICATION_EVENT, Notification, NotificationManager, Timeout},
+    vault::{BlockingNotification, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout},
     wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
@@ -23,6 +23,8 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
             let _ = notification_service_enter(sender_cl, layer_name).await;
         });
     });
+
+    let _ = NOTIFICATION_EVENT.set(BlockingNotification);
     let _ = win
         .loop_handle
         .clone()
@@ -73,11 +75,11 @@ async fn notification_service_enter(
     Ok(())
 }
 
-struct NotificationHandler {
-    sender: Sender<NotifyEvent>,
-    layer_name: String,
-    next_id: u32,
-    notifications: Vec<Notification>,
+pub(crate) struct NotificationHandler {
+    pub(crate) sender: Sender<NotifyEvent>,
+    pub(crate) layer_name: String,
+    pub(crate) next_id: u32,
+    pub(crate) notifications: Vec<Notification>,
 }
 
 #[interface(name = "org.freedesktop.Notifications", proxy(gen_blocking = false,))]
