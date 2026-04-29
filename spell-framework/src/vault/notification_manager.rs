@@ -34,12 +34,13 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
                     if let Err(err) = ui.new_notification(notification) {
                         warn!("{:?}", err);
                     }
-                }
-                NotifyEvent::NotificationClosed(id) => {
-                    if let Err(err) = ui.notifcation_close(id) {
-                        warn!("{:?}", err)
-                    }
-                }
+                } // _ => {
+                  //     warn!("Unhandled Case occured");
+                  // } // NotifyEvent::NotigicationClosed(id) => {
+                  //     if let Err(err) = ui.notifcation_close(id) {
+                  //         warn!("{:?}", err)
+                  //     }
+                  // }
             },
             channel::Event::Closed => info!("Notification Channel to async thread is closed!"),
         });
@@ -47,7 +48,7 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
 
 pub enum NotifyEvent {
     Noti(Notification),
-    NotificationClosed(u32),
+    // NotificationClosed(u32),
 }
 
 async fn notification_service_enter(
@@ -151,10 +152,10 @@ impl NotificationHandler {
         id: u32,
     ) -> Result<(), BusError> {
         emitter.notification_closed().await?;
-        let _ = self
-            .sender
-            .clone()
-            .send(NotifyEvent::NotificationClosed(id));
+        // let _ = self
+        //     .sender
+        //     .clone()
+        //     .send(NotifyEvent::NotificationClosed(id));
         Ok(())
     }
 

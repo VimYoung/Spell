@@ -60,7 +60,6 @@ impl BlockingNotification {
 
 pub trait NotificationManager {
     fn new_notification(&self, notification: Notification) -> Result<(), NotiError>;
-    fn notifcation_close(&self, id: u32) -> Result<(), NotiError>;
 }
 
 #[derive(Debug)]

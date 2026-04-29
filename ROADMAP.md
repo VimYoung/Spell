@@ -23,3 +23,6 @@ In the Next release, following things will be included:
    a rustconf presentation.
 3. Making multi-window system multi-threaded for better performance on niri.
 4. Hot reloading (by integration of `subsecond` if possible, I havn't done research on integration of it, so it is hard to say.)
+
+====
+Addition of compatability with clipboard.
