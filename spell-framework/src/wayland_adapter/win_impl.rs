@@ -17,7 +17,7 @@ use smithay_client_toolkit::{
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
         touch::TouchHandler,
     },
-    shell::WaylandSurface,
+    shell::{WaylandSurface, xdg::popup::PopupHandler},
 };
 use tracing::{info, trace, warn};
 
@@ -390,4 +390,25 @@ impl ProvidesRegistryState for SpellWin {
         &mut self.states.registry_state
     }
     registry_handlers![OutputState, SeatState];
+}
+
+impl PopupHandler for SpellWin {
+    fn configure(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+        config: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
+    ) {
+        todo!()
+    }
+
+    fn done(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+    ) {
+        todo!()
+    }
 }

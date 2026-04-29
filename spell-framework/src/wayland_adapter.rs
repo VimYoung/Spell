@@ -31,6 +31,7 @@ use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm, delegate_touch,
+    delegate_xdg_popup,
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
@@ -53,6 +54,7 @@ use smithay_client_toolkit::{
             KeyboardInteractivity, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
+        xdg::XdgShell,
     },
     shm::{
         Shm, ShmHandler,
@@ -140,7 +142,8 @@ impl SpellWin {
     ) -> Self {
         let (globals, mut event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
-
+        // let xdg_shell = XdgShell::bind(&globals, &qh).expect("failed to create shell");
+        // let xed_pop
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let event_loop: EventLoop<'static, SpellWin> =
@@ -557,6 +560,7 @@ delegate_touch!(SpellWin);
 delegate_layer!(SpellWin);
 delegate_fractional_scale!(SpellWin);
 delegate_viewporter!(SpellWin);
+delegate_xdg_popup!(SpellWin);
 
 impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
@@ -741,12 +745,14 @@ impl WinHandle {
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::add_input_region`]
     pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!("Add input region called from WinHandle");
         self.0
             .insert_idle(move |win| win.add_input_region(x, y, width, height));
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_input_region`]
     pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
+        info!("Subtract input region called from WinHandle");
         self.0
             .insert_idle(move |win| win.subtract_input_region(x, y, width, height));
     }
