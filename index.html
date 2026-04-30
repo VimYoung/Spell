@@ -1,0 +1,1508 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spell — Desktop Widgets for Wayland</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      href="https://i.postimg.cc/8PrD4kN4/spell-trans.png"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --ore: #c8550a;
+        --ember: #e8722a;
+        --spark: #f5a352;
+        --ash: #0d0d10;
+        --charcoal: #131318;
+        --coal: #1a1a22;
+        --smoke: #252530;
+        --parchment: #eee8e0;
+        --parchment-dim: #b8b0a8;
+        --off-white: #ede0d0;
+        --text-muted: #787880;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        background-color: var(--ash);
+        color: var(--parchment);
+        font-family: "Crimson Pro", Georgia, serif;
+        font-size: 18px;
+        line-height: 1.7;
+        overflow-x: hidden;
+      }
+
+      /* ── NOISE TEXTURE OVERLAY ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+        opacity: 0.04;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      /* ── NAV ── */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.2rem 3rem;
+        background: rgba(13, 13, 16, 0.88);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(200, 85, 10, 0.18);
+      }
+
+      .nav-brand {
+        font-family: "Cinzel", serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        color: var(--spark);
+        text-decoration: none;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 2.5rem;
+        list-style: none;
+      }
+
+      .nav-links a {
+        font-family: "Cinzel", serif;
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        color: var(--parchment-dim);
+        text-decoration: none;
+        text-transform: uppercase;
+        transition: color 0.25s;
+      }
+
+      .nav-links a:hover {
+        color: var(--spark);
+      }
+
+      /* ── HERO ── */
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8rem 2rem 4rem;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Decorative ember rings */
+      .hero::before,
+      .hero::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        border: 1px solid rgba(200, 85, 10, 0.12);
+        pointer-events: none;
+      }
+      .hero::before {
+        width: 700px;
+        height: 700px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: ringPulse 6s ease-in-out infinite;
+      }
+      .hero::after {
+        width: 1000px;
+        height: 1000px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: ringPulse 6s ease-in-out infinite 1.5s;
+      }
+
+      @keyframes ringPulse {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        50% {
+          opacity: 0.15;
+          transform: translate(-50%, -50%) scale(1.03);
+        }
+      }
+
+      .hero-glow {
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(
+          ellipse,
+          rgba(200, 85, 10, 0.15) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+        animation: glowBreath 4s ease-in-out infinite;
+      }
+
+      @keyframes glowBreath {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .hero-logo {
+        width: 110px;
+        height: 110px;
+        margin-bottom: 2.5rem;
+        position: relative;
+        z-index: 1;
+        filter: drop-shadow(0 0 24px rgba(200, 85, 10, 0.55));
+        animation: logoFloat 5s ease-in-out infinite;
+      }
+
+      @keyframes logoFloat {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+
+      .hero-eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.35em;
+        color: var(--ore);
+        text-transform: uppercase;
+        margin-bottom: 1.2rem;
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        animation: fadeUp 0.8s ease forwards 0.3s;
+      }
+
+      .hero-title {
+        font-family: "Cinzel", serif;
+        font-size: clamp(3.5rem, 9vw, 7.5rem);
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        line-height: 0.95;
+        color: var(--parchment);
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        animation: fadeUp 0.8s ease forwards 0.5s;
+      }
+
+      .hero-title span {
+        color: var(--ember);
+        text-shadow: 0 0 60px rgba(232, 114, 42, 0.4);
+      }
+
+      .hero-subtitle {
+        font-size: 1.25rem;
+        font-weight: 300;
+        font-style: italic;
+        color: var(--parchment-dim);
+        max-width: 540px;
+        margin: 1.8rem auto 0;
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        animation: fadeUp 0.8s ease forwards 0.7s;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 1.2rem;
+        justify-content: center;
+        margin-top: 3rem;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        animation: fadeUp 0.8s ease forwards 0.9s;
+      }
+
+      .btn {
+        font-family: "Cinzel", serif;
+        font-size: 0.78rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        text-decoration: none;
+        padding: 0.85rem 2.2rem;
+        border: 1px solid;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .btn-primary {
+        background: var(--ore);
+        border-color: var(--ore);
+        color: var(--parchment);
+        box-shadow: 0 0 30px rgba(200, 85, 10, 0.3);
+      }
+
+      .btn-primary:hover {
+        background: var(--ember);
+        border-color: var(--ember);
+        box-shadow: 0 0 50px rgba(232, 114, 42, 0.45);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background: transparent;
+        border-color: rgba(200, 85, 10, 0.5);
+        color: var(--spark);
+      }
+
+      .btn-secondary:hover {
+        border-color: var(--spark);
+        background: rgba(200, 85, 10, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .hero-badges {
+        display: flex;
+        gap: 0.8rem;
+        justify-content: center;
+        margin-top: 2.5rem;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        animation: fadeUp 0.8s ease forwards 1.1s;
+      }
+
+      .badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        padding: 0.35rem 0.9rem;
+        border: 1px solid rgba(200, 85, 10, 0.3);
+        color: var(--text-muted);
+        background: rgba(200, 85, 10, 0.06);
+      }
+
+      /* ── DIVIDER ── */
+      .rune-divider {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 0 3rem;
+        margin: 4rem 0;
+      }
+      .rune-divider::before,
+      .rune-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: rgba(200, 85, 10, 0.2);
+      }
+      .rune-divider span {
+        font-family: "Cinzel", serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.4em;
+        color: rgba(200, 85, 10, 0.5);
+        text-transform: uppercase;
+      }
+
+      /* ── SECTIONS ── */
+      section {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 5rem 2rem;
+      }
+
+      .section-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.4em;
+        color: var(--ore);
+        text-transform: uppercase;
+        margin-bottom: 0.8rem;
+      }
+
+      .section-title {
+        font-family: "Cinzel", serif;
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 700;
+        color: var(--parchment);
+        margin-bottom: 1.5rem;
+        line-height: 1.15;
+      }
+
+      .section-body {
+        font-size: 1.1rem;
+        color: var(--parchment-dim);
+        max-width: 660px;
+        font-weight: 300;
+      }
+
+      /* ── WHAT IS SPELL ── */
+      .about-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5rem;
+        align-items: center;
+      }
+
+      .about-visual {
+        position: relative;
+      }
+
+      .spell-card {
+        background: var(--charcoal);
+        border: 1px solid rgba(200, 85, 10, 0.2);
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .spell-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--ore),
+          transparent
+        );
+      }
+
+      .spell-card-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.68rem;
+        color: var(--ore);
+        letter-spacing: 0.1em;
+        margin-bottom: 0.5rem;
+      }
+
+      .spell-card-value {
+        font-family: "Cinzel", serif;
+        font-size: 1.1rem;
+        color: var(--parchment);
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0;
+        margin-top: 1.5rem;
+      }
+
+      .stat {
+        padding: 1.5rem;
+        border: 1px solid rgba(200, 85, 10, 0.15);
+        text-align: center;
+        transition: background 0.3s;
+      }
+
+      .stat:hover {
+        background: rgba(200, 85, 10, 0.06);
+      }
+
+      .stat-num {
+        font-family: "Cinzel", serif;
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--ember);
+        display: block;
+      }
+
+      .stat-desc {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-top: 0.3rem;
+      }
+
+      /* ── FEATURES ── */
+      .features-section {
+        background: var(--charcoal);
+        border-top: 1px solid rgba(200, 85, 10, 0.1);
+        border-bottom: 1px solid rgba(200, 85, 10, 0.1);
+        padding: 5rem 0;
+      }
+
+      .features-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      .features-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 4rem;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: rgba(200, 85, 10, 0.12);
+      }
+
+      .feature-card {
+        background: var(--charcoal);
+        padding: 2.5rem 2rem;
+        position: relative;
+        transition: background 0.3s;
+        overflow: hidden;
+      }
+
+      .feature-card:hover {
+        background: var(--coal);
+      }
+
+      .feature-card::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: rgba(200, 85, 10, 0);
+        transition: background 0.3s;
+      }
+
+      .feature-card:hover::after {
+        background: rgba(200, 85, 10, 0.4);
+      }
+
+      .feature-icon {
+        font-size: 1.6rem;
+        margin-bottom: 1.2rem;
+        display: block;
+        filter: drop-shadow(0 0 8px rgba(200, 85, 10, 0.4));
+      }
+
+      .feature-num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.65rem;
+        color: rgba(200, 85, 10, 0.4);
+        letter-spacing: 0.1em;
+        margin-bottom: 0.8rem;
+      }
+
+      .feature-title {
+        font-family: "Cinzel", serif;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--parchment);
+        margin-bottom: 0.8rem;
+        line-height: 1.3;
+      }
+
+      .feature-desc {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        font-weight: 300;
+      }
+
+      /* ── CODE SECTION ── */
+      .code-section {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 5rem 2rem;
+      }
+
+      .code-layout {
+        display: grid;
+        grid-template-columns: 1fr 1.4fr;
+        gap: 4rem;
+        align-items: start;
+        margin-top: 3rem;
+      }
+
+      .install-block {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .code-box {
+        background: var(--charcoal);
+        border: 1px solid rgba(200, 85, 10, 0.2);
+        overflow: hidden;
+      }
+
+      .code-box-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.8rem 1.2rem;
+        border-bottom: 1px solid rgba(200, 85, 10, 0.15);
+        background: rgba(200, 85, 10, 0.05);
+      }
+
+      .code-box-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.68rem;
+        color: var(--ore);
+        letter-spacing: 0.1em;
+      }
+
+      .code-dots {
+        display: flex;
+        gap: 5px;
+      }
+      .code-dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(200, 85, 10, 0.3);
+      }
+
+      pre {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.82rem;
+        line-height: 1.7;
+        padding: 1.4rem 1.5rem;
+        overflow-x: auto;
+        color: var(--parchment);
+      }
+
+      .kw {
+        color: var(--ember);
+      }
+      .cm {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      .st {
+        color: #a8d8a8;
+      }
+      .fn {
+        color: var(--spark);
+      }
+      .ty {
+        color: #a8c8e8;
+      }
+
+      /* ── WHY SLINT ── */
+      .why-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: rgba(200, 85, 10, 0.1);
+        margin-top: 3rem;
+      }
+
+      .why-card {
+        background: var(--ash);
+        padding: 2.5rem;
+        transition: background 0.3s;
+      }
+
+      .why-card:hover {
+        background: var(--charcoal);
+      }
+
+      .why-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        filter: drop-shadow(0 0 6px rgba(200, 85, 10, 0.4));
+      }
+
+      .why-title {
+        font-family: "Cinzel", serif;
+        font-size: 1rem;
+        color: var(--parchment);
+        margin-bottom: 0.6rem;
+      }
+
+      .why-text {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+        font-weight: 300;
+      }
+
+      /* ── CAUTION ── */
+      .caution-block {
+        background: rgba(200, 85, 10, 0.07);
+        border: 1px solid rgba(200, 85, 10, 0.25);
+        border-left: 3px solid var(--ore);
+        padding: 1.5rem 2rem;
+        margin-top: 3rem;
+      }
+
+      .caution-title {
+        font-family: "Cinzel", serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.15em;
+        color: var(--ember);
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+      }
+
+      .caution-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .caution-list li {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+        color: var(--parchment-dim);
+        padding-left: 1.2rem;
+        position: relative;
+      }
+
+      .caution-list li::before {
+        content: "▸";
+        position: absolute;
+        left: 0;
+        color: var(--ore);
+      }
+
+      /* ── CTA ── */
+      .cta-section {
+        background: var(--charcoal);
+        border-top: 1px solid rgba(200, 85, 10, 0.15);
+        text-align: center;
+        padding: 7rem 2rem;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .cta-glow {
+        position: absolute;
+        width: 600px;
+        height: 300px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(
+          ellipse,
+          rgba(200, 85, 10, 0.12) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .cta-section .section-title {
+        position: relative;
+        z-index: 1;
+      }
+
+      .cta-section .section-body {
+        margin: 1rem auto 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .cta-actions {
+        display: flex;
+        gap: 1.2rem;
+        justify-content: center;
+        margin-top: 3rem;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── FOOTER ── */
+      footer {
+        background: var(--ash);
+        border-top: 1px solid rgba(200, 85, 10, 0.12);
+        padding: 2rem 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .footer-brand {
+        font-family: "Cinzel", serif;
+        font-size: 0.9rem;
+        color: var(--spark);
+        letter-spacing: 0.2em;
+      }
+
+      .footer-note {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 2rem;
+      }
+
+      .footer-links a {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover {
+        color: var(--spark);
+      }
+
+      /* ── ANIMATIONS ── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition:
+          opacity 0.7s ease,
+          transform 0.7s ease;
+      }
+
+      .reveal.visible {
+        opacity: 1;
+        transform: none;
+      }
+
+      /* ── CODE TABS ── */
+      .code-tabs {
+        display: flex;
+        border: 1px solid rgba(200, 85, 10, 0.2);
+        border-bottom: none;
+        background: var(--charcoal);
+      }
+
+      .code-tab {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        padding: 0.65rem 1.4rem;
+        background: none;
+        border: none;
+        border-right: 1px solid rgba(200, 85, 10, 0.15);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        outline: none;
+      }
+
+      .code-tab:last-child {
+        border-right: none;
+      }
+      .code-tab:hover {
+        color: var(--spark);
+        background: rgba(200, 85, 10, 0.05);
+      }
+
+      .code-tab.active {
+        color: var(--ember);
+        background: rgba(200, 85, 10, 0.1);
+        border-bottom: 2px solid var(--ember);
+        position: relative;
+        top: 1px;
+      }
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar {
+        width: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--ash);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--smoke);
+        border-radius: 2px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--ore);
+      }
+
+      @media (max-width: 768px) {
+        nav {
+          padding: 1rem 1.5rem;
+        }
+        .nav-links {
+          display: none;
+        }
+        .about-grid,
+        .code-layout,
+        .why-grid {
+          grid-template-columns: 1fr;
+          gap: 2rem;
+        }
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+        .features-header {
+          flex-direction: column;
+          gap: 1.5rem;
+          align-items: flex-start;
+        }
+        .stat-row {
+          grid-template-columns: 1fr;
+        }
+        footer {
+          flex-direction: column;
+          gap: 1.5rem;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav>
+      <a href="#" class="nav-brand">
+        <img
+          src="https://i.postimg.cc/8PrD4kN4/spell-trans.png"
+          style="
+            height: 28px;
+            width: auto;
+            filter: drop-shadow(0 0 6px rgba(245, 163, 82, 0.5));
+            vertical-align: middle;
+            margin-right: 0.5rem;
+          "
+        />
+        SPELL
+      </a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#quickstart">Quickstart</a></li>
+        <li>
+          <a
+            href="https://docs.rs/spell-framework/latest/spell_framework/"
+            target="_blank"
+            >Docs</a
+          >
+        </li>
+        <li>
+          <a href="https://github.com/VimYoung/Spell" target="_blank">GitHub</a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-glow"></div>
+      <img
+        src="https://i.postimg.cc/8PrD4kN4/spell-trans.png"
+        style="
+          height: 245px;
+          width: auto;
+          filter: drop-shadow(0 0 6px rgba(245, 163, 82, 0.5));
+          vertical-align: middle;
+          margin-right: 0.5rem;
+        "
+      />
+      <p class="hero-eyebrow">A Rust Framework for Wayland</p>
+      <h1 class="hero-title">SPELL<br /><span>Framework</span></h1>
+      <p class="hero-subtitle">
+        Conjure desktop widgets with the mystic arts of Rust &amp; Slint —
+        lightweight, customisable, and memory safe.
+      </p>
+
+      <div class="hero-actions">
+        <a
+          href="https://docs.rs/spell-framework/latest/spell_framework/"
+          target="_blank"
+          class="btn btn-primary"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path
+              d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+            />
+          </svg>
+          Read the Docs
+        </a>
+        <a
+          href="https://github.com/VimYoung/Spell"
+          target="_blank"
+          class="btn btn-secondary"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
+            />
+          </svg>
+          View on GitHub
+        </a>
+        <a
+          href="https://crates.io/crates/spell-framework"
+          target="_blank"
+          class="btn btn-secondary"
+        >
+          📦 crates.io
+        </a>
+      </div>
+
+      <div class="hero-badges">
+        <span class="badge">⭐ 104 Stars</span>
+        <span class="badge">GPL-3.0</span>
+        <span class="badge">Wayland Native</span>
+        <span class="badge">Rust + Slint</span>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <section id="about">
+      <div class="about-grid">
+        <div class="reveal">
+          <p class="section-label">What is Spell?</p>
+          <h2 class="section-title">Cast Widgets onto Your Wayland Desktop</h2>
+          <p class="section-body">
+            Spell is a Rust framework that gives you everything you need to
+            build fully customisable desktop widgets for Wayland compositors —
+            niri, Hyprland, and more. Rather than leaning on GTK, Spell
+            harnesses <strong>Slint</strong>: a declarative UI language that is
+            beautiful by default and trivial to pick up.
+          </p>
+          <p class="section-body" style="margin-top: 1rem">
+            Your widget logic lives in Rust. Your visuals live in Slint. The two
+            meet in Spell — where performance, memory safety, and aesthetics
+            coexist.
+          </p>
+        </div>
+
+        <div class="reveal">
+          <div class="spell-card">
+            <div class="spell-card-label">Version</div>
+            <div class="spell-card-value">spell-framework 1.0.3 — Stable</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat">
+              <span class="stat-num">⚡</span>
+              <span class="stat-desc">Memory Safe</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num">🔥</span>
+              <span class="stat-desc">Hot Reload</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num">🎛️</span>
+              <span class="stat-desc">IPC Access</span>
+            </div>
+          </div>
+          <div class="stat-row" style="margin-top: 0">
+            <div class="stat">
+              <span class="stat-num">🦀</span>
+              <span class="stat-desc">Pure Rust</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num">💎</span>
+              <span class="stat-desc">Slint UI</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num">🌊</span>
+              <span class="stat-desc">Wayland</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <div class="features-section" id="features">
+      <div class="features-inner">
+        <div class="features-header reveal">
+          <div>
+            <p class="section-label">Incantations</p>
+            <h2 class="section-title">What Spell Provides</h2>
+          </div>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card reveal">
+            <span class="feature-num">01</span>
+            <span class="feature-icon">🖋️</span>
+            <h3 class="feature-title">Simple Frontend, Fast Backend</h3>
+            <p class="feature-desc">
+              Slint makes widget design intuitive and expressive. Rust keeps it
+              lightweight, predictable, and genuinely memory safe — no
+              compromise needed.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-num">02</span>
+            <span class="feature-icon">♨️</span>
+            <h3 class="feature-title">Hot Reload</h3>
+            <p class="feature-desc">
+              Once dimensions are set, changes in your Slint UI code are
+              reflected instantly in the running widget. Tighten your feedback
+              loop dramatically.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-num">03</span>
+            <span class="feature-icon">🗂️</span>
+            <h3 class="feature-title">Familiar Project Structure</h3>
+            <p class="feature-desc">
+              Spell doesn't impose any new file layouts. It adapts to the
+              existing Slint/Cargo structure you already know — zero new
+              paradigms to learn.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-num">04</span>
+            <span class="feature-icon">📡</span>
+            <h3 class="feature-title">Remote IPC Access</h3>
+            <p class="feature-desc">
+              The bundled
+              <code
+                style="
+                  font-family: &quot;JetBrains Mono&quot;;
+                  font-size: 0.85em;
+                  color: var(--spark);
+                "
+                >spell-cli</code
+              >
+              lets you expose and manipulate widget state from outside —
+              enabling seamless integration with your compositor setup.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-num">05</span>
+            <span class="feature-icon">🎨</span>
+            <h3 class="feature-title">Prebuilt Components</h3>
+            <p class="feature-desc">
+              Bootstrap with <strong>Material</strong> or
+              <strong>Vivi</strong> component sets via
+              <code
+                style="
+                  font-family: &quot;JetBrains Mono&quot;;
+                  font-size: 0.85em;
+                  color: var(--spark);
+                "
+                >sp new --material</code
+              >. Professional-grade UI out of the box.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-num">06</span>
+            <span class="feature-icon">🔋</span>
+            <h3 class="feature-title">Services Vault (WIP)</h3>
+            <p class="feature-desc">
+              App launcher backend, MPRIS integration, notification backend, and
+              more — a growing collection of common widget functionalities
+              built-in.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICKSTART -->
+    <section id="quickstart" class="code-section">
+      <div class="reveal">
+        <p class="section-label">Quickstart</p>
+        <h2 class="section-title">Cast Your First Spell</h2>
+        <p class="section-body">
+          Three commands to a running widget. Start with the CLI, scaffold a
+          project, then run.
+        </p>
+      </div>
+
+      <div class="code-layout" style="margin-top: 3rem">
+        <div class="install-block reveal">
+          <div class="code-box">
+            <div class="code-box-header">
+              <span class="code-box-label">Install CLI</span>
+              <div class="code-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <pre><span class="cm"># install the spell CLI</span>
+cargo install spell-cli
+
+<span class="cm"># scaffold a new project</span>
+sp new my-widget
+
+<span class="cm"># or with Material components</span>
+sp new --material my-widget</pre>
+          </div>
+
+          <div class="code-box">
+            <div class="code-box-header">
+              <span class="code-box-label">Cargo.toml</span>
+              <div class="code-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <pre>[dependencies]
+<span class="kw">spell-framework</span> = <span class="st">"1.0.3"</span>
+<span class="kw">slint</span>           = <span class="st">"*"</span></pre>
+          </div>
+        </div>
+
+        <!-- Tabbed code viewer -->
+        <div
+          class="reveal"
+          style="display: flex; flex-direction: column; gap: 0"
+        >
+          <div class="code-tabs" id="codeTabs">
+            <button class="code-tab active" data-tab="slint">
+              ui/app-window.slint
+            </button>
+            <button class="code-tab" data-tab="rust">src/main.rs</button>
+          </div>
+
+          <div class="code-box" style="border-top: none" id="tab-slint">
+            <div class="code-box-header">
+              <span class="code-box-label">Slint UI — Counter Widget</span>
+              <div class="code-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <pre><span class="cm">// ui/app-window.slint</span>
+<span class="kw">import</span> { <span class="ty">VerticalBox</span>, <span class="ty">Button</span> } <span class="kw">from</span> <span class="st">"std-widgets.slint"</span>;
+
+<span class="kw">export component</span> <span class="ty">AppWindow</span> <span class="kw">inherits</span> <span class="ty">Window</span> {
+    <span class="cm">// A two-way bindable integer property</span>
+    <span class="kw">in-out property</span> &lt;<span class="ty">int</span>&gt; counter: 42;
+
+    <span class="cm">// Callback fired when button is clicked</span>
+    <span class="kw">callback</span> <span class="fn">request-increase-value</span>();
+
+    <span class="ty">VerticalBox</span> {
+        <span class="ty">Text</span> {
+            text: <span class="st">"Counter: \{root.counter}"</span>;
+        }
+
+        <span class="ty">Button</span> {
+            text: <span class="st">"Increase value"</span>;
+            clicked =&gt; {
+                root.<span class="fn">request-increase-value</span>();
+            }
+        }
+    }
+}</pre>
+          </div>
+
+          <div
+            class="code-box"
+            style="border-top: none; display: none"
+            id="tab-rust"
+          >
+            <div class="code-box-header">
+              <span class="code-box-label">src/main.rs — Rust Backend</span>
+              <div class="code-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <pre><span class="kw">use</span> slint::ComponentHandle;
+<span class="kw">use</span> spell_framework::{
+    <span class="fn">cast_spell</span>,
+    layer_properties::{
+        <span class="ty">LayerAnchor</span>, <span class="ty">LayerType</span>, <span class="ty">WindowConf</span>
+    },
+};
+<span class="kw">use</span> std::{env, error::Error};
+
+slint::<span class="fn">include_modules!</span>();
+
+<span class="cm">// Generate Spell widgets/windows from slint windows</span>
+spell_framework::<span class="fn">generate_widgets!</span>[AppWindow];
+
+<span class="kw">fn</span> <span class="fn">main</span>() -&gt; Result&lt;(), Box&lt;<span class="kw">dyn</span> Error&gt;&gt; {
+    <span class="cm">// Set window configuration</span>
+    <span class="kw">let</span> window_conf = <span class="ty">WindowConf</span>::builder()
+        .<span class="fn">width</span>(376_u32)
+        .<span class="fn">height</span>(576_u32)
+        .<span class="fn">anchor_1</span>(<span class="ty">LayerAnchor</span>::TOP)
+        .<span class="fn">margins</span>(5, 0, 0, 10)
+        .<span class="fn">layer_type</span>(<span class="ty">LayerType</span>::Top)
+        .<span class="fn">build</span>()
+        .<span class="fn">unwrap</span>();
+
+    <span class="cm">// Initialise Slint window + wayland layer shell</span>
+    <span class="kw">let</span> ui = AppWindowSpell::<span class="fn">invoke_spell</span>(
+        <span class="st">"counter-widget"</span>, window_conf
+    );
+
+    <span class="cm">// Wire up the button callback</span>
+    ui.<span class="fn">on_request_increase_value</span>({
+        <span class="kw">let</span> ui_handle = ui.<span class="fn">as_weak</span>();
+        <span class="kw">move</span> || {
+            <span class="kw">let</span> ui = ui_handle.<span class="fn">unwrap</span>();
+            ui.<span class="fn">set_counter</span>(
+                ui.<span class="fn">get_counter</span>() + 1
+            );
+        }
+    });
+
+    <span class="cm">// Run the event loop</span>
+    <span class="fn">cast_spell!</span>(ui)
+}</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="caution-block reveal" style="margin: 3rem">
+        <div class="caution-title">⚠ Active Development — Breaking Changes</div>
+        <ul class="caution-list">
+          <li>
+            XDG popup development is in WIP and addition of branches in macro is
+            expected.
+          </li>
+          <!-- <li>Multi-widget can get unstable due to upstream Slint changes</li> -->
+          <!-- <li>Multi-widget event loops are slower on niri than Hyprland</li> -->
+          <!-- <li> -->
+          <!--   Hide/show works in niri but may hang in Hyprland (upstream bug) -->
+          <!-- </li> -->
+          <!-- <li> -->
+          <!--   Remote IPC access is currently under heavy rework — expect changes -->
+          <!-- </li> -->
+        </ul>
+      </div>
+    </section>
+
+    <!-- WHY SLINT -->
+    <div
+      style="
+        background: var(--charcoal);
+        border-top: 1px solid rgba(200, 85, 10, 0.1);
+        border-bottom: 1px solid rgba(200, 85, 10, 0.1);
+      "
+    >
+      <section>
+        <div class="reveal">
+          <p class="section-label">The Philosophy</p>
+          <h2 class="section-title">Why Rust &amp; Slint?</h2>
+        </div>
+
+        <div class="why-grid">
+          <div class="why-card reveal">
+            <div class="why-icon">💡</div>
+            <h3 class="why-title">The Gap in the Ecosystem</h3>
+            <p class="why-text">
+              There are very few widget-creation tools written in Rust. Spell
+              was born to fill that void — giving Rustaceans a native,
+              first-class path to desktop customisation without reaching for C
+              or Python.
+            </p>
+          </div>
+          <div class="why-card reveal">
+            <div class="why-icon">🌊</div>
+            <h3 class="why-title">Understanding Wayland</h3>
+            <p class="why-text">
+              Spell started as a personal exploration of how Wayland actually
+              works. Building a real client against the protocol is the fastest
+              way to understand it — and a framework emerged as a useful side
+              effect.
+            </p>
+          </div>
+          <div class="why-card reveal">
+            <div class="why-icon">🎨</div>
+            <h3 class="why-title">Slint's Expressiveness</h3>
+            <p class="why-text">
+              Slint is a declarative language you can grok in minutes. Unlike
+              many UI toolkits, its Rust integration is first-class — callbacks,
+              data binding, and hot-reload all feel native.
+            </p>
+          </div>
+          <div class="why-card reveal">
+            <div class="why-icon">🦀</div>
+            <h3 class="why-title">Rust All the Way Down</h3>
+            <p class="why-text">
+              No batteries included yet means no bloat. Every system
+              functionality you need — sysinfo, network management, Bluetooth —
+              can be plugged in via well-maintained Rust crates.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <div class="cta-glow"></div>
+      <p class="section-label">Ready to Conjure?</p>
+      <h2 class="section-title" style="max-width: 600px; margin: 0 auto">
+        Start building widgets by the mystic arts of Spell
+      </h2>
+      <p class="section-body" style="text-align: center">
+        The first stable release is out. Try it, file issues, open PRs — the
+        project thrives on community.
+      </p>
+      <div class="cta-actions">
+        <a
+          href="https://docs.rs/spell-framework/latest/spell_framework/"
+          target="_blank"
+          class="btn btn-primary"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path
+              d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+            />
+          </svg>
+          docs.rs
+        </a>
+        <a
+          href="https://github.com/VimYoung/Spell"
+          target="_blank"
+          class="btn btn-secondary"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
+            />
+          </svg>
+          GitHub — ⭐ Star it
+        </a>
+        <a
+          href="https://github.com/VimYoung/Spell/discussions"
+          target="_blank"
+          class="btn btn-secondary"
+          >Feature Requests</a
+        >
+      </div>
+    </div>
+
+    <footer>
+      <span
+        class="footer-brand"
+        style="display: flex; align-items: center; gap: 0.5rem"
+      >
+        <img
+          src="https://i.postimg.cc/8PrD4kN4/spell-trans.png"
+          style="
+            height: 28px;
+            width: auto;
+            filter: drop-shadow(0 0 6px rgba(245, 163, 82, 0.5));
+            vertical-align: middle;
+            margin-right: 0.5rem;
+          "
+        />
+        SPELL
+      </span>
+      <span class="footer-note">Made with ♥ and Vim · GPL-3.0</span>
+      <div class="footer-links">
+        <a
+          href="https://docs.rs/spell-framework/latest/spell_framework/"
+          target="_blank"
+          >docs.rs</a
+        >
+        <a href="https://crates.io/crates/spell-framework" target="_blank"
+          >crates.io</a
+        >
+        <a href="https://github.com/VimYoung/Spell" target="_blank">github</a>
+        <a
+          href="https://github.com/VimYoung/Spell/blob/main/ROADMAP.md"
+          target="_blank"
+          >roadmap</a
+        >
+      </div>
+    </footer>
+
+    <script>
+      // Scroll reveal
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e, i) => {
+            if (e.isIntersecting) {
+              setTimeout(() => e.target.classList.add("visible"), i * 80);
+              observer.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+
+      document
+        .querySelectorAll(".reveal")
+        .forEach((el) => observer.observe(el));
+
+      // Tab switching
+      document.querySelectorAll(".code-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tab = btn.dataset.tab;
+          document
+            .querySelectorAll(".code-tab")
+            .forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById("tab-slint").style.display =
+            tab === "slint" ? "block" : "none";
+          document.getElementById("tab-rust").style.display =
+            tab === "rust" ? "block" : "none";
+        });
+      });
+    </script>
+  </body>
+</html>
