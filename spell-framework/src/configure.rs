@@ -81,7 +81,7 @@ pub struct WindowConf {
     /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
     /// related explaination of usage. If both values are None, then widget is displayed in the
     /// center of screen.
-    pub anchor: (Option<Anchor>, Option<Anchor>),
+    pub anchor: [Option<Anchor>; 4],
     /// Defines the margin of widget from monitor edges, negative values make the widget go outside
     /// of monitor pixels if anchored to some edge(s). Otherwise, the widget moves to the opposite
     /// direction to the given pixels. Defaults to `0` for all sides.
@@ -105,33 +105,6 @@ pub struct WindowConf {
 }
 
 impl WindowConf {
-    /// constructor method for initialising an instance of WindowConf.
-    #[deprecated(
-        since = "1.0.2",
-        note = "Use the builder method to access all the configuration. It will be removed in release 1.0.3."
-    )]
-    pub fn new(
-        max_width: u32,
-        max_height: u32,
-        anchor: (Option<Anchor>, Option<Anchor>),
-        margin: (i32, i32, i32, i32),
-        layer_type: Layer,
-        board_interactivity: KeyboardInteractivity,
-        exclusive_zone: Option<i32>,
-    ) -> Self {
-        WindowConf {
-            width: max_width,
-            height: max_height,
-            anchor,
-            margin,
-            layer_type,
-            board_interactivity: Cell::new(board_interactivity),
-            exclusive_zone,
-            monitor_name: None,
-            natural_scroll: false,
-        }
-    }
-
     /// Creates a builder instance for creation of WindowConf, to view defaults
     /// head over to documentation of [`WindowConf`]'s parameters.
     pub fn builder() -> WindowConfBuilder {
@@ -145,7 +118,7 @@ impl WindowConf {
 pub struct WindowConfBuilder {
     max_width: u32,
     max_height: u32,
-    anchor: (Option<Anchor>, Option<Anchor>),
+    anchor: [Option<Anchor>; 4],
     margin: (i32, i32, i32, i32),
     layer_type: Option<Layer>,
     board_interactivity: KeyboardInteractivity,
@@ -172,14 +145,28 @@ impl WindowConfBuilder {
     /// Sets first anchor of [`WindowConf::anchor`].
     pub fn anchor_1(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
-        x.anchor.0 = Some(anchor);
+        x.anchor[0] = Some(anchor);
         x
     }
 
     /// Sets second anchor of [`WindowConf::anchor`].
     pub fn anchor_2(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
-        x.anchor.1 = Some(anchor);
+        x.anchor[1] = Some(anchor);
+        x
+    }
+
+    /// Sets third anchor of [`WindowConf::anchor`].
+    pub fn anchor_3(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor[2] = Some(anchor);
+        x
+    }
+
+    /// Sets fourth anchor of [`WindowConf::anchor`].
+    pub fn anchor_4(&mut self, anchor: Anchor) -> &mut Self {
+        let x = self;
+        x.anchor[3] = Some(anchor);
         x
     }
 

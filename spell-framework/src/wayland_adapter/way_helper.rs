@@ -56,47 +56,12 @@ pub(super) fn set_config(
 }
 
 fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface) {
-    match window_conf.anchor.0 {
-        Some(mut first_anchor) => match window_conf.anchor.1 {
-            Some(sec_anchor) => {
-                first_anchor.set(sec_anchor, true);
-                layer.set_anchor(first_anchor);
-            }
-            None => {
-                layer.set_anchor(first_anchor);
-                // if window_conf.exclusive_zone && first_configure {
-                //     match first_anchor {
-                //         Anchor::LEFT | Anchor::RIGHT => {
-                //             layer.set_exclusive_zone(window_conf.width as i32)
-                //         }
-                //         Anchor::TOP | Anchor::BOTTOM => {
-                //             layer.set_exclusive_zone(window_conf.height as i32)
-                //         }
-                //         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                //         // in which case no exclusive_zone will be set.
-                //         _ => {}
-                //     }
-                // }
-            }
-        },
-        None => {
-            if let Some(sec_anchor) = window_conf.anchor.1 {
-                layer.set_anchor(sec_anchor);
-                // if window_conf.exclusive_zone && first_configure {
-                //     match sec_anchor {
-                //         Anchor::LEFT | Anchor::RIGHT => {
-                //             layer.set_exclusive_zone(window_conf.width as i32)
-                //         }
-                //         Anchor::TOP | Anchor::BOTTOM => {
-                //             layer.set_exclusive_zone(window_conf.height as i32)
-                //         }
-                //         // Other Scenarios involve Calling the Anchor on 2 sides ( i.e. corners)
-                //         // in which case no exclusive_zone will be set.
-                //         _ => {}
-                //     }
-                // }
-            }
+    let mut anchors = window_conf.anchor.into_iter().flatten();
+    if let Some(mut combined) = anchors.next() {
+        for a in anchors {
+            combined.insert(a);
         }
+        layer.set_anchor(combined);
     }
     if let Some(val) = window_conf.exclusive_zone {
         layer.set_exclusive_zone(val);
