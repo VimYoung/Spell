@@ -16,7 +16,7 @@
   <a href="https://github.com/VimYoung/Spell/discussions">Request Feature</a>
   ·
   <a href="https://docs.rs/spell-framework/latest/spell_framework/">Wiki</a>
-  .
+  ·
   <a href="https://discord.com/invite/2bSHpuuJ">Join Discord</a>
   <br />
   <br />
