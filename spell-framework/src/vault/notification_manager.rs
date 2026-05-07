@@ -7,7 +7,7 @@ use std::{cmp::Ordering, collections::HashMap, result::Result};
 use tracing::{info, warn};
 use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter};
 
-/// It is an internal function used in the expansion of [`cast_spell!`] macro
+/// It is an internal function used in the expansion of [`cast_spell`](crate::cast_spell) macro
 /// if the macro has a notification instance to run.
 pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
     let (sender, rx) = channel::channel::<NotifyEvent>();

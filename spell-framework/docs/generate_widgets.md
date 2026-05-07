@@ -2,7 +2,7 @@ This macro is responsible for generating Spell compatible types from Slint compa
 types.
 
 This macro takes in one or more Slint windows. Thus, it is important to place
-this macro alongside slint's `include_modules` macro.
+this macro after slint's `include_modules` macro.
 
 Example code snippet.
 

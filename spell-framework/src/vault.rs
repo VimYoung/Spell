@@ -8,19 +8,15 @@
 //! </div>
 //!
 //! The whole module is divided into structs representing these utilities and
-//! their corresponding traits (if it applies). The [`Services`] is used to bind
-//! and initialise the traits. Why do most utilities have a trait counterpart?
+//! their corresponding traits (if it applies). Why do most utilities have a trait counterpart?
 //!
 //! Traits are made so as to represent actions when occured from the other server/
 //! application side. For example, An [`AppSelector`] is used and initialised for
-//! usage by your shell but [`new_app_added`](AppHandler::new_app_added) was called
-//! when the coming of a new desktop entry is to be notified. Some utilities like
+//! usage by your shell. Some utilities like
 //! `AppSelector` are more user intensive and less trait intensive(i.e. there are not
 //! many cases when server will ping, hence not much methods in traits). On the
-//! other hand implementations like that of notifications (via [`NotificationHandler`])
-//! are majorly trait intensive. Then, utilities like audio handling (via [`PipeWireHandler`] and
-//! [`AudioManager`]) have equal chances of being accessed from anywhere.
-//!
+//! other hand implementations like that of notifications (via [`NotificationManager`])
+//! are majorly trait intensive.
 //! As a general tip, the best way to implement traits is to stores weak reference to
 //! your widget windows on slint side in structs and then implement these traits on it.
 use crate::vault::application::desktop_entry_extracter;
@@ -39,11 +35,13 @@ use zbus::blocking::{Connection, Proxy};
 mod application;
 mod notification_manager;
 
-/// This public static is only set when a notification server instance is passed in [`cast_spell`].
+/// This public static is only set when a notification server instance is passed in
+/// [`cast_spell`](crate::cast_spell).
 /// It is created to maintain the compliance with freedesktop's desktop notification
 /// [specification](https://specifications.freedesktop.org/notification/1.3/index.html).
-/// The method can be called in specific senarios to notify applications that a notification
-/// with an id has been closed. This static holds an instance of [`BlockingNotificaiton`]
+/// It's method can be called in specific senarios to notify applications that a notification
+/// with an id has been closed. This static holds an instance of
+/// [`BlockingNotificaiton`](crate::vault::BlockingNotification)
 pub static NOTIFICATION_EVENT: OnceLock<BlockingNotification> = OnceLock::new();
 
 /// Holds blocking methods to notify when a notification has bee closed.
@@ -70,7 +68,7 @@ impl BlockingNotification {
 }
 
 /// This trait's implementation is necessary for passing spell's generated widget
-/// into the notification field of [`cast_spell`] macro. It is important to note that
+/// into the notification field of [`cast_spell`](crate::cast_spell) macro. It is important to note that
 /// implementation of this trait is not on the spell generated widget/window but on the
 /// **slint generated window**. For example, a window with name `TopBar` will have a
 /// spell implemetation `TopBarSpell`. This trait will be implemented over `TopBar`.
@@ -96,7 +94,7 @@ pub enum CloseReason {
     Undefined = 4,
 }
 
-/// Error type used by [`NotificationManger`].
+/// Error type used by [`NotificationManager`].
 #[derive(Debug)]
 pub enum NotiError {
     /// Returned when a new notification can't be handled by the custom implementation.
@@ -176,7 +174,7 @@ pub enum Hint {
     // Invalid,
 }
 
-/// The proposed urgency level by the notification, implementations of trait [`NotificationMananger`]
+/// The proposed urgency level by the notification, implementations of trait [`NotificationManager`]
 /// can mark the accent color of their notifications based on this.
 #[derive(Debug, Clone)]
 pub enum Urgency {
@@ -200,10 +198,6 @@ pub enum Timeout {
     /// Close the notification after specified milliseconds.
     Milliseconds(i32),
 }
-// //
-// fn check_for_new_apps(_app: Arc<dyn AppHandler>) {
-//     todo!()
-// }
 
 /// AppSelector stores the data for each application with possible actions. Known bugs
 /// include failing to open flatpak apps in certain cases and failing to find icons
@@ -258,18 +252,7 @@ impl Default for AppSelector {
                                         })
                                     })
                                     .collect();
-                                // let filtered_data: Vec<AppData> = new_data
-                                //     .iter()
-                                //     .filter_map(|val| val.to_owned())
-                                //     .collect::<Vec<AppData>>();
                                 app_line_data.extend(filtered_data);
-                                // if let Some(data) = new_data {
-                                //     // if !app_line_data.iter().any(|pushed_data| {
-                                //     //     pushed_data.desktop_file_id == data.desktop_file_id
-                                //     // }) {
-                                //     app_line_data.push(data);
-                                //     //}
-                                // }
                             } else if entry_or_dir.path().is_symlink() {
                                 println!("GOt the symlink");
                             } else {

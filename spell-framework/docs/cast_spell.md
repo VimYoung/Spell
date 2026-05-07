@@ -68,7 +68,7 @@ This is the biggest reason for using a macro instead of a function. It gives the
 flexibility for defining values optionally. Currently, there is only following values
 that can be specified. The key and requirement over input values is defined below.
 
-1. `notification`: value should implement [`NotificationHandler`](`crate::vault::NotificationHandler`).
+1. `notification`: value should implement [`NotificationManager`](`crate::vault::NotificationManager`).
 
 It is important to note that optional values can only be defined when passing single
 and multiple widgets. Example for all the optional values is defined below.
