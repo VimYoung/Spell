@@ -1,4 +1,3 @@
-use slint::platform::software_renderer::TargetPixel;
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -10,55 +9,6 @@ use tracing_subscriber::{
     registry::Registry,
     reload::Layer as LoadLayer,
 };
-
-/// Unused Internal struct representation of a pixel, it is similar to slint's
-/// representation of [pixel]() but implement few more trait. Currently, redundent
-#[allow(dead_code)]
-#[derive(Default)]
-pub struct Rgba8Pixel {
-    pub a: u8,
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl Rgba8Pixel {
-    pub fn new(a: u8, r: u8, g: u8, b: u8) -> Self {
-        Rgba8Pixel { a, r, g, b }
-    }
-}
-
-impl TargetPixel for Rgba8Pixel {
-    fn blend(&mut self, color: slint::platform::software_renderer::PremultipliedRgbaColor) {
-        let a: u16 = (u8::MAX - color.alpha) as u16;
-        // self.a = a as u8;
-        let out_a = color.alpha as u16 + (self.a as u16 * (255 - color.alpha) as u16) / 255;
-        self.a = out_a as u8;
-        self.r = (self.r as u16 * a / 255) as u8 + color.red;
-        self.g = (self.g as u16 * a / 255) as u8 + color.green;
-        self.b = (self.b as u16 * a / 255) as u8 + color.blue;
-    }
-
-    fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
-        let a = 0xFF;
-        Self::new(a, red, green, blue)
-    }
-
-    fn background() -> Self {
-        // TODO This needs to be decided to see how it should be 0xFF or 0x00;
-        // I think there is a bug in slint which is causing the leak of This
-        // value.
-        let a: u8 = 0x00;
-        Self::new(a, 0, 0, 0)
-    }
-}
-
-impl std::marker::Copy for Rgba8Pixel {}
-impl std::clone::Clone for Rgba8Pixel {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
 
 /// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
 /// of generated code) for defining the specifications of the widget.

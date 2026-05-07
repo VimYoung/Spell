@@ -7,6 +7,8 @@ use std::{cmp::Ordering, collections::HashMap, result::Result};
 use tracing::{info, warn};
 use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter};
 
+/// It is an internal function used in the expansion of [`cast_spell!`] macro
+/// if the macro has a notification instance to run.
 pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
     let (sender, rx) = channel::channel::<NotifyEvent>();
     // let (sender_async, rx_async) = channel::channel::<NotifyEvent>();
@@ -34,21 +36,20 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
                     if let Err(err) = ui.new_notification(notification) {
                         warn!("{:?}", err);
                     }
-                } // _ => {
-                  //     warn!("Unhandled Case occured");
-                  // } // NotifyEvent::NotigicationClosed(id) => {
-                  //     if let Err(err) = ui.notifcation_close(id) {
-                  //         warn!("{:?}", err)
-                  //     }
-                  // }
+                }
+                NotifyEvent::NotificationClosed(id) => {
+                    if let Err(err) = ui.close_notification(id) {
+                        warn!(" Error closing notification with id {} : {:?}", id, err);
+                    }
+                }
             },
             channel::Event::Closed => info!("Notification Channel to async thread is closed!"),
         });
 }
 
-pub enum NotifyEvent {
+pub(crate) enum NotifyEvent {
     Noti(Notification),
-    // NotificationClosed(u32),
+    NotificationClosed(u32),
 }
 
 async fn notification_service_enter(
@@ -151,11 +152,14 @@ impl NotificationHandler {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         id: u32,
     ) -> Result<(), BusError> {
-        emitter.notification_closed().await?;
-        // let _ = self
-        //     .sender
-        //     .clone()
-        //     .send(NotifyEvent::NotificationClosed(id));
+        emitter.notification_closed(id, 4).await?;
+        if let Err(err) = self
+            .sender
+            .clone()
+            .send(NotifyEvent::NotificationClosed(id))
+        {
+            warn!("Error calling CloseNotification: {err}")
+        }
         Ok(())
     }
 
@@ -169,7 +173,11 @@ impl NotificationHandler {
     }
 
     #[zbus(signal)]
-    async fn notification_closed(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
+    async fn notification_closed(
+        emitter: &SignalEmitter<'_>,
+        id: u32,
+        reason: u32,
+    ) -> zbus::Result<()>;
 
     #[zbus(signal)]
     async fn action_invoked(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;

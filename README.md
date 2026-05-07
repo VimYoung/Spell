@@ -8,6 +8,7 @@
 ![rust with crates.io](https://img.shields.io/badge/RUST-CRATES.IO-RED?style=for-the-badge&logo=Rust&logoSize=auto&color=%23fdacac&link=https%3A%2F%2Fcrates.io%2Fcrates%2Fspell-framework)
 ![docs.rs (with version)](https://img.shields.io/docsrs/spell-framework/latest?style=for-the-badge&logo=docsdotrs&logoSize=auto&label=docs.rs&color=CBF3BB&link=https%3A%2F%2Fdocs.rs%2Fspell-framework%2Flatest%2Fspell_framework%2F)
 ![GitHub Repo stars](https://img.shields.io/github/stars/VimYoung/Spell?style=for-the-badge&logo=Github&logoSize=auto&color=6AECE1&link=github.com%2FVimYoung%2FSpell)
+![Discord](https://img.shields.io/discord/1476450240679776256?style=for-the-badge&logo=discord&color=rgba(88%2C%20101%2C%20242%2C%201))
 
 <p align="left">
   <br />
