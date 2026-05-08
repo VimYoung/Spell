@@ -1,11 +1,14 @@
 use crate::{
-    vault::{BlockingNotification, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout},
+    vault::{
+        BlockingNotification, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout,
+        Urgency,
+    },
     wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
-use std::{cmp::Ordering, collections::HashMap, result::Result};
+use std::{cmp::Ordering, collections::HashMap};
 use tracing::{info, warn};
-use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter};
+use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter, zvariant::Value};
 
 /// It is an internal function used in the expansion of [`cast_spell`](crate::cast_spell) macro
 /// if the macro has a notification instance to run.
@@ -110,7 +113,7 @@ impl NotificationHandler {
         summary: String,
         body: String,
         actions: Vec<String>,
-        _hints: HashMap<String, zbus::zvariant::Value<'_>>,
+        hints: HashMap<String, zbus::zvariant::Value<'_>>,
         expire_timeout: i32,
     ) -> Result<u32, BusError> {
         // TODO add hints in the implementation
@@ -122,7 +125,117 @@ impl NotificationHandler {
             subtitle: None,
             body,
             icon: app_icon,
-            hints: HashMap::new(),
+            hints: hints
+                .into_iter()
+                .map(|(key, value)| {
+                    let val: Hint = match key.as_str() {
+                        "action-icons" => {
+                            if let Value::Bool(x) = value {
+                                Hint::ActionIcons(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "category" => {
+                            if let Value::Str(x) = value {
+                                Hint::Category(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "desktop-entry" => {
+                            if let Value::Str(x) = value {
+                                Hint::DesktopEntry(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "image-data" => Hint::Invalid,
+                        "image_data" => Hint::Invalid,
+                        "image-path" => {
+                            if let Value::Str(x) = value {
+                                Hint::ImagePath(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "image_path" => {
+                            if let Value::Str(x) = value {
+                                Hint::ImagePath(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "icon_data" => Hint::Invalid,
+                        "resident" => {
+                            if let Value::Bool(x) = value {
+                                Hint::Resident(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "sound-file" => {
+                            if let Value::Str(x) = value {
+                                Hint::SoundFile(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "sound-name" => {
+                            if let Value::Str(x) = value {
+                                Hint::SoundName(x.to_string())
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "suppress-sound" => {
+                            if let Value::Bool(x) = value {
+                                Hint::SuppressSound(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "transient" => {
+                            if let Value::Bool(x) = value {
+                                Hint::Transient(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "x" => {
+                            if let Value::I32(x) = value {
+                                Hint::X(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "y" => {
+                            if let Value::I32(x) = value {
+                                Hint::Y(x)
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        "urgency" => {
+                            if let Value::U8(x) = value {
+                                Hint::Urgency(match x {
+                                    0 => Urgency::Low,
+                                    1 => Urgency::Normal,
+                                    2 => Urgency::Critical,
+                                    _ => Urgency::Normal,
+                                })
+                            } else {
+                                Hint::Invalid
+                            }
+                        }
+                        err => {
+                            warn!("Invalid hint passed with key: {}", err);
+                            Hint::Invalid
+                        }
+                    };
+                    val
+                })
+                .collect(),
             actions,
             timeout: match expire_timeout.cmp(&0) {
                 Ordering::Equal => Timeout::Never,
@@ -182,10 +295,3 @@ impl NotificationHandler {
     #[zbus(signal)]
     async fn action_invoked(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
 }
-
-// #[interface(name = "org.VimYoung.NC", proxy(gen_blocking = false,))]
-// impl NotificationHandler {
-//     async fn get_notifications(&self) -> zbus::Result<Vec<Notification>> {
-//         Ok(self.notifications)
-//     }
-// }

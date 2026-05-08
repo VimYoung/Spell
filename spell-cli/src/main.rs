@@ -22,10 +22,11 @@ use crate::constant_files::{
     BUILD_FILE_MATERIAL, BUILD_FILE_SLEEK, BUILD_FILE_SUI, BUILD_FILE_VIVI,
 };
 
-static MATERIAL_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/material-1.0/");
-static SLEEK_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/sleek/");
-static SUI_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/surrealism-ui/");
-static VIVI_LIB: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/component_libs/vivi/");
+static MATERIAL_LIB: Dir<'_> =
+    include_bytes!("$CARGO_MANIFEST_DIR/component_libs/material-1.0.zip");
+static SLEEK_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/sleek.zip");
+static SUI_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/surrealism-ui.zip");
+static VIVI_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/vivi.zip");
 
 #[proxy(
     default_path = "/net/reactivated/Fprint/Manager",

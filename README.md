@@ -39,10 +39,6 @@ It, supports rust as backend, so as though there are not many batteries (for now
 included in the framework itself, everything can be brought to life from the dark
 arts of rust.
 
-> [!IMPORTANT]
-> Please provide your inputs to improve Spell 1.0.3 is out but remote IPC access remains broken.
-> Ability to pass vectors of ipc and non ipc will be added in the next release.
-
 ## Features 🖊️
 
 1. **Simple frontend with fast backend:** As Spell uses Slint for creating widgets,
@@ -56,8 +52,9 @@ arts of rust.
 4. **Remote Accessibility:** Spell also ships a CLI through which state of widget can be made accessible,
    enabling integration in compositor settings.
 5. **Prebuilt Components(Material, Vivi):** Spell's CLI can port slint's
-   [material components](https://material.slint.dev/) to your project, Just add `--material`
-   or `--vivi` when creating a starter project with `sp`.
+   [material components](https://material.slint.dev/), surreal, sleek etc component
+   libs to your project, Just add `--material` or `--vivi` etc when creating a starter
+   project with `sp`.
 6. **Services:** (WIP) Spell also provides a vault with common functionalities like
    app launcher backend, notification backend, MPRIS etc.
 
@@ -161,15 +158,16 @@ You can clone this repository and run the following examples.
 cargo run -p spell-demo --bin bar
 ```
 
+2. OSD from the tutorial blog can also be executed.
+
+```bash
+cargo run -p spell-demo --bin osd
+```
+
 ## When can we expect a stable release?
 
 I remember adding this section a few months ago, now I can say that the first stable version is out!!.
 Create a spell project and give it a shot.
-
-> [!WARNING]
-> There are some heavy breaking changes for making CLI/IPC/Remote access to
-> variables easier. `ForeignController` essentially replaced by `IpcController`.
-> Leading to a much lighter window.
 
 ## Caution
 
@@ -177,8 +175,8 @@ Create a spell project and give it a shot.
 > The crate is under active development and breaking changes are expected.
 
 1. Multi-widget gets unstable sometimes due to changes in slint.
-2. Multiwidget event loops are slow in niri than in hyprland
-3. Hide and show features of widgets work flawlessly in niri but hangs in hyprland due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
+2. Hide and show features of widgets work flawlessly in niri but hangs in hyprland
+  due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
 
 Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
 to add appropriate patches and dependencies to use spell with slint.

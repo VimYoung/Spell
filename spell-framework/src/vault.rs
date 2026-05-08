@@ -7,24 +7,13 @@
 //! are added, docs will expand to include examples and panic cases.
 //! </div>
 //!
-//! The whole module is divided into structs representing these utilities and
-//! their corresponding traits (if it applies). Why do most utilities have a trait counterpart?
-//!
-//! Traits are made so as to represent actions when occured from the other server/
-//! application side. For example, An [`AppSelector`] is used and initialised for
-//! usage by your shell. Some utilities like
-//! `AppSelector` are more user intensive and less trait intensive(i.e. there are not
-//! many cases when server will ping, hence not much methods in traits). On the
-//! other hand implementations like that of notifications (via [`NotificationManager`])
-//! are majorly trait intensive.
-//! As a general tip, the best way to implement traits is to stores weak reference to
-//! your widget windows on slint side in structs and then implement these traits on it.
+//! Current it provides three main functionalities, namely notification management
+//! interface via [`NotificationManager`]
 use crate::vault::application::desktop_entry_extracter;
 pub use mpris;
 pub use notification_manager::set_notification;
 pub use rust_fuzzy_search::fuzzy_search_best_n;
 use std::{
-    collections::HashMap,
     env,
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -121,7 +110,7 @@ pub struct Notification {
     pub icon: String,
     /// Hints of the notification. Refer [here](https://specifications.freedesktop.org/notification/1.3/hints.html)
     ///  for more details.
-    pub hints: HashMap<String, Hint>,
+    pub hints: Vec<Hint>,
     /// Specified actions by the notification. Currently partially implemented.
     pub actions: Vec<String>,
     /// Specified timeout in which the notification expects to expire itself.
@@ -171,7 +160,8 @@ pub enum Hint {
     Urgency(Urgency),
     // Custom(String, String),
     // CustomInt(String, i32),
-    // Invalid,
+    /// Invalid hint passed and not processed.
+    Invalid,
 }
 
 /// The proposed urgency level by the notification, implementations of trait [`NotificationManager`]
