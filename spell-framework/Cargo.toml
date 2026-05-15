@@ -30,7 +30,7 @@ tracing = { version = "0.1.44", features = ["max_level_trace"] }
 tracing-subscriber = { version = "0.3.19", features = ["std", "env-filter"] }
 # tracing-rfc-5424 = "0.2.0"
 # zbus = {version = "5.10.0", default-features=false, features=["blocking-api"]}
- bus = "5.10.0"
+zbus = "5.10.0"
 nonstick = "0.1.1"
 tracing-appender = "0.2.3"
 paste = "1.0.15"
