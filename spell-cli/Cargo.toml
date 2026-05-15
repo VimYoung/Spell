@@ -12,12 +12,11 @@ name = "sp"
 path = "src/main.rs"
 
 [dependencies]
-# spell-framework = { path = "../spell-framework/" }
-spell-framework = "1.0.0"
-zbus = "5.11.0"
+spell-framework = "1.0.4"
+zbus = {version = "5.10.0", default-features=false,}
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "sync"] }
 futures-util = "0.3.31"
-include_dir = "0.7.4"
+zip ={ version= "8.6.0", default-features = false,}
 
 [package.metadata.docs.rs]
 no-default-features = true

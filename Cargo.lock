@@ -2467,25 +2467,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40fac9d56ed6437b198fddba683305e8e2d651aa42647f00f5ae542e7f5c94a2"
 
 [[package]]
-name = "include_dir"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
-dependencies = [
- "include_dir_macros",
-]
-
-[[package]]
-name = "include_dir_macros"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
 name = "indexmap"
 version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4944,11 +4925,11 @@ name = "spell-cli"
 version = "1.0.2"
 dependencies = [
  "futures-util",
- "include_dir",
  "slint-build",
  "spell-framework 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "zbus",
+ "zip",
 ]
 
 [[package]]
@@ -4965,9 +4946,7 @@ dependencies = [
 name = "spell-framework"
 version = "1.0.4"
 dependencies = [
- "env_logger",
  "event-listener",
- "fs2",
  "futures-util",
  "i-slint-core",
  "i-slint-renderer-skia",
@@ -4975,14 +4954,12 @@ dependencies = [
  "nonstick",
  "paste",
  "rust-fuzzy-search",
- "signal-hook",
  "slint",
  "smithay-client-toolkit 0.20.0",
  "smithay-clipboard",
  "tokio",
  "tracing",
  "tracing-appender",
- "tracing-rfc-5424",
  "tracing-subscriber",
  "zbus",
 ]
@@ -5554,6 +5531,12 @@ dependencies = [
  "bincode",
  "serde",
 ]
+
+[[package]]
+name = "typed-path"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
 
 [[package]]
 name = "udev"
@@ -7009,6 +6992,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "zip"
+version = "8.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
+dependencies = [
+ "crc32fast",
+ "indexmap",
+ "memchr",
+ "typed-path",
 ]
 
 [[package]]

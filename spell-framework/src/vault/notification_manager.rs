@@ -116,7 +116,6 @@ impl NotificationHandler {
         hints: HashMap<String, zbus::zvariant::Value<'_>>,
         expire_timeout: i32,
     ) -> Result<u32, BusError> {
-        // TODO add hints in the implementation
         info!("Notifcation event received");
         let notification = Notification {
             id: replaces_id,

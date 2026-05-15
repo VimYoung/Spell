@@ -6,11 +6,13 @@ use constantvals::{
 };
 use core::panic;
 use futures_util::stream::StreamExt;
-use include_dir::{Dir, include_dir};
+use zip::ZipArchive;
+// use include_dir::{Dir, include_dir};
 use std::{
     env::{self, Args},
     fs::{self, OpenOptions},
-    io::{self, Read, Write},
+    include_bytes,
+    io::{self, Cursor, Read, Write},
     os::unix::net::{UnixDatagram, UnixStream},
     path::Path,
     process::Command,
@@ -22,11 +24,10 @@ use crate::constant_files::{
     BUILD_FILE_MATERIAL, BUILD_FILE_SLEEK, BUILD_FILE_SUI, BUILD_FILE_VIVI,
 };
 
-static MATERIAL_LIB: Dir<'_> =
-    include_bytes!("$CARGO_MANIFEST_DIR/component_libs/material-1.0.zip");
-static SLEEK_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/sleek.zip");
-static SUI_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/surrealism-ui.zip");
-static VIVI_LIB: Dir<'_> = include_bytes!("$CARGO_MANIFEST_DIR/component_libs/vivi.zip");
+static MATERIAL_LIB: &'static [u8] = include_bytes!("../component_libs/material-1.0.zip");
+static SLEEK_LIB: &'static [u8] = include_bytes!("../component_libs/sleek.zip");
+static SUI_LIB: &'static [u8] = include_bytes!("../component_libs/surrealism-ui.zip");
+static VIVI_LIB: &'static [u8] = include_bytes!("../component_libs/vivi.zip");
 
 #[proxy(
     default_path = "/net/reactivated/Fprint/Manager",
@@ -584,8 +585,10 @@ enum LogType {
     Dev,
 }
 
-fn copy_dir(src: &Dir<'_>, dst: impl AsRef<Path>) -> io::Result<()> {
-    src.extract(dst)?;
+fn copy_dir(src: &[u8], dst: impl AsRef<Path>) -> io::Result<()> {
+    let reader = Cursor::new(src);
+    let mut archieve = ZipArchive::new(reader)?;
+    archieve.extract(dst)?;
     Ok(())
 }
 

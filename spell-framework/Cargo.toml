@@ -9,26 +9,27 @@ keywords = ["widget", "rice", "spell", "slint", "wayland"]
 exclude = ["/src/bin/*"]
 
 [dependencies]
-env_logger = "0.11.7"
+# env_logger = "0.11.7"
 event-listener = "5.4.0"
-fs2 = "0.4.3"
+# fs2 = "0.4.3"
 futures-util = "0.3.31"
-i-slint-core = "1.15.1"
-i-slint-renderer-skia = { version = "1.15.1", features = [
-  "wayland",
-], optional = true }
+i-slint-core = { version="1.15.1", default-features=false}
+# i-slint-renderer-skia = { version = "1.15.1", features = [
+#   "wayland",
+# ], optional = true }
+i-slint-renderer-skia = { version = "1.15.1", default-features=false, optional=true}
 rust-fuzzy-search = "0.1.1"
-signal-hook = "0.4.3"
+# signal-hook = "0.4.3"
 slint = { version = "1.15.1", default-features = false, features = [
   "renderer-skia",
   "compat-1-2"
 ] }
-smithay-client-toolkit = "0.20.0"
+smithay-client-toolkit = {version="0.20.0", default-features=false, features=["xkbcommon"]}
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
 tracing = { version = "0.1.44", features = ["max_level_trace"] }
 tracing-subscriber = { version = "0.3.19", features = ["std", "env-filter"] }
-tracing-rfc-5424 = "0.2.0"
-zbus = "5.10.0"
+# tracing-rfc-5424 = "0.2.0"
+zbus = {version = "5.10.0", default-features=false, features=["blocking-api"]}
 nonstick = "0.1.1"
 tracing-appender = "0.2.3"
 paste = "1.0.15"

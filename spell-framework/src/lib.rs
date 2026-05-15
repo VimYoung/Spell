@@ -105,42 +105,6 @@ pub fn cast_spells_new(
 // TODO update the constant vals so that the new APIs are used.
 // TODO and configuration file to ensure that a single widget is open for a single layer name.
 // TODO IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
-// Code to launch a Zbus service
-// <BS>
-// pub async fn deploy_zbus_service(
-//     state: State,
-//     state_updater: Sender<InternalHandle>,
-//     layer_name: String,
-// ) -> zbus::Result<()> {
-//     let connection = BusConn::session().await.unwrap();
-//     connection
-//         .object_server()
-//         .at(
-//             "/org/VimYoung/VarHandler",
-//             VarHandler {
-//                 state: state.clone(),
-//                 state_updater: state_updater.clone(),
-//                 layer_name: layer_name.clone(),
-//             },
-//         )
-//         .await?;
-//     trace!("Object server set up");
-//     // connection.request_name("org.VimYoung.Spell").await?;
-//     // open_sec_service(state, state_updater, layer_name).await?;
-//     if let Err(err) = connection
-//         .request_name_with_flags("org.VimYoung.Spell", RequestNameFlags::DoNotQueue.into())
-//         .await
-//     {
-//         open_sec_service(state, state_updater, layer_name).await?;
-//         info!("Successfully created secondary service, Error: {}", err);
-//     } else {
-//         info!("Successfully created main service");
-//     }
-//     std::future::pending::<()>().await;
-//     Ok(())
-// }
-// Macro on top of VarHandler impl.
-// #[interface(name = "org.VimYoung.Spell1", proxy(gen_blocking = false,))]
 // TODO it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
 // TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
@@ -148,7 +112,6 @@ pub fn cast_spells_new(
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
 // TODO lock screen behaviour in a multi-monitor setup needs to be tested.
-// TODO implement logging for SpellLock.
 // Provide a method in the macro to disable tracing_subsriber completely for some project
 // which want's to do it themselves.
 // cast spell macro should be having following values.
@@ -159,6 +122,4 @@ pub fn cast_spells_new(
 // 4. it should have the option to take a window_conf or directly the window configurations
 // into the macro, removing the need to define it previously.
 // 5. monitor: Specify the monitor to show the widget in.
-// Also, a procedural macro to mimic the functionalities of ForeignController.
 // Build a consistent error type to deal with CLI, dbus and window creation errors
-// (including window conf) more gracefully.
