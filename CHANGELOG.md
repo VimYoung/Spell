@@ -1,4 +1,4 @@
-# 1.0.5 & 1.0.5 CLI (Due Date)
+# 1.0.5 & 1.0.5 CLI (26-05-15)
 
 Changes:
 
@@ -6,7 +6,6 @@ Changes:
 1. Activated touch screen inputs in SpellWin and SpellLock.
 1. Added support for lock in `generate_widgets` macro.
 1. Added notification manger.
-1. XDG popup implementation recently.
 
 Changes(spell-cli):
 

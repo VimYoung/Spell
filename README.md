@@ -17,7 +17,7 @@
   ·
   <a href="https://docs.rs/spell-framework/latest/spell_framework/">Wiki</a>
   ·
-  <a href="https://discord.com/invite/2bSHpuuJ">Join Discord</a>
+  <a href="https://matrix.to/#/#spell-framework:matrix.org">Join Matrix</a>
   <br />
   <br />
 </p>

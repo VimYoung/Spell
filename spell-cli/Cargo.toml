@@ -1,6 +1,6 @@
 [package]
 name = "spell-cli"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 description = "CLI for spell-framework"
 license = "GPL-3.0-or-later"
@@ -16,7 +16,7 @@ spell-framework = "1.0.4"
 zbus = {version = "5.10.0", default-features=false,}
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "sync"] }
 futures-util = "0.3.31"
-zip ={ version= "8.6.0", default-features = false,}
+zip = "8.6.0"
 
 [package.metadata.docs.rs]
 no-default-features = true

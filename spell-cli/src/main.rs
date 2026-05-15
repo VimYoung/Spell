@@ -342,40 +342,28 @@ fn create_spell_project(
 
     match external_lib {
         ThirdPartyComponents::Material => {
-            let lib_path = path_ui + "/material-1.0";
-            let target: &Path = Path::new(&lib_path);
-            fs::create_dir(target)?;
-            copy_dir(&MATERIAL_LIB, &target)?;
+            copy_dir(&MATERIAL_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_MATERIAL.as_bytes())?;
             println!("Writing slint file with material lib...");
             build_rs.write_all(BUILD_FILE_MATERIAL.as_bytes())?;
             println!("Writing build file with material...");
         }
         ThirdPartyComponents::Sleek => {
-            let lib_path = path_ui + "/sleek";
-            let target: &Path = Path::new(&lib_path);
-            fs::create_dir(target)?;
-            copy_dir(&SLEEK_LIB, &target)?;
+            copy_dir(&SLEEK_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_SLEEK.as_bytes())?;
             println!("Writing slint file with sleek external lib...");
             build_rs.write_all(BUILD_FILE_SLEEK.as_bytes())?;
             println!("Writing build file with sleek...");
         }
         ThirdPartyComponents::Surrealism => {
-            let lib_path = path_ui + "/surrealism-ui";
-            let target: &Path = Path::new(&lib_path);
-            fs::create_dir(target)?;
-            copy_dir(&SUI_LIB, &target)?;
+            copy_dir(&SUI_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_SUI.as_bytes())?;
             println!("Writing slint file surrealism lib...");
             build_rs.write_all(BUILD_FILE_SUI.as_bytes())?;
             println!("Writing build file surrealism...");
         }
         ThirdPartyComponents::Vivi => {
-            let lib_path = path_ui + "/vivi";
-            let target: &Path = Path::new(&lib_path);
-            fs::create_dir(target)?;
-            copy_dir(&VIVI_LIB, &target)?;
+            copy_dir(&VIVI_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_VIVI.as_bytes())?;
             println!("Writing slint file with vivi lib...");
             build_rs.write_all(BUILD_FILE_VIVI.as_bytes())?;
