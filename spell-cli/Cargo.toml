@@ -12,7 +12,7 @@ name = "sp"
 path = "src/main.rs"
 
 [dependencies]
-spell-framework = "1.0.4"
+spell-framework = "1.0.5"
 # zbus = {version = "5.10.0", default-features=false,}
 zbus = "5.10.0"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "sync"] }
