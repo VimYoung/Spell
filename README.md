@@ -29,7 +29,10 @@
        controls
        width="700">
 </video>
-<https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77>
+
+
+https://github.com/user-attachments/assets/bd359b91-27cf-4e8b-8158-0f685970fc9a
+
 
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
 
