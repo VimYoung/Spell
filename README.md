@@ -24,6 +24,11 @@
 
 **Don't forget to star the project if you like it 🌟🌟**
 
+
+<video src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/young-shell-display.mp4"
+       controls
+       width="700">
+</video>
 <https://github.com/user-attachments/assets/7e1c6beb-17ad-492c-b7d2-06688cfcbc77>
 
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
