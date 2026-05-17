@@ -18,21 +18,22 @@
   <a href="https://docs.rs/spell-framework/latest/spell_framework/">Wiki</a>
   ·
   <a href="https://matrix.to/#/#spell-framework:matrix.org">Join Matrix</a>
+  ·
+  <a href="https://github.com/VimYoung/Spell/discussions/24">Showcase</a>
+  ·
+  <a href="https://vimyoung.github.io/Spell/">Website</a>
   <br />
   <br />
 </p>
 
 **Don't forget to star the project if you like it 🌟🌟**
 
-
 <video src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/young-shell-display.mp4"
        controls
        width="700">
 </video>
 
-
-https://github.com/user-attachments/assets/bd359b91-27cf-4e8b-8158-0f685970fc9a
-
+<https://github.com/user-attachments/assets/bd359b91-27cf-4e8b-8158-0f685970fc9a>
 
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
 
@@ -166,7 +167,7 @@ You can clone this repository and run the following examples.
 cargo run -p spell-demo --bin bar
 ```
 
-2. OSD from the tutorial blog can also be executed.
+1. OSD from the tutorial blog can also be executed.
 
 ```bash
 cargo run -p spell-demo --bin osd
@@ -184,7 +185,7 @@ Create a spell project and give it a shot.
 
 1. Multi-widget gets unstable sometimes due to changes in slint.
 2. Hide and show features of widgets work flawlessly in niri but hangs in hyprland
-  due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
+   due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
 
 Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
 to add appropriate patches and dependencies to use spell with slint.
