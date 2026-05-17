@@ -35,6 +35,7 @@ use smithay_client_toolkit::{
     reexports::{
         calloop::{
             EventLoop, LoopHandle, RegistrationToken,
+            channel::{self, Sender},
             timer::{TimeoutAction, Timer},
         },
         calloop_wayland_source::WaylandSource,
@@ -66,6 +67,7 @@ use std::{
     process::Command,
     rc::Rc,
     sync::{Arc, Mutex, Once, OnceLock, RwLock},
+    thread,
     time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
@@ -830,6 +832,7 @@ pub struct SpellLock {
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
+    pub(crate) unlock_screen: Sender<bool>,
     // TODO, check if it need internal mutability?
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
     pub(crate) backspace: Option<RegistrationToken>,
@@ -870,6 +873,7 @@ impl SpellLock {
             last_cursor_enter_serial: None,
             current_wayland_cursor: MouseCursor::Default,
         };
+        let (sender, rx) = channel::channel::<bool>();
         let mut spell_lock = SpellLock {
             loop_handle: event_loop.handle().clone(),
             conn: conn.clone(),
@@ -884,6 +888,7 @@ impl SpellLock {
             shm,
             session_lock: None,
             lock_surfaces,
+            unlock_screen: sender,
             is_locked: true,
             event_loop: Rc::new(RefCell::new(event_loop)),
             backspace: None,
@@ -995,6 +1000,27 @@ impl SpellLock {
                 .unwrap(),
         );
 
+        let _ =
+            spell_lock
+                .loop_handle
+                .clone()
+                .insert_source(rx, move |event, _, data| match event {
+                    channel::Event::Msg(msg) => {
+                        if msg {
+                            if let Some(locked_val) = data.session_lock.take() {
+                                locked_val.unlock();
+                            } else {
+                                warn!("Authentication verified but couldn't unlock");
+                            }
+                            data.is_locked = false;
+                            data.conn.roundtrip().unwrap();
+                        }
+                    }
+                    channel::Event::Closed => {
+                        warn!("Unlock channel to open thread is closed.");
+                    }
+                });
+
         spell_lock
             .loop_handle
             .disable(&spell_lock.backspace.unwrap())
@@ -1054,40 +1080,42 @@ impl SpellLock {
         // }
 
         self.lock_surfaces[0].wl_surface().commit();
-        // core::mem::swap::<&mut [u8]>(&mut sec_canvas_data.as_mut_slice(), &mut primary_canvas);
-        // core::mem::swap::<&mut [Rgba8Pixel]>( &mut &mut *work_buffer, &mut &mut *currently_displayed_buffer,);
-
-        // TODO save and reuse buffer when the window size is unchanged.  This is especially
-        // useful if you do damage tracking, since you don't need to redraw the undamaged parts
-        // of the canvas.
     }
 
-    fn unlock_finger(&mut self) -> PamResult<()> {
-        let finger = FingerprintInfo;
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
-            .output()
-            .expect("Couldn't retrive username");
+    fn unlock_finger(&mut self, error_callback: Box<dyn FnOnce() + Send>) -> PamResult<()> {
+        let sender = self.unlock_screen.clone();
+        thread::spawn(move || {
+            fn unlock_internal(sender: Sender<bool>) -> PamResult<()> {
+                let finger = FingerprintInfo;
+                let output = Command::new("sh")
+                    .arg("-c")
+                    .arg("last | awk '{print $1}' | sort | uniq -c | sort -nr")
+                    .output()
+                    .expect("Couldn't retrive username");
 
-        let val = String::from_utf8_lossy(&output.stdout);
-        let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
-        let user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
+                let val = String::from_utf8_lossy(&output.stdout);
+                let val_2 = val.split('\n').collect::<Vec<_>>()[0].trim();
+                let user_name = val_2.split(" ").collect::<Vec<_>>()[1].to_string();
 
-        let mut txn = TransactionBuilder::new_with_service("login")
-            .username(user_name)
-            .build(finger.into_conversation())?;
-        // If authentication fails, this will return an error.
-        // We immediately give up rather than re-prompting the user.
-        txn.authenticate(AuthnFlags::empty())?;
-        txn.account_management(AuthnFlags::empty())?;
-        if let Some(locked_val) = self.session_lock.take() {
-            locked_val.unlock();
-        } else {
-            warn!("Authentication verified but couldn't unlock");
-        }
-        self.is_locked = false;
-        self.conn.roundtrip().unwrap();
+                let mut txn = TransactionBuilder::new_with_service("login")
+                    .username(user_name)
+                    .build(finger.into_conversation())?;
+                // If authentication fails, this will return an error.
+                // We immediately give up rather than re-prompting the user.
+                txn.authenticate(AuthnFlags::empty())?;
+                txn.account_management(AuthnFlags::empty())?;
+                if let Err(err) = sender.send(true) {
+                    warn!("Error sending unlock via sender: {err}");
+                }
+                Ok(())
+            }
+            if let Err(err) = unlock_internal(sender) {
+                println!("{:?}", err);
+                error_callback();
+            } else {
+                println!("Passed");
+            }
+        });
         Ok(())
     }
 
@@ -1187,14 +1215,15 @@ impl LockHandle {
     /// Function which opens fingerprint device for authentication.
     /// error_callback is executed when fingerprint is not registered and fails
     /// to unlock the lockscreen.
-    pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce()>) {
+    pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce() + Send>) {
         self.0.insert_idle(move |app_data| {
-            if let Err(err) = app_data.unlock_finger() {
-                println!("{:?}", err);
-                error_callback();
-            } else {
-                println!("Passed");
-            }
+            // if let Err(err) = app_data.unlock_finger() {
+            //     println!("{:?}", err);
+            //     error_callback();
+            // } else {
+            //     println!("Passed");
+            // }
+            app_data.unlock_finger(error_callback);
         });
     }
 }
