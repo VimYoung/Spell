@@ -34,7 +34,7 @@ use smithay_client_toolkit::{
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
-            EventLoop, LoopHandle, RegistrationToken,
+            self, EventLoop, LoopHandle, RegistrationToken,
             channel::{self, Sender},
             timer::{TimeoutAction, Timer},
         },
@@ -183,15 +183,14 @@ impl SpellWin {
             last_cursor_enter_serial: None,
         };
 
-        #[allow(clippy::type_complexity)]
-        let slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>> =
-            Arc::new(Mutex::new(Vec::new()));
+        let (slint_event_sender, slint_event_receiver) =
+            calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
             Rc::new(RefCell::new(pool)),
             RefCell::new(primary_slot),
             window_conf.width,
             window_conf.height,
-            slint_proxy.clone(),
+            slint_event_sender,
         );
 
         ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
@@ -201,7 +200,7 @@ impl SpellWin {
                 warn!("Error setting slint platform: {err}");
             }
         });
-        set_event_sources(&event_loop, handle);
+        set_event_sources(&event_loop, handle, slint_event_receiver);
 
         let mut win = SpellWin {
             adapter: adapter_value,
@@ -959,7 +958,8 @@ impl SpellLock {
                 wayland_buffer
             })
             .collect();
-        let slint_proxy = Arc::new(Mutex::new(Vec::new()));
+        let (slint_event_sender, slint_event_receiver) =
+            calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
         let pool: Rc<RefCell<SlotPool>> = Rc::new(RefCell::new(pool));
         let mut adapters: Vec<Rc<SpellSkiaWinAdapter>> = Vec::new();
         buffer_slots
@@ -971,7 +971,7 @@ impl SpellLock {
                     slot,
                     sizes[index].width,
                     sizes[index].height,
-                    slint_proxy.clone(),
+                    slint_event_sender.clone(),
                 );
                 adapters.push(adapter);
             });
@@ -982,6 +982,21 @@ impl SpellLock {
             size: sizes,
             wayland_buffer: buffers,
         });
+
+        spell_lock
+            .loop_handle
+            .insert_source(slint_event_receiver, |event, _, data| {
+                if let calloop::channel::Event::Msg(callback) = event {
+                    callback();
+
+                    if let Some(slint_part) = &data.slint_part {
+                        for adapter in &slint_part.adapters {
+                            adapter.request_redraw();
+                        }
+                    }
+                }
+            })
+            .unwrap();
 
         spell_lock.backspace = Some(
             spell_lock
@@ -1025,7 +1040,10 @@ impl SpellLock {
             .loop_handle
             .disable(&spell_lock.backspace.unwrap())
             .unwrap();
-        let _ = slint::platform::set_platform(Box::new(SpellLockShell::new(multi_handler)));
+        let _ = slint::platform::set_platform(Box::new(SpellLockShell::new(
+            multi_handler,
+            slint_event_sender,
+        )));
 
         WaylandSource::new(spell_lock.conn.clone(), event_queue)
             .insert(spell_lock.loop_handle.clone())
