@@ -33,21 +33,35 @@ use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 #[cfg(docsrs)]
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
+
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
     /// Span storing the logging context for `debug`` statements of slint.
     pub span: span::Span,
+    slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
 }
 
-impl Default for SpellLayerShell {
+impl SpellLayerShell {
     /// Creates an instance of this Platform implementation, for internal use.
-    fn default() -> Self {
-        SpellLayerShell {
+    pub(crate) fn new(
+        slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
+    ) -> Self {
+        Self {
             span: span!(Level::INFO, "slint-log",),
+            slint_event_sender,
         }
     }
 }
+
+// impl Default for SpellLayerShell {
+//     /// Creates an instance of this Platform implementation, for internal use.
+//     fn default() -> Self {
+//         SpellLayerShell {
+//             span: span!(Level::INFO, "slint-log",),
+//         }
+//     }
+// }
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
@@ -66,9 +80,7 @@ impl Platform for SpellLayerShell {
     }
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
-        Some(Box::new(SlintEventProxy(ADAPTERS.with(|v| {
-            v.borrow().last().unwrap().slint_event_proxy.clone()
-        }))))
+        Some(Box::new(SlintEventProxy(self.slint_event_sender.clone())))
     }
 }
 

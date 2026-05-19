@@ -4,7 +4,6 @@ use i_slint_core::{items::MouseCursor, partial_renderer::DirtyRegion, platform::
 
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window};
-use smithay_client_toolkit::reexports::calloop;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::{
@@ -123,8 +122,6 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
-    #[allow(clippy::type_complexity)]
-    pub(crate) slint_event_proxy: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
     pub(crate) current_cursor: Cell<MouseCursor>,
 }
 
@@ -185,7 +182,6 @@ impl SpellSkiaWinAdapterReal {
         primary_slot: RefCell<Slot>,
         width: u32,
         height: u32,
-        slint_proxy: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
     ) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBufferReal {
             primary_slot,
@@ -204,7 +200,6 @@ impl SpellSkiaWinAdapterReal {
             buffer_slint: buffer,
             scale_factor: Cell::new(1.),
             needs_redraw: Cell::new(true),
-            slint_event_proxy: slint_proxy,
             current_cursor: Cell::new(MouseCursor::Default),
         })
     }

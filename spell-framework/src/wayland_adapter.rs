@@ -66,7 +66,7 @@ use std::{
     os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
-    sync::{Arc, Mutex, Once, OnceLock, RwLock},
+    sync::{Once, OnceLock, RwLock},
     thread,
     time::Duration,
 };
@@ -190,13 +190,14 @@ impl SpellWin {
             RefCell::new(primary_slot),
             window_conf.width,
             window_conf.height,
-            slint_event_sender,
         );
 
         ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
         SET_SLINT_PLATFORM.call_once(|| {
             trace!("Slint platform set");
-            if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
+            if let Err(err) =
+                slint::platform::set_platform(Box::new(SpellLayerShell::new(slint_event_sender)))
+            {
                 warn!("Error setting slint platform: {err}");
             }
         });
@@ -971,7 +972,6 @@ impl SpellLock {
                     slot,
                     sizes[index].width,
                     sizes[index].height,
-                    slint_event_sender.clone(),
                 );
                 adapters.push(adapter);
             });
