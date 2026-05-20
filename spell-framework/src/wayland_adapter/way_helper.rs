@@ -5,11 +5,14 @@ use crate::{
 };
 use i_slint_core::items::MouseCursor;
 use nonstick::{ConversationAdapter, Result as PamResult};
-use slint::{SharedString, platform::Key};
+use slint::{
+    SharedString,
+    platform::{Key, WindowAdapter},
+};
 use smithay_client_toolkit::{
     reexports::{
         calloop::{
-            EventLoop,
+            self, EventLoop,
             timer::{TimeoutAction, Timer},
         },
         client::{
@@ -175,7 +178,11 @@ impl PointerState {
     }
 }
 
-pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handle: HomeHandle) {
+pub(crate) fn set_event_sources(
+    event_loop: &EventLoop<'static, SpellWin>,
+    handle: HomeHandle,
+    slint_event_receiver: calloop::channel::Channel<Box<dyn FnOnce() + Send>>,
+) {
     // let backspace_event = event_loop
     //     .handle()
     //     .insert_source(
@@ -267,24 +274,12 @@ pub(crate) fn set_event_sources(event_loop: &EventLoop<'static, SpellWin>, handl
 
     event_loop
         .handle()
-        .insert_source(
-            Timer::from_duration(Duration::from_millis(1000)),
-            |_, _, data| {
-                let slint_event_proxy = data.adapter.slint_event_proxy.clone();
-                if let Ok(mut list_of_events) = slint_event_proxy.try_lock()
-                    && !(*list_of_events).is_empty()
-                {
-                    let original_len = (*list_of_events).len();
-                    let mut x = 0;
-                    while x < original_len {
-                        let event = (*list_of_events).pop().unwrap();
-                        event();
-                        x += 1;
-                    }
-                }
-                TimeoutAction::ToDuration(Duration::from_millis(1000))
-            },
-        )
+        .insert_source(slint_event_receiver, |event, _, data| {
+            if let calloop::channel::Event::Msg(callback) = event {
+                callback();
+                data.adapter.request_redraw();
+            }
+        })
         .unwrap();
 }
 

@@ -15,7 +15,6 @@ use std::{
     cell::RefCell,
     fmt::Debug,
     rc::{Rc, Weak},
-    sync::{Arc, Mutex},
 };
 use tracing::{info, warn};
 
@@ -123,8 +122,6 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
-    #[allow(clippy::type_complexity)]
-    pub(crate) slint_event_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
     pub(crate) current_cursor: Cell<MouseCursor>,
 }
 
@@ -185,7 +182,6 @@ impl SpellSkiaWinAdapterReal {
         primary_slot: RefCell<Slot>,
         width: u32,
         height: u32,
-        slint_proxy: Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>,
     ) -> Rc<Self> {
         let buffer = Rc::new(SkiaSoftwareBufferReal {
             primary_slot,
@@ -204,7 +200,6 @@ impl SpellSkiaWinAdapterReal {
             buffer_slint: buffer,
             scale_factor: Cell::new(1.),
             needs_redraw: Cell::new(true),
-            slint_event_proxy: slint_proxy,
             current_cursor: Cell::new(MouseCursor::Default),
         })
     }

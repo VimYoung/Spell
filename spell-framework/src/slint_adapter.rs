@@ -4,12 +4,9 @@
 //! in intial iterations of spell_framework.
 use crate::configure::LayerConf;
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
-use tracing::{Level, info, span, warn};
+use smithay_client_toolkit::reexports::calloop;
+use std::{cell::RefCell, rc::Rc};
+use tracing::{Level, info, span};
 
 thread_local! {
     pub(crate) static ADAPTERS: RefCell<Vec<Rc<SpellSkiaWinAdapter>>> = const { RefCell::new(Vec::new()) };
@@ -36,21 +33,35 @@ use crate::dummy_skia_docs::SpellSkiaWinAdapterDummy;
 /// adapter internally uses [Skia](https://skia.org/) 2D graphics library for rendering.
 #[cfg(docsrs)]
 pub type SpellSkiaWinAdapter = SpellSkiaWinAdapterDummy;
+
 /// Previously needed to be implemented, now this struct is called and set internally
 /// when [`invoke_spell`](crate::wayland_adapter::SpellWin::invoke_spell) is called.
 pub struct SpellLayerShell {
     /// Span storing the logging context for `debug`` statements of slint.
     pub span: span::Span,
+    slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
 }
 
-impl Default for SpellLayerShell {
+impl SpellLayerShell {
     /// Creates an instance of this Platform implementation, for internal use.
-    fn default() -> Self {
-        SpellLayerShell {
+    pub(crate) fn new(
+        slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
+    ) -> Self {
+        Self {
             span: span!(Level::INFO, "slint-log",),
+            slint_event_sender,
         }
     }
 }
+
+// impl Default for SpellLayerShell {
+//     /// Creates an instance of this Platform implementation, for internal use.
+//     fn default() -> Self {
+//         SpellLayerShell {
+//             span: span!(Level::INFO, "slint-log",),
+//         }
+//     }
+// }
 
 impl Platform for SpellLayerShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
@@ -69,9 +80,7 @@ impl Platform for SpellLayerShell {
     }
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
-        Some(Box::new(SlintEventProxy(ADAPTERS.with(|v| {
-            v.borrow().last().unwrap().slint_event_proxy.clone()
-        }))))
+        Some(Box::new(SlintEventProxy(self.slint_event_sender.clone())))
     }
 }
 
@@ -112,6 +121,8 @@ impl SpellMultiWinHandler {
 pub struct SpellLockShell {
     /// An instance of [SpellMultiWinHandler].
     pub window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+    /// Channel to allow executing functions in the slint event loop immediately
+    pub slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
     /// Span storing the logging context for `debug`` statements of slint for
     /// lock screens.
     pub span: span::Span,
@@ -120,8 +131,12 @@ pub struct SpellLockShell {
 impl SpellLockShell {
     /// Internal function that creates an instance of layer implementation given
     /// [`SpellMultiWinHandler`] wrapped in smart pointers.
-    pub fn new(window_manager: Rc<RefCell<SpellMultiWinHandler>>) -> Self {
+    pub fn new(
+        window_manager: Rc<RefCell<SpellMultiWinHandler>>,
+        slint_event_sender: calloop::channel::Sender<Box<dyn FnOnce() + Send>>,
+    ) -> Self {
         SpellLockShell {
+            slint_event_sender,
             window_manager,
             span: span!(Level::INFO, "slint-lock-log",),
         }
@@ -132,6 +147,10 @@ impl Platform for SpellLockShell {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
         let value = self.window_manager.borrow_mut().request_new_lock();
         Ok(value)
+    }
+
+    fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
+        Some(Box::new(SlintEventProxy(self.slint_event_sender.clone())))
     }
 
     fn debug_log(&self, arguments: core::fmt::Arguments) {
@@ -145,8 +164,7 @@ impl Platform for SpellLockShell {
     }
 }
 
-#[allow(clippy::type_complexity)]
-struct SlintEventProxy(Arc<Mutex<Vec<Box<dyn FnOnce() + Send>>>>);
+struct SlintEventProxy(calloop::channel::Sender<Box<dyn FnOnce() + Send>>);
 
 impl EventLoopProxy for SlintEventProxy {
     fn quit_event_loop(&self) -> Result<(), i_slint_core::api::EventLoopError> {
@@ -157,11 +175,8 @@ impl EventLoopProxy for SlintEventProxy {
         &self,
         event: Box<dyn FnOnce() + Send>,
     ) -> Result<(), i_slint_core::api::EventLoopError> {
-        if let Ok(mut list_of_event) = self.0.try_lock() {
-            (*list_of_event).push(event);
-        } else {
-            warn!("Slint proxy event could not be processed");
-        }
-        Ok(())
+        self.0
+            .send(event)
+            .map_err(|_| i_slint_core::api::EventLoopError::EventLoopTerminated)
     }
 }
