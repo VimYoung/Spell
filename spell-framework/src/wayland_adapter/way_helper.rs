@@ -277,7 +277,7 @@ pub(crate) fn set_event_sources(
         .insert_source(slint_event_receiver, |event, _, data| {
             if let calloop::channel::Event::Msg(callback) = event {
                 callback();
-                data.adapter.request_redraw();
+                data.adapter.as_ref().unwrap().request_redraw();
             }
         })
         .unwrap();

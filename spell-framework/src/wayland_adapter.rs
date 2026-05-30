@@ -71,7 +71,6 @@ use std::{
     os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
-    sync::{Arc, Mutex},
     sync::{Once, OnceLock, RwLock},
 };
 use tracing::{Level, info, span, trace, warn};
@@ -167,26 +166,8 @@ impl SpellWin {
             current_wayland_cursor: MouseCursor::Default,
             last_cursor_enter_serial: None,
         };
-
-        let (slint_event_sender, slint_event_receiver) =
-            calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
-        let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
-            Rc::new(RefCell::new(pool)),
-            RefCell::new(primary_slot),
-            window_conf.width,
-            window_conf.height,
-        );
-
-        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
-        SET_SLINT_PLATFORM.call_once(|| {
-            trace!("Slint platform set");
-            if let Err(err) =
-                slint::platform::set_platform(Box::new(SpellLayerShell::new(slint_event_sender)))
-            {
-                warn!("Error setting slint platform: {err}");
-            }
-        });
-        set_event_sources(&event_loop, handle, slint_event_receiver);
+        let input_region = Region::new(&compositor).expect("Couldn't create region");
+        let opaque_region = Region::new(&compositor).expect("Couldn't create opaque region");
 
         let mut win = SpellWin {
             adapter: None,
@@ -307,18 +288,31 @@ impl SpellWin {
             RefCell::new(primary_slot),
             window_conf.evaluated_width,
             window_conf.evaluated_height,
-            slint_proxy.clone(),
         );
         win.adapter = Some(adapter_value.clone());
         win.buffer = Some(way_pri_buffer);
 
-        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value));
+        let (slint_event_sender, slint_event_receiver) =
+            calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
+
+        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
         SET_SLINT_PLATFORM.call_once(|| {
             trace!("Slint platform set");
-            if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
+            if let Err(err) =
+                slint::platform::set_platform(Box::new(SpellLayerShell::new(slint_event_sender)))
+            {
                 warn!("Error setting slint platform: {err}");
             }
         });
+        win.adapter = Some(adapter_value);
+        // set_event_sources(&event_loop, handle, slint_event_receiver);
+        // ADAPTERS.with_borrow_mut(|v| v.push(adapter_value));
+        // SET_SLINT_PLATFORM.call_once(|| {
+        //     trace!("Slint platform set");
+        //     if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
+        //         warn!("Error setting slint platform: {err}");
+        //     }
+        // });
         let target_output: Option<&WlOutput> = output_info.as_ref().map(|(a, _, _)| a);
         let layer = layer_shell.create_layer_surface(
             &qh,
@@ -347,7 +341,11 @@ impl SpellWin {
         win.layer = Some(layer);
         win.states.viewporter = Some(viewporter);
 
-        set_event_sources(&win.event_loop.as_ref().borrow(), handle);
+        set_event_sources(
+            &win.event_loop.as_ref().borrow(),
+            handle,
+            slint_event_receiver,
+        );
 
         info!("Win: {} layer created successfully.", layer_name);
 
