@@ -23,7 +23,7 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::configure::{WindowConf, WindowConfBuilder};
+    pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;

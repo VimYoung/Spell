@@ -61,6 +61,8 @@ impl TouchHandler for SpellWin {
         position: (f64, f64),
     ) {
         self.adapter
+            .as_ref()
+            .unwrap()
             .try_dispatch_event(WindowEvent::PointerMoved {
                 position: slint::LogicalPosition {
                     x: position.0 as f32,
@@ -143,6 +145,8 @@ impl KeyboardHandler for SpellWin {
         //         .unwrap();
         // } else {
         self.adapter
+            .as_ref()
+            .unwrap()
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap_or_else(|err| warn!("Key press event failed with error: {:?}", err));
         // }
@@ -164,6 +168,8 @@ impl KeyboardHandler for SpellWin {
         // event.keysym = key_sym;
         let string_val: SharedString = get_string(event);
         self.adapter
+            .as_ref()
+            .unwrap()
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
             .unwrap_or_else(|err| warn!("Key release event failed with error: {:?}", err));
     }
@@ -299,6 +305,8 @@ impl PointerHandler for SpellWin {
                 Leave { .. } => {
                     info!("Pointer left: {:?}", event.position);
                     self.adapter
+                        .as_ref()
+                        .unwrap()
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap_or_else(|err| {
                             warn!("Pointer exit event failed with error: {:?}", err)
@@ -307,6 +315,8 @@ impl PointerHandler for SpellWin {
                 Motion { .. } => {
                     // debug!("Pointer entered @{:?}", event.position);
                     self.adapter
+                        .as_ref()
+                        .unwrap()
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -320,6 +330,8 @@ impl PointerHandler for SpellWin {
                 Press { button, .. } => {
                     trace!("Press {:x} @ {:?}", button, event.position);
                     self.adapter
+                        .as_ref()
+                        .unwrap()
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -334,6 +346,8 @@ impl PointerHandler for SpellWin {
                 Release { button, .. } => {
                     trace!("Release {:x} @ {:?}", button, event.position);
                     self.adapter
+                        .as_ref()
+                        .unwrap()
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -353,6 +367,8 @@ impl PointerHandler for SpellWin {
                     trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
                     if !self.natural_scroll {
                         self.adapter
+                            .as_ref()
+                            .unwrap()
                             .try_dispatch_event(WindowEvent::PointerScrolled {
                                 position: slint::LogicalPosition {
                                     x: event.position.0 as f32,
@@ -366,6 +382,8 @@ impl PointerHandler for SpellWin {
                             });
                     } else {
                         self.adapter
+                            .as_ref()
+                            .unwrap()
                             .try_dispatch_event(WindowEvent::PointerScrolled {
                                 position: slint::LogicalPosition {
                                     x: event.position.0 as f32,

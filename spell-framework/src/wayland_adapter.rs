@@ -4,7 +4,7 @@
 //! with [`SpellLock`].
 use crate::{
     SpellAssociatedNew,
-    configure::{HomeHandle, LayerConf, WindowConf, set_up_tracing},
+    configure::{Dimension, HomeHandle, LayerConf, WindowConf, set_up_tracing},
     slint_adapter::{
         ADAPTERS, SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter,
     },
@@ -42,7 +42,12 @@ use smithay_client_toolkit::{
         client::{
             Connection, EventQueue, QueueHandle,
             globals::registry_queue_init,
-            protocol::{wl_keyboard::WlKeyboard, wl_output, wl_shm, wl_surface, wl_touch::WlTouch},
+            protocol::{
+                wl_keyboard::WlKeyboard,
+                wl_output::{self, WlOutput},
+                wl_shm, wl_surface,
+                wl_touch::WlTouch,
+            },
         },
     },
     registry::RegistryState,
@@ -66,9 +71,8 @@ use std::{
     os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
+    sync::{Arc, Mutex},
     sync::{Once, OnceLock, RwLock},
-    thread,
-    time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
 
@@ -79,7 +83,8 @@ mod viewporter;
 mod way_helper;
 mod win_impl;
 
-static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, wl_output::WlOutput>>> = OnceLock::new();
+static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, (wl_output::WlOutput, i32, i32)>>> =
+    OnceLock::new();
 static SET_SLINT_PLATFORM: Once = Once::new();
 
 #[derive(Debug)]
@@ -97,13 +102,13 @@ pub(crate) struct States {
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
 /// implementation, thus providing various features.
 pub struct SpellWin {
-    pub(crate) adapter: Rc<SpellSkiaWinAdapter>,
+    pub(crate) adapter: Option<Rc<SpellSkiaWinAdapter>>,
     /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
     pub loop_handle: LoopHandle<'static, SpellWin>,
     /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
     // pub(crate) queue: QueueHandle<SpellWin>,
-    pub(crate) buffer: Buffer,
+    pub(crate) buffer: Option<Buffer>,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
     pub(crate) first_configure: Cell<bool>,
@@ -136,45 +141,25 @@ impl std::fmt::Debug for SpellWin {
 impl SpellWin {
     pub(crate) fn create_window(
         conn: &Connection,
-        window_conf: WindowConf,
+        mut window_conf: WindowConf,
         layer_name: String,
         handle: HomeHandle,
     ) -> Self {
         let (globals, mut event_queue) = registry_queue_init(conn).unwrap();
         let qh: QueueHandle<SpellWin> = event_queue.handle();
-
         let compositor =
             CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
         let event_loop: EventLoop<'static, SpellWin> =
             EventLoop::try_new().expect("Failed to initialize the event loop!");
         let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
-        let mut pool = SlotPool::new((window_conf.width * window_conf.height * 4) as usize, &shm)
-            .expect("Failed to create pool");
-        let input_region = Region::new(&compositor).expect("Couldn't create region");
-        let opaque_region = Region::new(&compositor).expect("Couldn't create opaque region");
-        input_region.add(0, 0, window_conf.width as i32, window_conf.height as i32);
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
         let fractional_scale_state: FractionalScaleState =
             FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
-        let stride = window_conf.width as i32 * 4;
-
         let surface = compositor.create_surface(&qh);
         let viewporter_state =
             ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
-
-        let (way_pri_buffer, _) = pool
-            .create_buffer(
-                window_conf.width as i32,
-                window_conf.height as i32,
-                stride,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("Creating Buffer");
-
-        let primary_slot = way_pri_buffer.slot();
-
         let pointer_state = PointerState {
             pointer: None,
             pointer_data: None,
@@ -204,11 +189,11 @@ impl SpellWin {
         set_event_sources(&event_loop, handle, slint_event_receiver);
 
         let mut win = SpellWin {
-            adapter: adapter_value,
+            adapter: None,
             loop_handle: event_loop.handle(),
             ipc_handler: None,
             // queue: qh.clone(),
-            buffer: way_pri_buffer,
+            buffer: None,
             states: States {
                 registry_state: RegistryState::new(&globals),
                 seat_state: SeatState::new(&globals, &qh),
@@ -240,7 +225,7 @@ impl SpellWin {
             }
         }
 
-        let target_output: Option<wl_output::WlOutput> =
+        let mut output_info: Option<(wl_output::WlOutput, i32, i32)> =
             if let Some(name) = &window_conf.monitor_name {
                 let output = AVAILABLE_MONITORS
                     .get()
@@ -254,13 +239,95 @@ impl SpellWin {
                 None
             };
 
+        match window_conf.width {
+            Dimension::Pixel(x) => window_conf.evaluated_width = x,
+            Dimension::Full => {
+                window_conf.evaluated_width = output_info
+                    .as_ref()
+                    .expect("Output info couldn't be retrieved")
+                    .1 as u32
+            }
+            Dimension::Percentage(y) => {
+                window_conf.evaluated_width = output_info
+                    .as_mut()
+                    .expect("Output info couldn't be retrieved")
+                    .1 as u32
+                    / y;
+            }
+        }
+
+        match window_conf.height {
+            Dimension::Pixel(x) => window_conf.evaluated_height = x,
+            Dimension::Full => {
+                window_conf.evaluated_height = output_info
+                    .as_ref()
+                    .expect("Output info couldn't be retrieved")
+                    .1 as u32
+            }
+            Dimension::Percentage(y) => {
+                window_conf.evaluated_height = output_info
+                    .as_ref()
+                    .expect("Output info couldn't be retrieved")
+                    .1 as u32
+                    / y;
+            }
+        }
+        win.config = window_conf.clone();
+
+        info!(
+            "Evaluated width: {}, evaluated_height: {}",
+            window_conf.evaluated_width, window_conf.evaluated_height
+        );
+
+        let mut pool = SlotPool::new(
+            (window_conf.evaluated_width * window_conf.evaluated_height * 4) as usize,
+            &win.states.shm,
+        )
+        .expect("Failed to create pool");
+        win.input_region.add(
+            0,
+            0,
+            window_conf.evaluated_width as i32,
+            window_conf.evaluated_height as i32,
+        );
+
+        let stride = window_conf.evaluated_width as i32 * 4;
+        let (way_pri_buffer, _) = pool
+            .create_buffer(
+                window_conf.evaluated_width as i32,
+                window_conf.evaluated_height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("Creating Buffer");
+
+        let primary_slot = way_pri_buffer.slot();
+        let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
+            Rc::new(RefCell::new(pool)),
+            RefCell::new(primary_slot),
+            window_conf.evaluated_width,
+            window_conf.evaluated_height,
+            slint_proxy.clone(),
+        );
+        win.adapter = Some(adapter_value.clone());
+        win.buffer = Some(way_pri_buffer);
+
+        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value));
+        SET_SLINT_PLATFORM.call_once(|| {
+            trace!("Slint platform set");
+            if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
+                warn!("Error setting slint platform: {err}");
+            }
+        });
+        let target_output: Option<&WlOutput> = output_info.as_ref().map(|(a, _, _)| a);
         let layer = layer_shell.create_layer_surface(
             &qh,
             surface,
             window_conf.layer_type,
             Some(layer_name.clone()),
-            target_output.as_ref(),
+            target_output,
         );
+        // layer.commit();
         let fractional_scale = fractional_scale_state.get_scale(layer.wl_surface(), &qh);
 
         let viewporter = viewporter_state.get_viewport(layer.wl_surface(), &qh, fractional_scale);
@@ -272,10 +339,15 @@ impl SpellWin {
             Some(win.input_region.wl_region()),
             None,
         );
+        if let Err(err) = event_queue.roundtrip(&mut win) {
+            warn!("Received roundtrip error: {}", err);
+        }
         layer.commit();
 
         win.layer = Some(layer);
         win.states.viewporter = Some(viewporter);
+
+        set_event_sources(&win.event_loop.as_ref().borrow(), handle);
 
         info!("Win: {} layer created successfully.", layer_name);
 
@@ -297,7 +369,7 @@ impl SpellWin {
     fn get_available_monitors(
         event_queue: &mut EventQueue<SpellWin>,
         win: &mut SpellWin,
-    ) -> Option<HashMap<String, wl_output::WlOutput>> {
+    ) -> Option<HashMap<String, (wl_output::WlOutput, i32, i32)>> {
         // roundtrip to get all available monitors from Wayland
         event_queue.roundtrip(win).ok()?;
 
@@ -307,7 +379,10 @@ impl SpellWin {
                 .outputs()
                 .filter_map(|output| {
                     let info = win.states.output_state.info(&output)?;
-                    Some((info.name?, output))
+                    Some((
+                        info.name?,
+                        (output, info.logical_size?.0, info.logical_size?.1),
+                    ))
                 })
                 .collect(),
         )
@@ -429,14 +504,14 @@ impl SpellWin {
 
     fn converter(&mut self, qh: &QueueHandle<Self>) {
         slint::platform::update_timers_and_animations();
-        let width: u32 = self.adapter.size.get().width;
-        let height: u32 = self.adapter.size.get().height;
+        let width: u32 = self.adapter.as_ref().unwrap().size.get().width;
+        let height: u32 = self.adapter.as_ref().unwrap().size.get().height;
         let window_adapter = self.adapter.clone();
 
         // Rendering from Skia
         if !self.is_hidden.get() {
             // let skia_now = std::time::Instant::now();
-            let redraw_val: bool = window_adapter.draw_if_needed();
+            let redraw_val: bool = window_adapter.unwrap().draw_if_needed();
             // let elasped_time = skia_now.elapsed().as_millis();
             // if elasped_time != 0 {
             //     debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
@@ -444,7 +519,7 @@ impl SpellWin {
 
             self.states
                 .pointer_state
-                .update_cursor(self.adapter.current_cursor.get(), &qh);
+                .update_cursor(self.adapter.as_ref().unwrap().current_cursor.get(), &qh);
 
             let buffer = &self.buffer;
             if self.first_configure.get() || redraw_val {
@@ -473,11 +548,11 @@ impl SpellWin {
                 //     }
                 // }
                 // Request our next frame
-                self.layer
-                    .as_ref()
-                    .unwrap()
-                    .wl_surface()
-                    .attach(Some(buffer.wl_buffer()), 0, 0);
+                self.layer.as_ref().unwrap().wl_surface().attach(
+                    Some(buffer.as_ref().unwrap().wl_buffer()),
+                    0,
+                    0,
+                );
             }
 
             self.layer
@@ -660,26 +735,29 @@ impl FractionalScaleHandler for SpellWin {
         scale: u32,
     ) {
         info!("Scale factor changed, invoked from custom trait. {}", scale);
-        let width_old = self.adapter.size_original.get().width;
-        let height_old = self.adapter.size_original.get().height;
+        let width_old = self.adapter.as_ref().unwrap().size_original.get().width;
+        let height_old = self.adapter.as_ref().unwrap().size_original.get().height;
         self.layer.as_ref().unwrap().wl_surface().damage_buffer(
             0,
             0,
-            self.adapter.size.get().width as i32,
-            self.adapter.size.get().height as i32,
+            self.adapter.as_ref().unwrap().size.get().width as i32,
+            self.adapter.as_ref().unwrap().size.get().height as i32,
         );
-        let (buffer, width, height, scale_factor) = self.adapter.changed_scale_factor(scale);
-        self.config.width = width;
-        self.config.height = height;
-        self.buffer = buffer;
+        let (buffer, width, height, scale_factor) =
+            self.adapter.as_ref().unwrap().changed_scale_factor(scale);
+        self.config.evaluated_width = width;
+        self.config.evaluated_height = height;
+        self.buffer = Some(buffer);
         self.adapter
+            .as_ref()
+            .unwrap()
             .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
             .unwrap();
         self.states.viewporter.as_ref().unwrap().set_source(
             0.,
             0.,
-            self.adapter.size.get().width.into(),
-            self.adapter.size.get().height.into(),
+            self.adapter.as_ref().unwrap().size.get().width.into(),
+            self.adapter.as_ref().unwrap().size.get().height.into(),
         );
 
         self.states
@@ -687,7 +765,7 @@ impl FractionalScaleHandler for SpellWin {
             .as_ref()
             .unwrap()
             .set_destination(width_old as i32, height_old as i32);
-        self.adapter.request_redraw();
+        self.adapter.as_ref().unwrap().request_redraw();
         self.layer.as_ref().unwrap().commit();
     }
 }
@@ -1002,14 +1080,14 @@ impl SpellLock {
             spell_lock
                 .loop_handle
                 .insert_source(
-                    Timer::from_duration(Duration::from_millis(1500)),
+                    Timer::from_duration(std::time::Duration::from_millis(1500)),
                     |_, _, data| {
                         data.slint_part.as_ref().unwrap().adapters[0]
                             .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
                                 text: Key::Backspace.into(),
                             })
                             .unwrap();
-                        TimeoutAction::ToDuration(Duration::from_millis(1500))
+                        TimeoutAction::ToDuration(std::time::Duration::from_millis(1500))
                     },
                 )
                 .unwrap(),
@@ -1102,7 +1180,7 @@ impl SpellLock {
 
     fn unlock_finger(&mut self, error_callback: Box<dyn FnOnce() + Send>) -> PamResult<()> {
         let sender = self.unlock_screen.clone();
-        thread::spawn(move || {
+        std::thread::spawn(move || {
             fn unlock_internal(sender: Sender<bool>) -> PamResult<()> {
                 let finger = FingerprintInfo;
                 let output = Command::new("sh")

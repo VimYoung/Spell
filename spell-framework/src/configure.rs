@@ -10,24 +10,58 @@ use tracing_subscriber::{
     reload::Layer as LoadLayer,
 };
 
+impl Into<Dimension> for u32 {
+    fn into(self) -> Dimension {
+        Dimension::Pixel(self)
+    }
+}
+
+/// This enum provides multiple ways for defininf the Dimensions of a widget. Thus
+/// making the prcess dynamic rather than being anchored to just pixels. if `Full`
+/// or `Percentage` is provided in Dimension, output name is compulsary to be defined.
+/// To maintain backward compatibility, Dimension implements into from `u32` in which
+/// case it simply returns an instant of [`Dimension::Pixel`].
+#[derive(Debug, Clone)]
+pub enum Dimension {
+    /// Full screen Dimension of the selected monitor.
+    Full,
+    /// Whole number percentage Dimension of width/height, relative to the selected monitor.
+    Percentage(u32),
+    /// Definition of widgets in static pixels.
+    Pixel(u32),
+}
+
+impl Default for Dimension {
+    fn default() -> Self {
+        Dimension::Full
+    }
+}
+
 /// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
 /// of generated code) for defining the specifications of the widget.
 ///
 /// ## Panics
 ///
-/// event loops like [cast_spell](crate::cast_spell) will panic if 0 is provided as width or height.
+/// 1. Event loops ([cast_spell](crate::cast_spell)) will panic if 0 is provided as width or height.
+/// 2. Builder will also panic if percentage or full is used without specifying the monitor explicitly.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
-    /// Defines the widget width in pixels. On setting values greater than the provided pixels of
+    /// Defines the widget width in pixels, fullscreen width or pecentage width of full screen.
+    /// On setting values greater than the provided pixels of
     /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
     /// note that the value should be the maximum width the widget will ever attain, not the
-    /// current width in case of resizeable widgets. This value has no default and needs to be set.
-    pub width: u32,
-    /// Defines the widget height in pixels. On setting values greater than the provided pixels of
+    /// current width in case of resizeable widgets. This value has full screen width as its default.
+    pub width: Dimension,
+    /// Defines the widget height in pixels, fullscreen width or pecentage height of full screen.
+    /// On setting values greater than the provided pixels of
     /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
     /// note that the value should be the maximum height the widget will ever attain, not the
-    /// current height in case of resizeable widgets. This value has no default and needs to be set.
-    pub height: u32,
+    /// current height in case of resizeable widgets. This value has full screen height as its default.
+    pub height: Dimension,
+    /// width calculated from provided Dimension of width. Not intended for external use.
+    pub evaluated_width: u32,
+    /// height provided from evaluated Dimension of height. Not intended for external use.
+    pub evaluated_height: u32,
     /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
     /// related explaination of usage. If both values are None, then widget is displayed in the
     /// center of screen.
@@ -66,8 +100,8 @@ impl WindowConf {
 /// of [`WindowConf`].
 #[derive(Default)]
 pub struct WindowConfBuilder {
-    max_width: u32,
-    max_height: u32,
+    max_width: Dimension,
+    max_height: Dimension,
     anchor: [Option<Anchor>; 4],
     margin: (i32, i32, i32, i32),
     layer_type: Option<Layer>,
@@ -79,14 +113,14 @@ pub struct WindowConfBuilder {
 
 impl WindowConfBuilder {
     /// Sets [`WindowConf::width`].
-    pub fn width<I: Into<u32>>(&mut self, width: I) -> &mut Self {
+    pub fn width<I: Into<Dimension>>(&mut self, width: I) -> &mut Self {
         let new = self;
         new.max_width = width.into();
         new
     }
 
     /// Sets [`WindowConf::height`].
-    pub fn height<I: Into<u32>>(&mut self, height: I) -> &mut Self {
+    pub fn height<I: Into<Dimension>>(&mut self, height: I) -> &mut Self {
         let x = self;
         x.max_height = height.into();
         x
@@ -142,9 +176,9 @@ impl WindowConfBuilder {
     }
 
     /// Sets [`WindowConf::exclusive_zone`].
-    pub fn exclusive_zone(&mut self, dimention: i32) -> &mut Self {
+    pub fn exclusive_zone(&mut self, dimension: i32) -> &mut Self {
         let x = self;
-        x.exclusive_zone = Some(dimention);
+        x.exclusive_zone = Some(dimension);
         x
     }
 
@@ -164,19 +198,33 @@ impl WindowConfBuilder {
 
     /// Creates an instnce of [`WindowConf`] with the provided configurations.
     /// This function result in an error if width and height are not set or they
-    /// are set to zero.
+    /// are set to zero or monitor is not specified when full or percentage dimention is used.
     pub fn build(&self) -> Result<WindowConf, Box<dyn std::error::Error>> {
         Ok(WindowConf {
-            width: if self.max_width != 0 {
-                self.max_width
+            width: if let Dimension::Percentage(x) = self.max_width
+                && x == 0
+            {
+                return Err("width is zero in percentage".into());
+            } else if let Dimension::Pixel(y) = self.max_width
+                && y == 0
+            {
+                return Err("width is zero in pixel".into());
             } else {
-                return Err("width is either not defined or set to zero".into());
+                self.max_width.clone()
             },
-            height: if self.max_height != 0 {
-                self.max_height
+            height: if let Dimension::Percentage(x) = self.max_height
+                && x == 0
+            {
+                return Err("height is zero in percentage".into());
+            } else if let Dimension::Pixel(y) = self.max_height
+                && y == 0
+            {
+                return Err("height is zero in pixel".into());
             } else {
-                return Err("height is either not defined or set to zero".into());
+                self.max_height.clone()
             },
+            evaluated_width: 0,
+            evaluated_height: 0,
             anchor: self.anchor,
             margin: self.margin,
             layer_type: match self.layer_type {
@@ -185,7 +233,20 @@ impl WindowConfBuilder {
             },
             board_interactivity: Cell::new(self.board_interactivity),
             exclusive_zone: self.exclusive_zone,
-            monitor_name: self.monitor_name.clone(),
+            monitor_name: {
+                let needs_monitor =
+                    matches!(self.max_width, Dimension::Full | Dimension::Percentage(_))
+                        || matches!(self.max_height, Dimension::Full | Dimension::Percentage(_));
+
+                if needs_monitor && self.monitor_name.is_none() {
+                    return Err(
+                        "Provide explicit monitor name if using Full or Percentage dimensions"
+                            .into(),
+                    );
+                } else {
+                    self.monitor_name.clone()
+                }
+            },
             natural_scroll: self.natural_scroll,
         })
     }
