@@ -301,9 +301,24 @@ impl PointerHandler for SpellWin {
                     );
 
                     self.states.pointer_state.last_cursor_enter_serial = Some(serial);
+
+                    // PointerMoved feeds the initial cursor state to slint when it enters the window.
+                    // This ensures slint receives the correct cursor state on startup.
+                    self.adapter
+                        .as_ref()
+                        .unwrap()
+                        .try_dispatch_event(WindowEvent::PointerMoved {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                        })
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer enter event failed with error: {:?}", err)
+                        });
                 }
                 Leave { .. } => {
-                    info!("Pointer left: {:?}", event.position);
+                    trace!("Pointer left: {:?}", event.position);
                     self.adapter
                         .as_ref()
                         .unwrap()
