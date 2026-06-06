@@ -342,7 +342,7 @@ impl PointerHandler for SpellWin {
                     self.states.pointer_state.last_cursor_enter_serial = Some(serial);
                 }
                 Leave { .. } => {
-                    info!("Pointer left: {:?}", event.position);
+                    trace!("Pointer left: {:?}", event.position);
                     self.adapter
                         .as_ref()
                         .unwrap()
