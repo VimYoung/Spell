@@ -300,6 +300,21 @@ impl PointerHandler for SpellWin {
                         serial, event.position
                     );
 
+                    self.adapter
+                        .as_ref()
+                        .unwrap()
+                        .try_dispatch_event(WindowEvent::PointerMoved {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                        })
+                        .unwrap_or_else(|err| {
+                            warn!(
+                                "Pointer move event after entry failed with error: {:?}",
+                                err
+                            )
+                        });
                     self.states.pointer_state.last_cursor_enter_serial = Some(serial);
                 }
                 Leave { .. } => {
