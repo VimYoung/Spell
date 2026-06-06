@@ -77,6 +77,7 @@ pub use widget_impls::lock_impl::SpellSlintLock;
 
 mod fractional_scaling;
 mod slint_to_wl_cursor_mapping;
+mod smithay_to_slint_mouse_button_mapping;
 mod viewporter;
 mod way_helper;
 mod widget_impls;

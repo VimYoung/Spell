@@ -1,4 +1,6 @@
-use crate::wayland_adapter::{SpellWin, way_helper::get_string};
+use crate::wayland_adapter::{
+    SpellWin, smithay_to_slint_mouse_button_mapping::map_mouse_button, way_helper::get_string,
+};
 use slint::{
     SharedString,
     platform::{PointerEventButton, WindowEvent},
@@ -365,7 +367,7 @@ impl PointerHandler for SpellWin {
                         });
                 }
                 Press { button, .. } => {
-                    trace!("Press {:x} @ {:?}", button, event.position);
+                    trace!("Press {:?} @ {:?}", button, event.position);
                     self.adapter
                         .as_ref()
                         .unwrap()
@@ -374,14 +376,15 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: PointerEventButton::Left,
+                            button: map_mouse_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer press event failed with error: {:?}", err)
                         });
                 }
                 Release { button, .. } => {
-                    trace!("Release {:x} @ {:?}", button, event.position);
+                    trace!("Release {:?} @ {:?}", button, event.position);
+
                     self.adapter
                         .as_ref()
                         .unwrap()
@@ -390,7 +393,7 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: PointerEventButton::Left,
+                            button: map_mouse_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer release event failed with error: {:?}", err)
