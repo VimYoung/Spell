@@ -17,9 +17,31 @@ use smithay_client_toolkit::{
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
         touch::TouchHandler,
     },
-    shell::WaylandSurface,
+    shell::{WaylandSurface, xdg::window::WindowHandler},
 };
 use tracing::{info, trace, warn};
+
+impl WindowHandler for SpellWin {
+    fn request_close(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        window: &smithay_client_toolkit::shell::xdg::window::Window,
+    ) {
+        todo!()
+    }
+
+    fn configure(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        window: &smithay_client_toolkit::shell::xdg::window::Window,
+        configure: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
+        serial: u32,
+    ) {
+        todo!()
+    }
+}
 
 // Slint doesn't hve very specific
 // APIs for touch support (I think). I am talking with them on what
@@ -417,7 +439,7 @@ impl PointerHandler for SpellWin {
     }
 }
 
-// TODO FIND What is the use of registery_handlers here?
+// TODO: FIND What is the use of registery_handlers here?
 impl ProvidesRegistryState for SpellWin {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.states.registry_state

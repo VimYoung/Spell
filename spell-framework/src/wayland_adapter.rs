@@ -19,7 +19,6 @@ use crate::{
     },
 };
 use i_slint_core::items::MouseCursor;
-pub use lock_impl::SpellSlintLock;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
@@ -74,13 +73,13 @@ use std::{
     sync::{Once, OnceLock, RwLock},
 };
 use tracing::{Level, info, span, trace, warn};
+pub use widget_impls::lock_impl::SpellSlintLock;
 
 mod fractional_scaling;
-mod lock_impl;
 mod slint_to_wl_cursor_mapping;
 mod viewporter;
 mod way_helper;
-mod win_impl;
+mod widget_impls;
 
 static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, (wl_output::WlOutput, i32, i32)>>> =
     OnceLock::new();
@@ -113,8 +112,6 @@ pub struct SpellWin {
     pub(crate) first_configure: Cell<bool>,
     pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
-    /// Name of widget's layer.
-    pub layer_name: String,
     pub(crate) config: WindowConf,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
