@@ -16,7 +16,12 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
     let (sender, rx) = channel::channel::<NotifyEvent>();
     // let (sender_async, rx_async) = channel::channel::<NotifyEvent>();
     // NOTIFICATION_EVENT.get_or_init(|| sender_async);
-    let layer_name = win.layer_name.clone();
+    let layer_name: String = if let Some(data) = win.span.metadata() {
+        data.name().to_string()
+    } else {
+        warn!("Error in retriving span metadata for name.");
+        "unkonwn_notification".to_string()
+    };
     let sender_cl = sender.clone();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
