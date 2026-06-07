@@ -292,5 +292,9 @@ impl NotificationHandler {
     ) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    async fn action_invoked(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
+    async fn action_invoked(
+        emitter: &SignalEmitter<'_>,
+        id: u32,
+        action_key: &str,
+    ) -> zbus::Result<()>;
 }

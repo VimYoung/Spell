@@ -54,6 +54,23 @@ impl BlockingNotification {
         proxy.call_noreply("NotificationClosed", &(id, reason as u32))?;
         Ok(())
     }
+
+    /// Calls an action to the owner application of the notification via a dbus signal.
+    pub fn action_invoked(
+        &self,
+        id: i32,
+        action_key: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::session()?;
+        let proxy = Proxy::new(
+            &conn,
+            "org.freedesktop.Notifications",
+            "/org/freedesktop/Notifications",
+            "org.freedesktop.Notifications",
+        )?;
+        proxy.call_noreply("ActionInvoked", &(id, action_key))?;
+        Ok(())
+    }
 }
 
 /// This trait's implementation is necessary for passing spell's generated widget

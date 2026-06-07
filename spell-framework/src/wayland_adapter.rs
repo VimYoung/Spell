@@ -189,7 +189,6 @@ impl SpellWin {
             first_configure: Cell::new(true),
             natural_scroll: window_conf.natural_scroll,
             is_hidden: Cell::new(false),
-            layer_name: layer_name.clone(),
             config: window_conf.clone(),
             input_region,
             opaque_region,
@@ -305,14 +304,6 @@ impl SpellWin {
             }
         });
         win.adapter = Some(adapter_value);
-        // set_event_sources(&event_loop, handle, slint_event_receiver);
-        // ADAPTERS.with_borrow_mut(|v| v.push(adapter_value));
-        // SET_SLINT_PLATFORM.call_once(|| {
-        //     trace!("Slint platform set");
-        //     if let Err(err) = slint::platform::set_platform(Box::new(SpellLayerShell::default())) {
-        //         warn!("Error setting slint platform: {err}");
-        //     }
-        // });
         let target_output: Option<&WlOutput> = output_info.as_ref().map(|(a, _, _)| a);
         let layer = layer_shell.create_layer_surface(
             &qh,
