@@ -198,7 +198,7 @@ impl WindowConfBuilder {
 
     /// Creates an instnce of [`WindowConf`] with the provided configurations.
     /// This function result in an error if width and height are not set or they
-    /// are set to zero or monitor is not specified when full or percentage dimention is used.
+    /// are set to zero or monitor is not specified when full or percentage dimension is used.
     pub fn build(&self) -> Result<WindowConf, Box<dyn std::error::Error>> {
         Ok(WindowConf {
             width: if let Dimension::Percentage(x) = self.max_width

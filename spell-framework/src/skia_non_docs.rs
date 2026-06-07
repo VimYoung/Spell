@@ -118,7 +118,6 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) size: Cell<PhysicalSize>,
     pub(crate) size_original: Cell<PhysicalSize>,
     pub(crate) renderer: SkiaRenderer,
-    #[allow(dead_code)]
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
