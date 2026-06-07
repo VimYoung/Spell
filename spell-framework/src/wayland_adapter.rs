@@ -1164,7 +1164,7 @@ impl SpellLock {
         self.lock_surfaces[0].wl_surface().commit();
     }
 
-    fn unlock_finger(&mut self, error_callback: Box<dyn FnOnce() + Send>) -> PamResult<()> {
+    fn unlock_finger(&mut self, error_callback: Box<dyn FnOnce() + Send>) {
         let sender = self.unlock_screen.clone();
         std::thread::spawn(move || {
             fn unlock_internal(sender: Sender<bool>) -> PamResult<()> {
@@ -1192,13 +1192,12 @@ impl SpellLock {
                 Ok(())
             }
             if let Err(err) = unlock_internal(sender) {
-                println!("{:?}", err);
+                warn!("{:?}", err);
                 error_callback();
             } else {
-                println!("Passed");
+                info!("Password passed");
             }
         });
-        Ok(())
     }
 
     fn unlock(
