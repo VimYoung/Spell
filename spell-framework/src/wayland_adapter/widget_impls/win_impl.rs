@@ -1,8 +1,7 @@
-use crate::wayland_adapter::{SpellWin, way_helper::get_string};
-use slint::{
-    SharedString,
-    platform::{PointerEventButton, WindowEvent},
+use crate::wayland_adapter::{
+    SpellWin, pointer_button::map_pointer_button, way_helper::get_string,
 };
+use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     output::OutputState,
     reexports::client::{
@@ -340,7 +339,7 @@ impl PointerHandler for SpellWin {
                     self.states.pointer_state.last_cursor_enter_serial = Some(serial);
                 }
                 Leave { .. } => {
-                    info!("Pointer left: {:?}", event.position);
+                    trace!("Pointer left: {:?}", event.position);
                     self.adapter
                         .as_ref()
                         .unwrap()
@@ -365,7 +364,7 @@ impl PointerHandler for SpellWin {
                         });
                 }
                 Press { button, .. } => {
-                    trace!("Press {:x} @ {:?}", button, event.position);
+                    trace!("Press {:?} @ {:?}", button, event.position);
                     self.adapter
                         .as_ref()
                         .unwrap()
@@ -374,14 +373,15 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: PointerEventButton::Left,
+                            button: map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer press event failed with error: {:?}", err)
                         });
                 }
                 Release { button, .. } => {
-                    trace!("Release {:x} @ {:?}", button, event.position);
+                    trace!("Release {:?} @ {:?}", button, event.position);
+
                     self.adapter
                         .as_ref()
                         .unwrap()
@@ -390,7 +390,7 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: PointerEventButton::Left,
+                            button: map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer release event failed with error: {:?}", err)
