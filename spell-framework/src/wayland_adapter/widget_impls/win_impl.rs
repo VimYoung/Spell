@@ -1,10 +1,7 @@
 use crate::wayland_adapter::{
-    SpellWin, smithay_to_slint_mouse_button_mapping::map_mouse_button, way_helper::get_string,
+    SpellWin, pointer_button::map_pointer_button, way_helper::get_string,
 };
-use slint::{
-    SharedString,
-    platform::{PointerEventButton, WindowEvent},
-};
+use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     output::OutputState,
     reexports::client::{
@@ -376,7 +373,7 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: map_mouse_button(button),
+                            button: map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer press event failed with error: {:?}", err)
@@ -393,7 +390,7 @@ impl PointerHandler for SpellWin {
                                 x: event.position.0 as f32,
                                 y: event.position.1 as f32,
                             },
-                            button: map_mouse_button(button),
+                            button: map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
                             warn!("Pointer release event failed with error: {:?}", err)
