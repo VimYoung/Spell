@@ -3,8 +3,10 @@
 //! This example creates a window with rectangles for each different mouse cursor type.
 //! Hovering over each rectangle should change the cursor to the corresponding shape,
 //! allowing visual verification that the Wayland cursor implementation works correctly.
+//! It also demonstrates how each mouse button press (left, right, middle)
+//! is registered and reported.
 //!
-//! Run with: cargo run -p spell-demo --bin cursor_test
+//! Run with: cargo run -p spell-demo --bin mouse_interactions
 
 use std::error::Error;
 
@@ -40,8 +42,54 @@ slint::slint! {
         }
     }
 
+    component MouseButtonTile inherits Rectangle {
+        in property <string> label;
+        in property <PointerEventButton> button-type;
+        out property <bool> pressed: false;
+
+        width: 120px;
+        height: 60px;
+        border-radius: 8px;
+        background: root.pressed ? #e05a47 : (ta.has-hover ? #4a90d9 : #2d4a6a);
+        border-width: 2px;
+        border-color: root.pressed ? #f57b6c : (ta.has-hover ? #7ab8f0 : #3d5a7a);
+
+        animate background { duration: 100ms; }
+        animate border-color { duration: 100ms; }
+
+        ta := TouchArea {
+            pointer-event(event) => {
+                if (event.button == root.button-type) {
+                    if (event.kind == PointerEventKind.down) {
+                        root.pressed = true;
+                    } else if (event.kind == PointerEventKind.up) {
+                        root.pressed = false;
+                    }
+                }
+            }
+        }
+
+        VerticalBox {
+            alignment: center;
+            spacing: 2px;
+            Text {
+                text: root.label;
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: root.pressed ? "Pressed" : "Released";
+                color: root.pressed ? #ffcccc : #cccccc;
+                font-size: 10px;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
     export component CursorTest inherits Window {
-        title: "Cursor Test - Hover to Test Each Cursor";
+        title: "Cursor & Mouse Interaction Test";
         background: #1a2a3a;
 
         ScrollView {
@@ -50,6 +98,34 @@ slint::slint! {
             VerticalBox {
                 padding: 20px;
                 spacing: 10px;
+
+                Text {
+                    text: "Mouse Interaction Test - Click with different mouse buttons";
+                    color: #ffffff;
+                    font-size: 16px;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: center;
+                    MouseButtonTile { label: "Left Button"; button-type: left; }
+                    MouseButtonTile { label: "Right Button"; button-type: right; }
+                    MouseButtonTile { label: "Middle Button"; button-type: middle; }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: center;
+                    MouseButtonTile { label: "Back Button"; button-type: back; }
+                    MouseButtonTile { label: "Forward Button"; button-type: forward; }
+                    MouseButtonTile { label: "Other Button"; button-type: other; }
+                }
+
+                Rectangle {
+                    height: 2px;
+                    background: #3d5a7a;
+                }
 
                 Text {
                     text: "Cursor Test - Hover over each tile to test cursor shapes";
@@ -142,7 +218,7 @@ spell_framework::generate_widgets![CursorTest];
 fn main() -> Result<(), Box<dyn Error>> {
     let window_conf = WindowConf::builder()
         .width(560u32)
-        .height(520u32)
+        .height(720u32)
         .anchor_1(LayerAnchor::TOP)
         .margins(50, 0, 0, 0)
         .layer_type(LayerType::Top)

@@ -76,6 +76,7 @@ use tracing::{Level, info, span, trace, warn};
 pub use widget_impls::lock_impl::SpellSlintLock;
 
 mod fractional_scaling;
+mod pointer_button;
 mod slint_to_wl_cursor_mapping;
 mod viewporter;
 mod way_helper;
