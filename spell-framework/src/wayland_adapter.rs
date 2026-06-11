@@ -44,7 +44,8 @@ use smithay_client_toolkit::{
             protocol::{
                 wl_keyboard::WlKeyboard,
                 wl_output::{self, WlOutput},
-                wl_shm, wl_surface,
+                wl_shm,
+                wl_surface::{self, WlSurface},
                 wl_touch::WlTouch,
             },
         },
@@ -154,8 +155,6 @@ impl SpellWin {
         let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
         let cursor_manager =
             CursorShapeManager::bind(&globals, &qh).expect("cursor shape is not available");
-        let fractional_scale_state: FractionalScaleState =
-            FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let surface = compositor.create_surface(&qh);
         let viewporter_state =
             ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
@@ -313,10 +312,6 @@ impl SpellWin {
             Some(layer_name.clone()),
             target_output,
         );
-        // layer.commit();
-        let fractional_scale = fractional_scale_state.get_scale(layer.wl_surface(), &qh);
-
-        let viewporter = viewporter_state.get_viewport(layer.wl_surface(), &qh, fractional_scale);
 
         set_config(
             &win.config,
@@ -328,11 +323,16 @@ impl SpellWin {
         if let Err(err) = event_queue.roundtrip(&mut win) {
             warn!("Received roundtrip error: {}", err);
         }
-        layer.commit();
-
         win.layer = Some(layer);
+        let fractional_scale_state: FractionalScaleState =
+            FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
+        let surface: &WlSurface = win.layer.as_ref().unwrap().wl_surface();
+        let fractional_scale = fractional_scale_state.get_scale(surface, &qh);
+
+        let viewporter = viewporter_state.get_viewport(surface, &qh, fractional_scale);
         win.states.viewporter = Some(viewporter);
 
+        win.layer.as_ref().unwrap().commit();
         set_event_sources(
             &win.event_loop.as_ref().borrow(),
             handle,
