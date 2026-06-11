@@ -272,13 +272,7 @@ macro_rules! cast_spell {
         entry: $way:expr,
         $_ui: expr
     ) => {
-        let layer_name: String = if let Some(data) = $way.span.metadata() {
-            data.name().to_string()
-        } else {
-            $crate::macro_internal::warn!("Error in retriving span metadata for name.");
-            "unkonwn_notification".to_string()
-        };
-        let socket_path = format!("/tmp/{}_ipc.sock",layer_name);
+        let socket_path = format!("/tmp/{}_ipc.sock",$way.layer_name);
         let _ = std::fs::remove_file(&socket_path); // Cleanup old socket
         let listener = std::os::unix::net::UnixListener::bind(&socket_path)?;
         let listener_clone = listener.try_clone().unwrap();

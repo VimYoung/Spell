@@ -114,6 +114,8 @@ pub struct SpellWin {
     pub(crate) natural_scroll: bool,
     pub(crate) is_hidden: Cell<bool>,
     pub(crate) config: WindowConf,
+    ///Used to define the name of socket for the IPC channel.
+    pub layer_name: String,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
     /// Event loop which runs and refreshes UI.
@@ -188,6 +190,7 @@ impl SpellWin {
             natural_scroll: window_conf.natural_scroll,
             is_hidden: Cell::new(false),
             config: window_conf.clone(),
+            layer_name: layer_name.clone(),
             input_region,
             opaque_region,
             event_loop: Rc::new(RefCell::new(event_loop)),
