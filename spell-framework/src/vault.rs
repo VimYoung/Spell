@@ -19,10 +19,10 @@ use std::{
     path::{Component, Path, PathBuf},
     sync::OnceLock,
 };
-use zbus::blocking::{Connection, Proxy};
 
 mod application;
 mod notification_manager;
+
 
 /// This public static is only set when a notification server instance is passed in
 /// [`cast_spell`](crate::cast_spell).
@@ -32,6 +32,28 @@ mod notification_manager;
 /// with an id has been closed. This static holds an instance of
 /// [`BlockingNotificaiton`](crate::vault::BlockingNotification)
 pub static NOTIFICATION_EVENT: OnceLock<BlockingNotification> = OnceLock::new();
+
+/// Event enum used to route notification signals back to the primary dbus thread.
+pub enum DbusSignalEvent {
+    /// Sent when an action is triggered.
+    ActionInvoked { 
+        /// The id of the notification.
+        id: u32, 
+        /// The specific action key associated with the specyfic action,
+        action_key: String 
+    },
+    /// Sent when a notification is closed.
+    NotificationClosed { 
+        /// The id of the notification.
+        id: u32, 
+        /// The reason for the notification being closed.
+        reason: u32 
+    },
+}
+
+/// Channel to send notification events to the main dbus thread.
+/// Events need to be sent from the main dbus thread that is authenticated as "/org/freedesktop/Notifications" or dbus will reject them.
+pub static DBUS_SIGNAL_SENDER: OnceLock<tokio::sync::mpsc::UnboundedSender<DbusSignalEvent>> = OnceLock::new();
 
 /// Holds blocking methods to notify when a notification has bee closed.
 #[derive(Default)]
@@ -44,31 +66,29 @@ impl BlockingNotification {
         id: u32,
         reason: CloseReason,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let conn = Connection::session()?;
-        let proxy = Proxy::new(
-            &conn,
-            "org.freedesktop.Notifications",
-            "/org/freedesktop/Notifications",
-            "org.freedesktop.Notifications",
-        )?;
-        proxy.call_noreply("NotificationClosed", &(id, reason as u32))?;
+        tracing::info!("Close triggered for ID: {}, Reason: {:?}", id, reason);
+        
+        if let Some(tx) = DBUS_SIGNAL_SENDER.get() {
+            let _ = tx.send(DbusSignalEvent::NotificationClosed { id, reason: reason as u32 });
+        } else {
+            tracing::error!("DBUS_SIGNAL_SENDER is not initialized!");
+        }
         Ok(())
     }
 
     /// Calls an action to the owner application of the notification via a dbus signal.
     pub fn action_invoked(
         &self,
-        id: i32,
+        id: u32,
         action_key: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let conn = Connection::session()?;
-        let proxy = Proxy::new(
-            &conn,
-            "org.freedesktop.Notifications",
-            "/org/freedesktop/Notifications",
-            "org.freedesktop.Notifications",
-        )?;
-        proxy.call_noreply("ActionInvoked", &(id, action_key))?;
+        tracing::info!("Action triggered for ID: {}, Action Key: '{}'", id, action_key);
+
+        if let Some(tx) = DBUS_SIGNAL_SENDER.get() {
+            let _ = tx.send(DbusSignalEvent::ActionInvoked { id, action_key: action_key.to_string() });
+        } else {
+            tracing::error!("DBUS_SIGNAL_SENDER is not initialized!");
+        }
         Ok(())
     }
 }

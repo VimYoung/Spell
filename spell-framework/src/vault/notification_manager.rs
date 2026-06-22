@@ -1,9 +1,7 @@
 use crate::{
     vault::{
-        BlockingNotification, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout,
-        Urgency,
-    },
-    wayland_adapter::SpellWin,
+        BlockingNotification, DBUS_SIGNAL_SENDER, DbusSignalEvent, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout, Urgency,
+    }, wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
 use std::{cmp::Ordering, collections::HashMap};
@@ -82,7 +80,28 @@ async fn notification_service_enter(
         warn!("Error When creating notification crate {:?}", err);
     }
     info!("Notification service is live with the provided name");
-    std::future::pending::<()>().await;
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DbusSignalEvent>();
+    let _ = DBUS_SIGNAL_SENDER.set(tx);
+
+    while let Some(event) = rx.recv().await {
+        if let Ok(iface_ref) = conn
+            .object_server()
+            .interface::<_, NotificationHandler>("/org/freedesktop/Notifications")
+            .await
+        {
+            let emitter = iface_ref.signal_emitter();
+            match event {
+                DbusSignalEvent::ActionInvoked { id, action_key } => {
+                    let _ = NotificationHandler::action_invoked(&emitter, id, &action_key).await;
+                }
+                DbusSignalEvent::NotificationClosed { id, reason } => {
+                    let _ = NotificationHandler::notification_closed(&emitter, id, reason).await;
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
