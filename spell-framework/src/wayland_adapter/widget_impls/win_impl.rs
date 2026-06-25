@@ -4,9 +4,14 @@ use crate::wayland_adapter::{
 use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     output::OutputState,
-    reexports::client::{
-        Connection, QueueHandle,
-        protocol::{wl_pointer, wl_seat},
+    reexports::{
+        client::{
+            Connection, Dispatch, QueueHandle,
+            protocol::{wl_pointer, wl_seat},
+        },
+        protocols::xdg::shell::client::{
+            xdg_popup::XdgPopup, xdg_positioner::XdgPositioner, xdg_surface::XdgSurface,
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -16,7 +21,10 @@ use smithay_client_toolkit::{
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
         touch::TouchHandler,
     },
-    shell::{WaylandSurface, xdg::window::WindowHandler},
+    shell::{
+        WaylandSurface,
+        xdg::{XdgShell, popup::PopupHandler, window::WindowHandler},
+    },
 };
 use tracing::{info, trace, warn};
 
@@ -438,6 +446,26 @@ impl PointerHandler for SpellWin {
         }
     }
 }
+impl PopupHandler for SpellWin {
+    fn configure(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+        config: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
+    ) {
+        todo!()
+    }
+
+    fn done(
+        &mut self,
+        conn: &Connection,
+        qh: &QueueHandle<Self>,
+        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+    ) {
+        todo!()
+    }
+}
 
 // TODO: FIND What is the use of registery_handlers here?
 impl ProvidesRegistryState for SpellWin {
@@ -445,4 +473,30 @@ impl ProvidesRegistryState for SpellWin {
         &mut self.states.registry_state
     }
     registry_handlers![OutputState, SeatState];
+}
+
+impl Dispatch<XdgSurface, ()> for SpellWin {
+    fn event(
+        state: &mut Self,
+        proxy: &XdgSurface,
+        event: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        todo!()
+    }
+}
+
+impl Dispatch<XdgPositioner, ()> for SpellWin {
+    fn event(
+        state: &mut Self,
+        proxy: &XdgPositioner,
+        event: <XdgPositioner as smithay_client_toolkit::reexports::client::Proxy>::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        todo!();
+    }
 }

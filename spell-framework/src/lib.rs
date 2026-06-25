@@ -74,6 +74,10 @@ pub trait SpellAssociatedNew: std::fmt::Debug {
     }
 }
 
+pub trait PopupSlint {
+    fn create_new() -> Self;
+}
+
 /// event loop function internally used by [`cast_spell`] for single widget setups.
 /// Not to be used by end user,
 pub fn cast_spell_inner<S: SpellAssociatedNew>(mut waywindow: S) -> Result<(), Box<dyn Error>> {
@@ -118,8 +122,4 @@ pub fn cast_spells_new(
 // 1. Disable log: should disable setting subscriber, generally for the project to use or for
 // someone to set their own.
 // 2. forge: provide a forge instance to run independently.
-// 3. exclusive_zone: true or false or with specified value.
-// 4. it should have the option to take a window_conf or directly the window configurations
-// into the macro, removing the need to define it previously.
-// 5. monitor: Specify the monitor to show the widget in.
 // Build a consistent error type to deal with CLI, dbus and window creation errors

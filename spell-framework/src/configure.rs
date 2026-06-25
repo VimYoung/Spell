@@ -10,6 +10,11 @@ use tracing_subscriber::{
     reload::Layer as LoadLayer,
 };
 
+pub struct PopupConf {
+    pub width: u32,
+    pub height: u32,
+}
+
 impl Into<Dimension> for u32 {
     fn into(self) -> Dimension {
         Dimension::Pixel(self)

@@ -1,481 +1,161 @@
-//! This example is horrible. Please make a better one soon.
-
-use crate::wayland_adapter::SpellXDGPopup;
 use smithay_client_toolkit::{
-    compositor::{CompositorHandler, CompositorState},
-    output::{OutputHandler, OutputState},
-    reexports::client::{
-        Connection, QueueHandle,
-        globals::registry_queue_init,
-        protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
+    reexports::{
+        client::protocol::wl_shm,
+        protocols::xdg::shell::client::{xdg_positioner::XdgPositioner, xdg_surface::XdgSurface},
     },
-    registry::{ProvidesRegistryState, RegistryState},
-    registry_handlers,
-    seat::{
-        Capability, SeatHandler, SeatState,
-        keyboard::{KeyEvent, KeyboardHandler, Keysym, Modifiers, RawModifiers},
-        pointer::{PointerEvent, PointerEventKind, PointerHandler},
-    },
-    shell::{
-        WaylandSurface,
-        wlr_layer::{
-            Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
-            LayerSurfaceConfigure,
-        },
-        xdg::popup::PopupHandler,
-    },
-    shm::{Shm, ShmHandler, slot::SlotPool},
+    shell::xdg::popup::Popup,
+    shm::slot::{Buffer, SlotPool},
 };
-use std::{convert::TryInto, num::NonZeroU32};
+use std::{cell::RefCell, rc::Rc};
 
-// fn main() {
+use crate::{
+    PopupSlint,
+    configure::PopupConf,
+    slint_adapter::{ADAPTERS, SpellSkiaWinAdapter},
+    wayland_adapter::SpellXDGPopup,
+};
 
-//     // All Wayland apps start by connecting the compositor (server).
-//     let conn = Connection::connect_to_env().unwrap();
-
-//     // Enumerate the list of globals to get the protocols the server implements.
-//     let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
-//     let qh = event_queue.handle();
-
-//     // The compositor (not to be confused with the server which is commonly called the compositor) allows
-//     // configuring surfaces to be presented.
-//     let compositor = CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
-//     // This app uses the wlr layer shell, which may not be available with every compositor.
-//     let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
-//     // Since we are not using the GPU in this example, we use wl_shm to allow software rendering to a buffer
-//     // we share with the compositor process.
-//     let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
-
-//     // A layer surface is created from a surface.
-//     let surface = compositor.create_surface(&qh);
-
-//     // And then we create the layer shell.
-//     let layer =
-//         layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("simple_layer"), None);
-//     // Configure the layer surface, providing things like the anchor on screen, desired size and the keyboard
-//     // interactivity
-//     layer.set_anchor(Anchor::BOTTOM);
-//     layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-//     layer.set_size(256, 256);
-
-//     // In order for the layer surface to be mapped, we need to perform an initial commit with no attached\
-//     // buffer. For more info, see WaylandSurface::commit
-//     //
-//     // The compositor will respond with an initial configure that we can then use to present to the layer
-//     // surface with the correct options.
-//     layer.commit();
-
-//     // We don't know how large the window will be yet, so lets assume the minimum size we suggested for the
-//     // initial memory allocation.
-//     let pool = SlotPool::new(256 * 256 * 4, &shm).expect("Failed to create pool");
-
-//     let mut simple_layer = SpellXDGPopup {
-//         // Seats and outputs may be hotplugged at runtime, therefore we need to setup a registry state to
-//         // listen for seats and outputs.
-//         registry_state: RegistryState::new(&globals),
-//         seat_state: SeatState::new(&globals, &qh),
-//         output_state: OutputState::new(&globals, &qh),
-//         shm,
-
-//         exit: false,
-//         first_configure: true,
-//         pool,
-//         width: 256,
-//         height: 256,
-//         shift: None,
-//         layer,
-//         keyboard: None,
-//         keyboard_focus: false,
-//         pointer: None,
-//     };
-
-//     // We don't draw immediately, the configure will notify us when to first draw.
-//     loop {
-//         event_queue.blocking_dispatch(&mut simple_layer).unwrap();
-
-//         if simple_layer.exit {
-//             println!("exiting example");
-//             break;
-//         }
-//     }
-// }
-
-impl PopupHandler for SpellXDGPopup {
-    fn configure(
-        &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
-        config: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
-    ) {
-        todo!()
-    }
-
-    fn done(
-        &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
-    ) {
-        todo!()
-    }
+pub(crate) struct PopupManager {
+    popups: Vec<SpellXDGPopup>,
+    xdg_surface: Option<XdgSurface>,
+    pool: Option<Rc<RefCell<SlotPool>>>,
 }
 
-impl CompositorHandler for SpellXDGPopup {
-    fn scale_factor_changed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_factor: i32,
-    ) {
-        // Not needed for this example.
-    }
-
-    fn transform_changed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_transform: wl_output::Transform,
-    ) {
-        // Not needed for this example.
-    }
-
-    fn frame(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _time: u32,
-    ) {
-        self.draw(qh);
-    }
-
-    fn surface_enter(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        // Not needed for this example.
-    }
-
-    fn surface_leave(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        // Not needed for this example.
-    }
-}
-
-impl OutputHandler for SpellXDGPopup {
-    fn output_state(&mut self) -> &mut OutputState {
-        &mut self.output_state
-    }
-
-    fn new_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-
-    fn update_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-
-    fn output_destroyed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-    }
-}
-
-impl LayerShellHandler for SpellXDGPopup {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
-        self.exit = true;
-    }
-
-    fn configure(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
-        configure: LayerSurfaceConfigure,
-        _serial: u32,
-    ) {
-        self.width = NonZeroU32::new(configure.new_size.0).map_or(256, NonZeroU32::get);
-        self.height = NonZeroU32::new(configure.new_size.1).map_or(256, NonZeroU32::get);
-
-        // Initiate the first draw.
-        if self.first_configure {
-            self.first_configure = false;
-            self.draw(qh);
-        }
-    }
-}
-
-impl SeatHandler for SpellXDGPopup {
-    fn seat_state(&mut self) -> &mut SeatState {
-        &mut self.seat_state
-    }
-
-    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-
-    fn new_capability(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        // if capability == Capability::Keyboard && self.keyboard.is_none() {
-        //     println!("Set keyboard capability");
-        //     let keyboard = self
-        //         .seat_state
-        //         .get_keyboard(qh, &seat, None)
-        //         .expect("Failed to create keyboard");
-        //     self.keyboard = Some(keyboard);
-        // }
-
-        if capability == Capability::Pointer && self.pointer.is_none() {
-            println!("Set pointer capability");
-            let pointer = self
-                .seat_state
-                .get_pointer(qh, &seat)
-                .expect("Failed to create pointer");
-            self.pointer.pointer = Some(pointer);
+impl PopupManager {
+    pub(crate) fn new() -> Self {
+        PopupManager {
+            popups: Vec::new(),
+            xdg_surface: None,
+            pool: None,
         }
     }
 
-    fn remove_capability(
-        &mut self,
-        _conn: &Connection,
-        _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        if capability == Capability::Keyboard && self.keyboard.is_some() {
-            println!("Unset keyboard capability");
-            self.keyboard.take().unwrap().release();
-        }
-
-        if capability == Capability::Pointer && self.pointer.is_some() {
-            println!("Unset pointer capability");
-            self.pointer.take().unwrap().release();
-        }
+    pub(crate) fn set_pool(&mut self, pool: Rc<RefCell<SlotPool>>) {
+        self.pool = Some(pool);
+    }
+    pub(crate) fn xdg_surface(&self) -> &XdgSurface {
+        self.xdg_surface.as_ref().unwrap()
     }
 
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-}
-
-impl KeyboardHandler for SpellXDGPopup {
-    fn enter(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        surface: &wl_surface::WlSurface,
-        _: u32,
-        _: &[u32],
-        keysyms: &[Keysym],
-    ) {
-        if self.layer.wl_surface() == surface {
-            println!("Keyboard focus on window with pressed syms: {keysyms:?}");
-            self.keyboard_focus = true;
-        }
+    pub(crate) fn set_surface(&mut self, surface: XdgSurface) {
+        self.xdg_surface = Some(surface);
     }
-
-    fn leave(
+    pub(crate) fn create_popup<T: PopupSlint>(
         &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        surface: &wl_surface::WlSurface,
-        _: u32,
+        position: &XdgPositioner,
+        popup: Popup,
+        popup_conf: PopupConf,
     ) {
-        if self.layer.wl_surface() == surface {
-            println!("Release keyboard focus on window");
-            self.keyboard_focus = false;
-        }
-    }
-
-    fn press_key(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        event: KeyEvent,
-    ) {
-        println!("Key press: {event:?}");
-        // press 'esc' to exit
-        if event.keysym == Keysym::Escape {
-            self.exit = true;
-        }
-    }
-
-    fn repeat_key(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &wl_keyboard::WlKeyboard,
-        _serial: u32,
-        event: KeyEvent,
-    ) {
-        println!("Key repeat: {event:?}");
-    }
-
-    fn release_key(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        event: KeyEvent,
-    ) {
-        println!("Key release: {event:?}");
-    }
-
-    fn update_modifiers(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _serial: u32,
-        modifiers: Modifiers,
-        _raw_modifiers: RawModifiers,
-        _layout: u32,
-    ) {
-        println!("Update modifiers: {modifiers:?}");
-    }
-}
-
-impl PointerHandler for SpellXDGPopup {
-    fn pointer_frame(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _pointer: &wl_pointer::WlPointer,
-        events: &[PointerEvent],
-    ) {
-        use PointerEventKind::*;
-        for event in events {
-            // Ignore events for other surfaces
-            if &event.surface != self.layer.wl_surface() {
-                continue;
-            }
-            match event.kind {
-                Enter { .. } => {
-                    println!("Pointer entered @{:?}", event.position);
-                }
-                Leave { .. } => {
-                    println!("Pointer left");
-                }
-                Motion { .. } => {}
-                Press { button, .. } => {
-                    println!("Press {:x} @ {:?}", button, event.position);
-                    self.shift = self.shift.xor(Some(0));
-                }
-                Release { button, .. } => {
-                    println!("Release {:x} @ {:?}", button, event.position);
-                }
-                Axis {
-                    horizontal,
-                    vertical,
-                    ..
-                } => {
-                    println!("Scroll H:{horizontal:?}, V:{vertical:?}");
-                }
-            }
-        }
-    }
-}
-
-impl ShmHandler for SpellXDGPopup {
-    fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
+        let stride = popup_conf.width as i32 * 4;
+        let (buffer, _) = self
+            .pool
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .create_buffer(
+                popup_conf.width as i32,
+                popup_conf.height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .expect("failed to create buffer for popup");
+        let popup = SpellXDGPopup::new::<T>(
+            position,
+            self.pool.as_ref().unwrap().clone(),
+            popup,
+            popup_conf,
+            buffer,
+        );
+        self.popups.push(popup);
     }
 }
 
 impl SpellXDGPopup {
-    pub fn draw(&mut self, qh: &QueueHandle<Self>) {
-        let width = self.width;
-        let height = self.height;
-        let stride = self.width as i32 * 4;
-
-        let (buffer, canvas) = self
-            .pool
-            .create_buffer(
-                width as i32,
-                height as i32,
-                stride,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("create buffer");
-
-        // Draw to the window:
-        {
-            let shift = self.shift.unwrap_or(0);
-            canvas
-                .chunks_exact_mut(4)
-                .enumerate()
-                .for_each(|(index, chunk)| {
-                    let x = ((index + shift as usize) % width as usize) as u32;
-                    let y = (index / width as usize) as u32;
-
-                    let a = 0xFF;
-                    let r = u32::min(((width - x) * 0xFF) / width, ((height - y) * 0xFF) / height);
-                    let g = u32::min((x * 0xFF) / width, ((height - y) * 0xFF) / height);
-                    let b = u32::min(((width - x) * 0xFF) / width, (y * 0xFF) / height);
-                    let color = (a << 24) + (r << 16) + (g << 8) + b;
-
-                    let array: &mut [u8; 4] = chunk.try_into().unwrap();
-                    *array = color.to_le_bytes();
-                });
-
-            if let Some(shift) = &mut self.shift {
-                *shift = (*shift + 1) % width;
-            }
+    fn new<T: PopupSlint + 'static>(
+        position: &XdgPositioner,
+        pool: Rc<RefCell<SlotPool>>,
+        popup: Popup,
+        popup_conf: PopupConf,
+        buffer: Buffer,
+    ) -> Self {
+        let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
+            pool,
+            RefCell::new(buffer.slot()),
+            popup_conf.width,
+            popup_conf.height,
+        );
+        ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
+        SpellXDGPopup {
+            frontend: Box::new(T::create_new()),
+            adapter: adapter_value,
+            // evaluated_width: popup_conf.width,
+            // evaluated_height: popup_conf.height,
+            popup,
+            buffer,
         }
-
-        // Damage the entire window
-        self.layer
-            .wl_surface()
-            .damage_buffer(0, 0, width as i32, height as i32);
-
-        // Request our next frame
-        self.layer
-            .wl_surface()
-            .frame(qh, FrameCallbackData(self.layer.wl_surface().clone()));
-
-        // Attach and commit to present.
-        buffer
-            .attach_to(self.layer.wl_surface())
-            .expect("buffer attach");
-        self.layer.commit();
-
-        // TODO save and reuse buffer when the window size is unchanged.  This is especially
-        // useful if you do damage tracking, since you don't need to redraw the undamaged parts
-        // of the canvas.
     }
-}
 
-impl ProvidesRegistryState for SpellXDGPopup {
-    fn registry(&mut self) -> &mut RegistryState {
-        &mut self.registry_state
-    }
-    registry_handlers![OutputState, SeatState];
+    // fn converter(&mut self, qh: &QueueHandle<Self>) {
+    //     slint::platform::update_timers_and_animations();
+    //     let width: u32 = self.adapter.as_ref().size.get().width;
+    //     let height: u32 = self.adapter.as_ref().size.get().height;
+    //     let window_adapter = self.adapter.clone();
+
+    //     // Rendering from Skia
+    //     if !self.is_hidden.get() {
+    //         // let skia_now = std::time::Instant::now();
+    //         let redraw_val: bool = window_adapter.unwrap().draw_if_needed();
+    //         // let elasped_time = skia_now.elapsed().as_millis();
+    //         // if elasped_time != 0 {
+    //         //     debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
+    //         // }
+
+    //         self.states
+    //             .pointer_state
+    //             .update_cursor(self.adapter.as_ref().current_cursor.get(), &qh);
+
+    //         let buffer = &self.buffer;
+    //         if self.first_configure.get() || redraw_val {
+    //             // if self.first_configure {
+    //             self.first_configure.set(false);
+    //             self.layer.as_ref().unwrap().wl_surface().damage_buffer(
+    //                 0,
+    //                 0,
+    //                 width as i32,
+    //                 height as i32,
+    //             );
+    //             // } else {
+    //             //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+    //             //         // println!(
+    //             //         //     "{}, {}, {}, {}",
+    //             //         //     position.x, position.y, size.width as i32, size.height as i32,
+    //             //         // );
+    //             //         // if size.width != width && size.height != height {
+    //             //         self.layer.wl_surface().damage_buffer(
+    //             //             position.x,
+    //             //             position.y,
+    //             //             size.width as i32,
+    //             //             size.height as i32,
+    //             //         );
+    //             //         //}
+    //             //     }
+    //             // }
+    //             // Request our next frame
+    //             self.layer.as_ref().unwrap().wl_surface().attach(
+    //                 Some(buffer.as_ref().unwrap().wl_buffer()),
+    //                 0,
+    //                 0,
+    //             );
+    //         }
+
+    //         self.layer
+    //             .as_ref()
+    //             .unwrap()
+    //             .wl_surface()
+    //             .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+    //         self.layer.as_ref().unwrap().commit();
+    //     } else {
+    //         self.layer.as_ref().unwrap().commit();
+    //     }
+    // }
 }
