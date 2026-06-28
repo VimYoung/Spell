@@ -614,23 +614,36 @@ impl SpellWin {
         self.layer.as_ref().unwrap().commit();
     }
 
-    pub fn open_popup<T: PopupSlint>(&mut self, popup_conf: PopupConf) {
+    pub fn open_popup<T: PopupSlint + 'static>(
+        &mut self,
+        popup_conf: PopupConf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let position = &self
             .xdg_shell
             .xdg_wm_base()
             .create_positioner(&self.queue, ());
+        position.set_reactive();
+        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
+        self.popup_manager.xdg_surface().set_window_geometry(
+            0,
+            0,
+            popup_conf.width as i32,
+            popup_conf.height as i32,
+        );
         if let Ok(popup) = Popup::new(
             self.popup_manager.xdg_surface(),
-            &position,
+            position,
             &self.queue,
             &self.states.compositor_state,
             &self.xdg_shell,
         ) {
             self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
-            self.popup_manager
-                .create_popup::<T>(position, popup, popup_conf);
+            self.popup_manager.create_popup::<T>(popup, popup_conf);
+            info!("Popup created");
+            Ok(())
         } else {
             warn!("couldn't create a popup");
+            Err("Couldn't create Popup".into())
         }
     }
 }
@@ -1362,7 +1375,7 @@ delegate_seat!(SpellLock);
 
 /// Future XDGpopup implementation will occur on this struct;
 pub struct SpellXDGPopup {
-    frontend: Box<dyn PopupSlint>,
+    // frontend: Box<dyn PopupSlint>,
     adapter: Rc<SpellSkiaWinAdapter>,
     // evaluated_width: u32,
     // evaluated_height: u32,

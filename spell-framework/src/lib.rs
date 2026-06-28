@@ -23,10 +23,13 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
+    pub use crate::configure::{
+        Dimension, PopupConf, PopupSettings, WindowConf, WindowConfBuilder,
+    };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
+    pub use smithay_client_toolkit::shell::xdg::popup::Popup;
 }
 /// Components of this module are not be used by end user directly. This module contains
 /// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
@@ -39,8 +42,11 @@ pub mod macro_internal {
     };
     pub use tracing::{info, span::Span, warn};
 }
+use smithay_client_toolkit::{reexports::client::QueueHandle, shell::xdg::popup::Popup};
 use std::error::Error;
 use tracing::{Level, span, trace};
+
+use crate::{configure::PopupSettings, wayland_adapter::SpellWin};
 
 /// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
@@ -75,7 +81,12 @@ pub trait SpellAssociatedNew: std::fmt::Debug {
 }
 
 pub trait PopupSlint {
-    fn create_new() -> Self;
+    fn create_new(settings: PopupSettings) -> Self
+    where
+        Self: Sized;
+
+    fn converter(&mut self);
+    fn inner(&self) -> &Popup;
 }
 
 /// event loop function internally used by [`cast_spell`] for single widget setups.
