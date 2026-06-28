@@ -449,12 +449,16 @@ impl PointerHandler for SpellWin {
 impl PopupHandler for SpellWin {
     fn configure(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
+        _: &Connection,
+        _: &QueueHandle<Self>,
         popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
-        config: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
+        _: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
     ) {
-        todo!()
+        if let Some(current_popup) = self.popup_manager.return_popup(popup) {
+            current_popup.converter();
+        } else {
+            warn!("Popup configured but not pushed to the manager");
+        }
     }
 
     fn done(

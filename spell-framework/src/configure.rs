@@ -1,5 +1,19 @@
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
-use std::{cell::Cell, fs, io::Write, os::unix::net::UnixDatagram, path::Path, sync::Mutex};
+use smithay_client_toolkit::{
+    shell::{
+        wlr_layer::{Anchor, KeyboardInteractivity, Layer},
+        xdg::popup::Popup,
+    },
+    shm::slot::{Buffer, SlotPool},
+};
+use std::{
+    cell::{Cell, RefCell},
+    fs,
+    io::Write,
+    os::unix::net::UnixDatagram,
+    path::Path,
+    rc::Rc,
+    sync::Mutex,
+};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     EnvFilter, Layer as TracingTraitLayer,
@@ -9,6 +23,13 @@ use tracing_subscriber::{
     registry::Registry,
     reload::Layer as LoadLayer,
 };
+
+pub struct PopupSettings {
+    pub(crate) pool: Rc<RefCell<SlotPool>>,
+    pub(crate) popup: Popup,
+    pub(crate) popup_conf: PopupConf,
+    pub(crate) buffer: Buffer,
+}
 
 pub struct PopupConf {
     pub width: u32,

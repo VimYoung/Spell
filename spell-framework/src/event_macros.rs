@@ -82,6 +82,13 @@ macro_rules! generate_widgets {
                         WinHandle(self.way.loop_handle.clone())
                     }
 
+                    pub fn open_popup<T: $crate::PopupSlint + 'static>(
+                        &mut self,
+                        popup_conf: $crate::layer_properties::PopupConf,
+                    ) -> Result<(), Box<dyn std::error::Error>> {
+                        self.way.open_popup::<T>(popup_conf)
+                    }
+
                     pub fn parts(self) -> ($slint_win, SpellWin) {
                         let [<$slint_win Spell>] { ui, way } = self;
                         (ui, way)
