@@ -61,7 +61,7 @@ use smithay_client_toolkit::{
             KeyboardInteractivity, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        xdg::{XdgShell, popup::Popup},
+        xdg::{XdgPositioner, XdgShell, popup::Popup},
     },
     shm::{
         Shm, ShmHandler,
@@ -74,7 +74,7 @@ use std::{
     os::unix::net::UnixListener,
     process::Command,
     rc::Rc,
-    sync::{Once, OnceLock, RwLock, Weak},
+    sync::{Once, OnceLock, RwLock},
 };
 use tracing::{Level, info, span, trace, warn};
 pub use widget_impls::lock_impl::SpellSlintLock;
@@ -288,16 +288,15 @@ impl SpellWin {
                 wl_shm::Format::Argb8888,
             )
             .expect("Creating Buffer");
-        let pool_mut = Rc::new(RefCell::new(pool));
 
         let primary_slot = way_pri_buffer.slot();
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
-            pool_mut.clone(),
+            Rc::new(RefCell::new(pool)),
             RefCell::new(primary_slot),
             window_conf.evaluated_width,
             window_conf.evaluated_height,
         );
-        win.popup_manager.set_pool(pool_mut.clone());
+        // win.popup_manager.set_pool(pool_mut.clone());
         win.adapter = Some(adapter_value.clone());
         win.buffer = Some(way_pri_buffer);
 
@@ -347,13 +346,6 @@ impl SpellWin {
             handle,
             slint_event_receiver,
         );
-
-        let xdg_surface = win.xdg_shell.xdg_wm_base().get_xdg_surface(
-            win.layer.as_ref().unwrap().wl_surface(),
-            &qh,
-            (),
-        );
-        win.popup_manager.set_surface(xdg_surface);
 
         info!("Win: {} layer created successfully.", layer_name);
 
@@ -618,26 +610,35 @@ impl SpellWin {
         &mut self,
         popup_conf: PopupConf,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let position = &self
-            .xdg_shell
-            .xdg_wm_base()
-            .create_positioner(&self.queue, ());
-        position.set_reactive();
-        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
-        self.popup_manager.xdg_surface().set_window_geometry(
-            0,
-            0,
-            popup_conf.width as i32,
-            popup_conf.height as i32,
-        );
-        if let Ok(popup) = Popup::new(
-            self.popup_manager.xdg_surface(),
-            position,
+        let popup_surface = self.states.compositor_state.create_surface(&self.queue);
+        let xdg_surface = self.xdg_shell.xdg_wm_base().get_xdg_surface(
+            // win.layer.as_ref().unwrap().wl_surface(),
+            &popup_surface,
             &self.queue,
-            &self.states.compositor_state,
+            (),
+        );
+        popup_surface.commit();
+        self.popup_manager.set_surface(xdg_surface);
+        let position =
+            XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
+        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
+        popup_surface.commit();
+        if let Ok(popup) = Popup::from_surface(
+            // Some(self.popup_manager.xdg_surface()),
+            None,
+            &position,
+            &self.queue,
+            popup_surface,
             &self.xdg_shell,
         ) {
+            let pool = SlotPool::new(
+                (popup_conf.width * popup_conf.height * 4) as usize,
+                &self.states.shm,
+            )
+            .expect("Unable to create slot pool for popup");
+            self.popup_manager.set_pool(Rc::new(RefCell::new(pool)));
             self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
+            popup.wl_surface().commit();
             self.popup_manager.create_popup::<T>(popup, popup_conf);
             info!("Popup created");
             Ok(())
@@ -1381,6 +1382,7 @@ pub struct SpellXDGPopup {
     // evaluated_height: u32,
     popup: Popup,
     buffer: Buffer,
+    first_configure: Cell<bool>,
 }
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.

@@ -3,7 +3,9 @@ use std::{env, error::Error};
 use slint::ComponentHandle;
 use spell_framework::{
     cast_spell,
-    layer_properties::{LayerAnchor, LayerType, Popup, PopupConf, PopupSettings, WindowConf},
+    layer_properties::{
+        LayerAnchor, LayerType, Popup, PopupConf, PopupSettings, QueueHandle, WindowConf, WlSurface,
+    },
     wayland_adapter::SpellXDGPopup,
     PopupSlint,
 };
@@ -27,12 +29,25 @@ impl PopupSlint for TestPopupSpell {
         }
     }
 
-    fn converter(&mut self) {
-        self.backend.converter_popup();
-    }
+    //
+    // fn converter(&mut self, wl_surface: WlSurface) {
+    //     self.backend.converter_popup(wl_surface);
+    // }
 
     fn inner(&self) -> &Popup {
         self.backend.popup()
+    }
+
+    fn converter_popup<'a>(
+        &self,
+        wl_surface: &'a WlSurface,
+        qh: &'a QueueHandle<SpellWin>,
+    ) -> &'a WlSurface {
+        self.backend.converter_popup(wl_surface, qh)
+    }
+
+    fn first_configure(&self) -> bool {
+        self.backend.first_configure()
     }
 }
 
@@ -56,9 +71,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             ui.set_counter(ui.get_counter() + 1);
         }
     });
-    ui.open_popup::<TestPopupSpell>(PopupConf {
+    if let Err(_) = ui.open_popup::<TestPopupSpell>(PopupConf {
         width: 200,
         height: 200,
-    });
+    }) {
+        println!("Error encountered when creating popup");
+    };
     cast_spell!(ui)
 }
