@@ -9,9 +9,7 @@ use smithay_client_toolkit::{
             Connection, Dispatch, QueueHandle,
             protocol::{wl_pointer, wl_seat},
         },
-        protocols::xdg::shell::client::{
-            xdg_popup::XdgPopup, xdg_positioner::XdgPositioner, xdg_surface::XdgSurface,
-        },
+        protocols::xdg::shell::client::xdg_surface::XdgSurface,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -23,7 +21,7 @@ use smithay_client_toolkit::{
     },
     shell::{
         WaylandSurface,
-        xdg::{XdgShell, popup::PopupHandler, window::WindowHandler},
+        xdg::{XdgPositioner, popup::PopupHandler, window::WindowHandler},
     },
 };
 use tracing::{info, trace, warn};
@@ -31,20 +29,20 @@ use tracing::{info, trace, warn};
 impl WindowHandler for SpellWin {
     fn request_close(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        window: &smithay_client_toolkit::shell::xdg::window::Window,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::window::Window,
     ) {
         todo!()
     }
 
     fn configure(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        window: &smithay_client_toolkit::shell::xdg::window::Window,
-        configure: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
-        serial: u32,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::window::Window,
+        _: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
+        _: u32,
     ) {
         todo!()
     }
@@ -446,6 +444,7 @@ impl PointerHandler for SpellWin {
         }
     }
 }
+
 impl PopupHandler for SpellWin {
     fn configure(
         &mut self,
@@ -454,8 +453,12 @@ impl PopupHandler for SpellWin {
         popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
         _: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
     ) {
-        if let Some(current_popup) = self.popup_manager.return_popup(popup) {
-            current_popup.converter();
+        let x = self.popup_manager.return_popup(popup);
+        if let Some(current_popup) = x {
+            current_popup.inner().wl_surface().commit();
+            if current_popup.first_configure() {
+                current_popup.converter_popup(current_popup.inner().wl_surface(), &self.queue);
+            }
         } else {
             warn!("Popup configured but not pushed to the manager");
         }
@@ -463,9 +466,9 @@ impl PopupHandler for SpellWin {
 
     fn done(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::popup::Popup,
     ) {
         todo!()
     }
@@ -481,26 +484,26 @@ impl ProvidesRegistryState for SpellWin {
 
 impl Dispatch<XdgSurface, ()> for SpellWin {
     fn event(
-        state: &mut Self,
-        proxy: &XdgSurface,
-        event: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _: &mut Self,
+        _: &XdgSurface,
+        _: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
     ) {
         todo!()
     }
 }
 
-impl Dispatch<XdgPositioner, ()> for SpellWin {
-    fn event(
-        state: &mut Self,
-        proxy: &XdgPositioner,
-        event: <XdgPositioner as smithay_client_toolkit::reexports::client::Proxy>::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
-    ) {
-        todo!();
-    }
-}
+// impl Dispatch<XdgPositioner, ()> for SpellWin {
+//     fn event(
+//         _: &mut Self,
+//         _: &XdgPositioner,
+//         _: <XdgPositioner as smithay_client_toolkit::reexports::client::Proxy>::Event,
+//         _: &(),
+//         _: &Connection,
+//         _: &QueueHandle<Self>,
+//     ) {
+//         todo!();
+//     }
+// }

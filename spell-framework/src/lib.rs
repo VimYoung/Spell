@@ -26,6 +26,9 @@ pub mod layer_properties {
     pub use crate::configure::{
         Dimension, PopupConf, PopupSettings, WindowConf, WindowConfBuilder,
     };
+    pub use smithay_client_toolkit::reexports::client::{
+        QueueHandle, protocol::wl_surface::WlSurface,
+    };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
@@ -42,7 +45,10 @@ pub mod macro_internal {
     };
     pub use tracing::{info, span::Span, warn};
 }
-use smithay_client_toolkit::{reexports::client::QueueHandle, shell::xdg::popup::Popup};
+use smithay_client_toolkit::{
+    reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
+    shell::xdg::popup::Popup,
+};
 use std::error::Error;
 use tracing::{Level, span, trace};
 
@@ -85,8 +91,15 @@ pub trait PopupSlint {
     where
         Self: Sized;
 
-    fn converter(&mut self);
+    fn converter_popup<'a>(
+        &self,
+        wl_surface: &'a WlSurface,
+        qh: &'a QueueHandle<SpellWin>,
+    ) -> &'a WlSurface;
+
     fn inner(&self) -> &Popup;
+
+    fn first_configure(&self) -> bool;
 }
 
 /// event loop function internally used by [`cast_spell`] for single widget setups.
@@ -115,6 +128,7 @@ pub fn cast_spells_new(
     }
 }
 
+// TODO make the converter back to non mut reference if possible.
 // TODO Update docs of spellock and spellwin to justify their use being purely internal.
 // TODO update the blog with latest API changes in spell-framework.
 // TODO update the constant vals so that the new APIs are used.

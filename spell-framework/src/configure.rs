@@ -36,9 +36,9 @@ pub struct PopupConf {
     pub height: u32,
 }
 
-impl Into<Dimension> for u32 {
-    fn into(self) -> Dimension {
-        Dimension::Pixel(self)
+impl From<u32> for Dimension {
+    fn from(value: u32) -> Self {
+        Dimension::Pixel(value)
     }
 }
 
@@ -486,6 +486,7 @@ pub(crate) fn set_up_tracing(widget_name: &str) -> HomeHandle {
         .without_time()
         .with_target(false)
         .with_writer(writer)
+        .with_ansi(false)
         .with_filter(EnvFilter::new("spell_framework=trace,info"));
 
     // Logs on socket read by cli.

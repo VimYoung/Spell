@@ -1,22 +1,32 @@
 use smithay_client_toolkit::{
     reexports::{
-        client::{QueueHandle, protocol::wl_shm},
+        client::{
+            QueueHandle,
+            protocol::{
+                wl_shm,
+                wl_surface::{self, WlSurface},
+            },
+        },
         protocols::xdg::shell::client::{xdg_positioner::XdgPositioner, xdg_surface::XdgSurface},
     },
     shell::xdg::popup::Popup,
     shm::slot::{Buffer, SlotPool},
 };
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use crate::{
     PopupSlint,
     configure::{PopupConf, PopupSettings},
     slint_adapter::{ADAPTERS, SpellSkiaWinAdapter},
-    wayland_adapter::SpellXDGPopup,
+    wayland_adapter::{SpellWin, SpellXDGPopup},
 };
 
 pub(crate) struct PopupManager {
     popups: Vec<Box<dyn PopupSlint>>,
+    // pub(crate) surface: WlSurface,
     xdg_surface: Option<XdgSurface>,
     pool: Option<Rc<RefCell<SlotPool>>>,
 }
@@ -30,10 +40,10 @@ impl PopupManager {
         }
     }
 
-    pub(crate) fn return_popup(&mut self, popup_inner: &Popup) -> Option<&mut dyn PopupSlint> {
-        for popup in self.popups.iter_mut() {
+    pub(crate) fn return_popup(&self, popup_inner: &Popup) -> Option<&dyn PopupSlint> {
+        for popup in self.popups.iter() {
             if popup_inner == popup.inner() {
-                return Some(popup.as_mut());
+                return Some(popup.as_ref());
             }
         }
         None
@@ -73,12 +83,6 @@ impl PopupManager {
             popup_conf,
             buffer,
         });
-        // let popup = SpellXDGPopup::new(
-        //     self.pool.as_ref().unwrap().clone(),
-        //     popup,
-        //     popup_conf,
-        //     buffer,
-        // );
         self.popups.push(Box::new(popup));
     }
 }
@@ -99,6 +103,7 @@ impl SpellXDGPopup {
             // evaluated_height: popup_conf.height,
             popup: popup_settings.popup,
             buffer: popup_settings.buffer,
+            first_configure: Cell::new(true),
         }
     }
 
@@ -106,10 +111,23 @@ impl SpellXDGPopup {
         &self.popup
     }
 
-    pub fn converter_popup(&mut self) {
+    pub fn first_configure(&self) -> bool {
+        if self.first_configure.get() {
+            self.first_configure.set(false);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn converter_popup<'a>(
+        &self,
+        wl_surface: &'a WlSurface,
+        qh: &'a QueueHandle<SpellWin>,
+    ) -> &'a WlSurface {
         slint::platform::update_timers_and_animations();
-        // let width: u32 = self.adapter.as_ref().size.get().width;
-        // let height: u32 = self.adapter.as_ref().size.get().height;
+        let width: u32 = self.adapter.as_ref().size.get().width;
+        let height: u32 = self.adapter.as_ref().size.get().height;
         let window_adapter = self.adapter.clone();
 
         // let skia_now = std::time::Instant::now();
@@ -123,49 +141,36 @@ impl SpellXDGPopup {
         //     .pointer_state
         //     .update_cursor(self.adapter.as_ref().current_cursor.get(), &qh);
 
-        // let buffer = &self.buffer;
-        // if
-        // /*self.first_configure.get() ||*/
-        // redraw_val {
-        //     // if self.first_configure {
-        //     // self.first_configure.set(false);
-        //     self.layer.as_ref().unwrap().wl_surface().damage_buffer(
-        //         0,
-        //         0,
-        //         width as i32,
-        //         height as i32,
-        //     );
-        //     // } else {
-        //     //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
-        //     //         // println!(
-        //     //         //     "{}, {}, {}, {}",
-        //     //         //     position.x, position.y, size.width as i32, size.height as i32,
-        //     //         // );
-        //     //         // if size.width != width && size.height != height {
-        //     //         self.layer.wl_surface().damage_buffer(
-        //     //             position.x,
-        //     //             position.y,
-        //     //             size.width as i32,
-        //     //             size.height as i32,
-        //     //         );
-        //     //         //}
-        //     //     }
-        //     // }
-        //     // Request our next frame
-        //     self.layer.as_ref().unwrap().wl_surface().attach(
-        //         Some(buffer.as_ref().unwrap().wl_buffer()),
-        //         0,
-        //         0,
-        //     );
-        //
-        //     self.layer
-        //         .as_ref()
-        //         .unwrap()
-        //         .wl_surface()
-        //         .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
-        //     self.layer.as_ref().unwrap().commit();
-        // } else {
-        //     self.layer.as_ref().unwrap().commit();
-        // }
+        let buffer = &self.buffer;
+        if
+        /*self.first_configure.get() ||*/
+        redraw_val {
+            // if self.first_configure {
+            // self.first_configure.set(false);
+            wl_surface.damage_buffer(0, 0, width as i32, height as i32);
+            // } else {
+            //     for (position, size) in self.damaged_part.as_ref().unwrap().iter() {
+            //         // println!(
+            //         //     "{}, {}, {}, {}",
+            //         //     position.x, position.y, size.width as i32, size.height as i32,
+            //         // );
+            //         // if size.width != width && size.height != height {
+            //         self.layer.wl_surface().damage_buffer(
+            //             position.x,
+            //             position.y,
+            //             size.width as i32,
+            //             size.height as i32,
+            //         );
+            //         //}
+            //     }
+            // }
+            // Request our next frame
+            wl_surface.attach(Some(buffer.wl_buffer()), 0, 0);
+            wl_surface.frame(qh, wl_surface.clone());
+            wl_surface.commit();
+        } else {
+            wl_surface.commit();
+        }
+        wl_surface
     }
 }
