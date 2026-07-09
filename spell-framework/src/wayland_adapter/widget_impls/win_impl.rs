@@ -21,7 +21,7 @@ use smithay_client_toolkit::{
     },
     shell::{
         WaylandSurface,
-        xdg::{XdgPositioner, popup::PopupHandler, window::WindowHandler},
+        xdg::{popup::PopupHandler, window::WindowHandler},
     },
 };
 use tracing::{info, trace, warn};
@@ -494,16 +494,3 @@ impl Dispatch<XdgSurface, ()> for SpellWin {
         todo!()
     }
 }
-
-// impl Dispatch<XdgPositioner, ()> for SpellWin {
-//     fn event(
-//         _: &mut Self,
-//         _: &XdgPositioner,
-//         _: <XdgPositioner as smithay_client_toolkit::reexports::client::Proxy>::Event,
-//         _: &(),
-//         _: &Connection,
-//         _: &QueueHandle<Self>,
-//     ) {
-//         todo!();
-//     }
-// }

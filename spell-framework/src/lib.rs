@@ -5,7 +5,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico"
 )]
 #![doc = include_str!("../docs/entry.md")]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 mod configure;
 #[cfg(docsrs)]
 mod dummy_skia_docs;
@@ -91,11 +91,7 @@ pub trait PopupSlint {
     where
         Self: Sized;
 
-    fn converter_popup<'a>(
-        &self,
-        wl_surface: &'a WlSurface,
-        qh: &'a QueueHandle<SpellWin>,
-    ) -> &'a WlSurface;
+    fn converter_popup(&self, wl_surface: &WlSurface, qh: &QueueHandle<SpellWin>);
 
     fn inner(&self) -> &Popup;
 
@@ -128,19 +124,20 @@ pub fn cast_spells_new(
     }
 }
 
-// TODO make the converter back to non mut reference if possible.
-// TODO Update docs of spellock and spellwin to justify their use being purely internal.
-// TODO update the blog with latest API changes in spell-framework.
-// TODO update the constant vals so that the new APIs are used.
-// TODO and configuration file to ensure that a single widget is open for a single layer name.
-// TODO IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
-// TODO it is necessary to call join unwrap on spawned threads to ensure
+// TODO: Update code to remove all the todo!() macros with log implementations.
+// TODO: make the converter back to non mut reference if possible.
+// TODO: Update docs of spellock and spellwin to justify their use being purely internal.
+// TODO: update the blog with latest API changes in spell-framework.
+// TODO: update the constant vals so that the new APIs are used.
+// TODO: and configuration file to ensure that a single widget is open for a single layer name.
+// TODO: IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
+// TODO: it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
-// TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
+// TODO: linux's DNF Buffers needs to be used to improve rendering and avoid conversions
 // from CPU to GPU and vice versa.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
-// TODO lock screen behaviour in a multi-monitor setup needs to be tested.
+// TODO: lock screen behaviour in a multi-monitor setup needs to be tested.
 // Provide a method in the macro to disable tracing_subsriber completely for some project
 // which want's to do it themselves.
 // cast spell macro should be having following values.
