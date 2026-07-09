@@ -611,14 +611,7 @@ impl SpellWin {
         popup_conf: PopupConf,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let popup_surface = self.states.compositor_state.create_surface(&self.queue);
-        let xdg_surface = self.xdg_shell.xdg_wm_base().get_xdg_surface(
-            // win.layer.as_ref().unwrap().wl_surface(),
-            &popup_surface,
-            &self.queue,
-            (),
-        );
         popup_surface.commit();
-        self.popup_manager.set_surface(xdg_surface);
         let position =
             XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
         position.set_size(popup_conf.width as i32, popup_conf.height as i32);
