@@ -4,9 +4,12 @@ use crate::wayland_adapter::{
 use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
     output::OutputState,
-    reexports::client::{
-        Connection, QueueHandle,
-        protocol::{wl_pointer, wl_seat},
+    reexports::{
+        client::{
+            Connection, Dispatch, QueueHandle,
+            protocol::{wl_pointer, wl_seat},
+        },
+        protocols::xdg::shell::client::xdg_surface::XdgSurface,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -16,27 +19,30 @@ use smithay_client_toolkit::{
         pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler},
         touch::TouchHandler,
     },
-    shell::{WaylandSurface, xdg::window::WindowHandler},
+    shell::{
+        WaylandSurface,
+        xdg::{XdgPositioner, popup::PopupHandler, window::WindowHandler},
+    },
 };
 use tracing::{info, trace, warn};
 
 impl WindowHandler for SpellWin {
     fn request_close(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        window: &smithay_client_toolkit::shell::xdg::window::Window,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::window::Window,
     ) {
         todo!()
     }
 
     fn configure(
         &mut self,
-        conn: &Connection,
-        qh: &QueueHandle<Self>,
-        window: &smithay_client_toolkit::shell::xdg::window::Window,
-        configure: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
-        serial: u32,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::window::Window,
+        _: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
+        _: u32,
     ) {
         todo!()
     }
@@ -439,6 +445,35 @@ impl PointerHandler for SpellWin {
     }
 }
 
+impl PopupHandler for SpellWin {
+    fn configure(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        popup: &smithay_client_toolkit::shell::xdg::popup::Popup,
+        _: smithay_client_toolkit::shell::xdg::popup::PopupConfigure,
+    ) {
+        let x = self.popup_manager.return_popup(popup);
+        if let Some(current_popup) = x {
+            current_popup.inner().wl_surface().commit();
+            if current_popup.first_configure() {
+                current_popup.converter_popup(current_popup.inner().wl_surface(), &self.queue);
+            }
+        } else {
+            warn!("Popup configured but not pushed to the manager");
+        }
+    }
+
+    fn done(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &smithay_client_toolkit::shell::xdg::popup::Popup,
+    ) {
+        todo!()
+    }
+}
+
 // TODO: FIND What is the use of registery_handlers here?
 impl ProvidesRegistryState for SpellWin {
     fn registry(&mut self) -> &mut RegistryState {
@@ -446,3 +481,29 @@ impl ProvidesRegistryState for SpellWin {
     }
     registry_handlers![OutputState, SeatState];
 }
+
+impl Dispatch<XdgSurface, ()> for SpellWin {
+    fn event(
+        _: &mut Self,
+        _: &XdgSurface,
+        _: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        todo!()
+    }
+}
+
+// impl Dispatch<XdgPositioner, ()> for SpellWin {
+//     fn event(
+//         _: &mut Self,
+//         _: &XdgPositioner,
+//         _: <XdgPositioner as smithay_client_toolkit::reexports::client::Proxy>::Event,
+//         _: &(),
+//         _: &Connection,
+//         _: &QueueHandle<Self>,
+//     ) {
+//         todo!();
+//     }
+// }

@@ -3,8 +3,8 @@
 //! window as called by many) is [SpellWin]. You can also implement a lock screen
 //! with [`SpellLock`].
 use crate::{
-    SpellAssociatedNew,
-    configure::{Dimension, HomeHandle, LayerConf, WindowConf, set_up_tracing},
+    PopupSlint, SpellAssociatedNew,
+    configure::{Dimension, HomeHandle, LayerConf, PopupConf, WindowConf, set_up_tracing},
     slint_adapter::{
         ADAPTERS, SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter,
     },
@@ -16,6 +16,7 @@ use crate::{
         way_helper::{
             FingerprintInfo, PointerState, UsernamePassConvo, set_config, set_event_sources,
         },
+        widget_impls::popup_impl::PopupManager,
     },
 };
 use i_slint_core::items::MouseCursor;
@@ -30,6 +31,7 @@ use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm, delegate_touch,
+    delegate_xdg_popup, delegate_xdg_shell,
     output::{self, OutputHandler, OutputState},
     reexports::{
         calloop::{
@@ -59,6 +61,7 @@ use smithay_client_toolkit::{
             KeyboardInteractivity, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
+        xdg::{XdgPositioner, XdgShell, popup::Popup},
     },
     shm::{
         Shm, ShmHandler,
@@ -92,6 +95,7 @@ pub(crate) struct States {
     pub(crate) registry_state: RegistryState,
     pub(crate) seat_state: SeatState,
     pub(crate) output_state: OutputState,
+    pub(crate) compositor_state: CompositorState,
     pub(crate) pointer_state: PointerState,
     pub(crate) keyboard_state: Option<WlKeyboard>,
     pub(crate) touch_state: Option<WlTouch>,
@@ -107,7 +111,7 @@ pub struct SpellWin {
     pub loop_handle: LoopHandle<'static, SpellWin>,
     /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
-    // pub(crate) queue: QueueHandle<SpellWin>,
+    pub(crate) queue: QueueHandle<SpellWin>,
     pub(crate) buffer: Option<Buffer>,
     pub(crate) states: States,
     pub(crate) layer: Option<LayerSurface>,
@@ -119,12 +123,12 @@ pub struct SpellWin {
     pub layer_name: String,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
+    pub(crate) xdg_shell: XdgShell,
+    pub(crate) popup_manager: PopupManager,
     /// Event loop which runs and refreshes UI.
     pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     /// Span required for proper logging.
     pub span: span::Span,
-    // #[allow(dead_code)]
-    // pub(crate) backspace: calloop::RegistrationToken,
 }
 
 impl std::fmt::Debug for SpellWin {
@@ -158,6 +162,7 @@ impl SpellWin {
         let surface = compositor.create_surface(&qh);
         let viewporter_state =
             ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
+        let xdg_shell = XdgShell::bind(&globals, &qh).expect("Couldn't bind xdg_shell");
         let pointer_state = PointerState {
             pointer: None,
             pointer_data: None,
@@ -172,12 +177,13 @@ impl SpellWin {
             adapter: None,
             loop_handle: event_loop.handle(),
             ipc_handler: None,
-            // queue: qh.clone(),
+            queue: qh.clone(),
             buffer: None,
             states: States {
                 registry_state: RegistryState::new(&globals),
                 seat_state: SeatState::new(&globals, &qh),
                 output_state: OutputState::new(&globals, &qh),
+                compositor_state: compositor,
                 pointer_state,
                 keyboard_state: None,
                 touch_state: None,
@@ -192,6 +198,8 @@ impl SpellWin {
             layer_name: layer_name.clone(),
             input_region,
             opaque_region,
+            xdg_shell,
+            popup_manager: PopupManager::new(),
             event_loop: Rc::new(RefCell::new(event_loop)),
             span: span!(Level::INFO, "widget", name = layer_name.as_str(),),
         };
@@ -288,6 +296,7 @@ impl SpellWin {
             window_conf.evaluated_width,
             window_conf.evaluated_height,
         );
+        // win.popup_manager.set_pool(pool_mut.clone());
         win.adapter = Some(adapter_value.clone());
         win.buffer = Some(way_pri_buffer);
 
@@ -328,7 +337,6 @@ impl SpellWin {
             FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let surface: &WlSurface = win.layer.as_ref().unwrap().wl_surface();
         let fractional_scale = fractional_scale_state.get_scale(surface, &qh);
-
         let viewporter = viewporter_state.get_viewport(surface, &qh, fractional_scale);
         win.states.viewporter = Some(viewporter);
 
@@ -591,11 +599,46 @@ impl SpellWin {
 
     /// This method is used to set exclusive zone. Generally, useful when
     /// dimensions of width are different than exclusive zone you want.
+    // self.set_config_internal();
     pub fn set_exclusive_zone(&mut self, val: i32) {
-        // self.set_config_internal();
         self.config.exclusive_zone = Some(val);
         self.layer.as_ref().unwrap().set_exclusive_zone(val);
         self.layer.as_ref().unwrap().commit();
+    }
+
+    pub fn open_popup<T: PopupSlint + 'static>(
+        &mut self,
+        popup_conf: PopupConf,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let popup_surface = self.states.compositor_state.create_surface(&self.queue);
+        popup_surface.commit();
+        let position =
+            XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
+        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
+        popup_surface.commit();
+        if let Ok(popup) = Popup::from_surface(
+            // Some(self.popup_manager.xdg_surface()),
+            None,
+            &position,
+            &self.queue,
+            popup_surface,
+            &self.xdg_shell,
+        ) {
+            let pool = SlotPool::new(
+                (popup_conf.width * popup_conf.height * 4) as usize,
+                &self.states.shm,
+            )
+            .expect("Unable to create slot pool for popup");
+            self.popup_manager.set_pool(Rc::new(RefCell::new(pool)));
+            self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
+            popup.wl_surface().commit();
+            self.popup_manager.create_popup::<T>(popup, popup_conf);
+            info!("Popup created");
+            Ok(())
+        } else {
+            warn!("couldn't create a popup");
+            Err("Couldn't create Popup".into())
+        }
     }
 }
 
@@ -614,6 +657,8 @@ impl SpellAssociatedNew for SpellWin {
 }
 
 delegate_compositor!(SpellWin);
+delegate_xdg_shell!(SpellWin);
+delegate_xdg_popup!(SpellWin);
 delegate_registry!(SpellWin);
 delegate_output!(SpellWin);
 delegate_shm!(SpellWin);
@@ -1323,7 +1368,15 @@ delegate_session_lock!(SpellLock);
 delegate_seat!(SpellLock);
 
 /// Future XDGpopup implementation will occur on this struct;
-pub struct SpellXdg;
+pub struct SpellXDGPopup {
+    // frontend: Box<dyn PopupSlint>,
+    adapter: Rc<SpellSkiaWinAdapter>,
+    // evaluated_width: u32,
+    // evaluated_height: u32,
+    popup: Popup,
+    buffer: Buffer,
+    first_configure: Cell<bool>,
+}
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

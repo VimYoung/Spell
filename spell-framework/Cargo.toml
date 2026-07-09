@@ -25,7 +25,9 @@ slint = { version = "1.15.1", default-features = false, features = [
   "renderer-skia",
   "compat-1-2",
 ] }
-smithay-client-toolkit = { version = "0.20.0", default-features = false, features = [
+smithay-client-toolkit = { version = "0.20.0",
+    # path = "../../client-toolkit/",
+    default-features = false, features = [
   "xkbcommon",
 ] }
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }

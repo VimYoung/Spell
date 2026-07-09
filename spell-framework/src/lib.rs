@@ -23,10 +23,16 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
+    pub use crate::configure::{
+        Dimension, PopupConf, PopupSettings, WindowConf, WindowConfBuilder,
+    };
+    pub use smithay_client_toolkit::reexports::client::{
+        QueueHandle, protocol::wl_surface::WlSurface,
+    };
     pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
     pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
     pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
+    pub use smithay_client_toolkit::shell::xdg::popup::Popup;
 }
 /// Components of this module are not be used by end user directly. This module contains
 /// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
@@ -39,8 +45,14 @@ pub mod macro_internal {
     };
     pub use tracing::{info, span::Span, warn};
 }
+use smithay_client_toolkit::{
+    reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
+    shell::xdg::popup::Popup,
+};
 use std::error::Error;
 use tracing::{Level, span, trace};
+
+use crate::{configure::PopupSettings, wayland_adapter::SpellWin};
 
 /// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
@@ -74,6 +86,22 @@ pub trait SpellAssociatedNew: std::fmt::Debug {
     }
 }
 
+pub trait PopupSlint {
+    fn create_new(settings: PopupSettings) -> Self
+    where
+        Self: Sized;
+
+    fn converter_popup<'a>(
+        &self,
+        wl_surface: &'a WlSurface,
+        qh: &'a QueueHandle<SpellWin>,
+    ) -> &'a WlSurface;
+
+    fn inner(&self) -> &Popup;
+
+    fn first_configure(&self) -> bool;
+}
+
 /// event loop function internally used by [`cast_spell`] for single widget setups.
 /// Not to be used by end user,
 pub fn cast_spell_inner<S: SpellAssociatedNew>(mut waywindow: S) -> Result<(), Box<dyn Error>> {
@@ -100,6 +128,7 @@ pub fn cast_spells_new(
     }
 }
 
+// TODO make the converter back to non mut reference if possible.
 // TODO Update docs of spellock and spellwin to justify their use being purely internal.
 // TODO update the blog with latest API changes in spell-framework.
 // TODO update the constant vals so that the new APIs are used.
@@ -118,8 +147,4 @@ pub fn cast_spells_new(
 // 1. Disable log: should disable setting subscriber, generally for the project to use or for
 // someone to set their own.
 // 2. forge: provide a forge instance to run independently.
-// 3. exclusive_zone: true or false or with specified value.
-// 4. it should have the option to take a window_conf or directly the window configurations
-// into the macro, removing the need to define it previously.
-// 5. monitor: Specify the monitor to show the widget in.
 // Build a consistent error type to deal with CLI, dbus and window creation errors
