@@ -52,13 +52,13 @@ impl PopupManager {
     pub(crate) fn set_pool(&mut self, pool: Rc<RefCell<SlotPool>>) {
         self.pool = Some(pool);
     }
-    pub(crate) fn xdg_surface(&self) -> &XdgSurface {
-        self.xdg_surface.as_ref().unwrap()
-    }
+    // pub(crate) fn xdg_surface(&self) -> &XdgSurface {
+    //     self.xdg_surface.as_ref().unwrap()
+    // }
 
-    pub(crate) fn set_surface(&mut self, surface: XdgSurface) {
-        self.xdg_surface = Some(surface);
-    }
+    // pub(crate) fn set_surface(&mut self, surface: XdgSurface) {
+    //     self.xdg_surface = Some(surface);
+    // }
     pub(crate) fn create_popup<T: PopupSlint + 'static>(
         &mut self,
         popup: Popup,
