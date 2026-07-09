@@ -1,5 +1,6 @@
-use crate::wayland_adapter::{
-    SpellWin, pointer_button::map_pointer_button, way_helper::get_string,
+use crate::{
+    slint_adapter::SpellSkiaWinAdapter,
+    wayland_adapter::{SpellWin, pointer_button::map_pointer_button, way_helper::get_string},
 };
 use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
@@ -316,10 +317,15 @@ impl PointerHandler for SpellWin {
     ) {
         use PointerEventKind::*;
         for event in events {
-            // Ignore events for other surfaces
-            if &event.surface != self.layer.as_ref().unwrap().wl_surface() {
-                continue;
-            }
+            let adapter: &std::rc::Rc<SpellSkiaWinAdapter> =
+                if let Some(popup) = self.popup_manager.return_adapter(&event.surface) {
+                    popup
+                } else if &event.surface == self.layer.as_ref().unwrap().wl_surface() {
+                    self.adapter.as_ref().unwrap()
+                } else {
+                    continue;
+                };
+
             match event.kind {
                 Enter { serial } => {
                     trace!(
@@ -327,9 +333,7 @@ impl PointerHandler for SpellWin {
                         serial, event.position
                     );
 
-                    self.adapter
-                        .as_ref()
-                        .unwrap()
+                    adapter
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -346,19 +350,17 @@ impl PointerHandler for SpellWin {
                 }
                 Leave { .. } => {
                     trace!("Pointer left: {:?}", event.position);
-                    self.adapter
-                        .as_ref()
-                        .unwrap()
+
+                    adapter
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap_or_else(|err| {
                             warn!("Pointer exit event failed with error: {:?}", err)
                         });
                 }
                 Motion { .. } => {
-                    // debug!("Pointer entered @{:?}", event.position);
-                    self.adapter
-                        .as_ref()
-                        .unwrap()
+                    trace!("Pointer entered @{:?}", event.position);
+
+                    adapter
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -371,9 +373,8 @@ impl PointerHandler for SpellWin {
                 }
                 Press { button, .. } => {
                     trace!("Press {:?} @ {:?}", button, event.position);
-                    self.adapter
-                        .as_ref()
-                        .unwrap()
+
+                    adapter
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -388,9 +389,7 @@ impl PointerHandler for SpellWin {
                 Release { button, .. } => {
                     trace!("Release {:?} @ {:?}", button, event.position);
 
-                    self.adapter
-                        .as_ref()
-                        .unwrap()
+                    adapter
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -408,10 +407,9 @@ impl PointerHandler for SpellWin {
                     ..
                 } => {
                     trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
+
                     if !self.natural_scroll {
-                        self.adapter
-                            .as_ref()
-                            .unwrap()
+                        adapter
                             .try_dispatch_event(WindowEvent::PointerScrolled {
                                 position: slint::LogicalPosition {
                                     x: event.position.0 as f32,
@@ -424,9 +422,7 @@ impl PointerHandler for SpellWin {
                                 warn!("Pointer scroll event failed with error: {:?}", err)
                             });
                     } else {
-                        self.adapter
-                            .as_ref()
-                            .unwrap()
+                        adapter
                             .try_dispatch_event(WindowEvent::PointerScrolled {
                                 position: slint::LogicalPosition {
                                     x: event.position.0 as f32,
@@ -455,6 +451,7 @@ impl PopupHandler for SpellWin {
     ) {
         let x = self.popup_manager.return_popup(popup);
         if let Some(current_popup) = x {
+            // FIXME: Is this commit required?
             current_popup.inner().wl_surface().commit();
             if current_popup.first_configure() {
                 current_popup.converter_popup(current_popup.inner().wl_surface(), &self.queue);

@@ -52,7 +52,9 @@ use smithay_client_toolkit::{
 use std::error::Error;
 use tracing::{Level, span, trace};
 
-use crate::{configure::PopupSettings, wayland_adapter::SpellWin};
+use crate::{
+    configure::PopupSettings, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin,
+};
 
 /// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
@@ -96,6 +98,8 @@ pub trait PopupSlint {
     fn inner(&self) -> &Popup;
 
     fn first_configure(&self) -> bool;
+
+    fn adapter(&self) -> &std::rc::Rc<SpellSkiaWinAdapter>;
 }
 
 /// event loop function internally used by [`cast_spell`] for single widget setups.

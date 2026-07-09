@@ -738,6 +738,7 @@ impl CompositorHandler for SpellWin {
         _time: u32,
     ) {
         self.converter(qh);
+        self.popup_manager.redraw_popups(qh);
     }
 
     fn surface_enter(

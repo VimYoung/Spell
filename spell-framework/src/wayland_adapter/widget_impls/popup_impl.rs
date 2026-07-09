@@ -70,6 +70,24 @@ impl PopupManager {
         });
         self.popups.push(Box::new(popup));
     }
+
+    pub(crate) fn redraw_popups(&self, qh: &QueueHandle<SpellWin>) {
+        for popup in self.popups.iter() {
+            popup.converter_popup(popup.inner().wl_surface(), qh);
+        }
+    }
+
+    pub(crate) fn return_adapter(
+        &self,
+        surface: &WlSurface,
+    ) -> Option<&std::rc::Rc<SpellSkiaWinAdapter>> {
+        for popup in self.popups.iter() {
+            if popup.inner().wl_surface() == surface {
+                return Some(popup.adapter());
+            }
+        }
+        None
+    }
 }
 
 impl SpellXDGPopup {
@@ -102,6 +120,10 @@ impl SpellXDGPopup {
         }
     }
 
+    pub fn adapter(&self) -> &std::rc::Rc<SpellSkiaWinAdapter> {
+        &self.adapter
+    }
+
     pub fn converter_popup<'a>(&self, wl_surface: &'a WlSurface, qh: &'a QueueHandle<SpellWin>) {
         slint::platform::update_timers_and_animations();
         let width: u32 = self.adapter.as_ref().size.get().width;
@@ -109,7 +131,6 @@ impl SpellXDGPopup {
         let window_adapter = self.adapter.clone();
 
         let redraw_val: bool = window_adapter.draw_if_needed();
-
         let buffer = &self.buffer;
         if self.first_configure.get() || redraw_val {
             // if self.first_configure {
