@@ -237,76 +237,6 @@ impl KeyboardHandler for SpellWin {
     }
 }
 
-impl SeatHandler for SpellWin {
-    fn seat_state(&mut self) -> &mut SeatState {
-        &mut self.states.seat_state
-    }
-
-    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-
-    fn new_capability(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        seat: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        if capability == Capability::Keyboard && self.states.keyboard_state.is_none() {
-            info!("Setting keyboard capability");
-            let keyboard = self
-                .states
-                .seat_state
-                .get_keyboard(qh, &seat, None)
-                .expect("Failed to create keyboard");
-            self.states.keyboard_state = Some(keyboard);
-        }
-        if capability == Capability::Touch && self.states.touch_state.is_none() {
-            info!("Setting touch Capability");
-            let touch = self
-                .states
-                .seat_state
-                .get_touch(qh, &seat)
-                .expect("Failed to create touch");
-            self.states.touch_state = Some(touch);
-        }
-        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
-            info!("Setting pointer capability");
-            let pointer = self
-                .states
-                .seat_state
-                .get_pointer(qh, &seat)
-                .expect("Failed to create pointer");
-            let pointer_data = PointerData::new(seat);
-            self.states.pointer_state.pointer = Some(pointer);
-            self.states.pointer_state.pointer_data = Some(pointer_data);
-        }
-    }
-
-    fn remove_capability(
-        &mut self,
-        _conn: &Connection,
-        _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
-        capability: Capability,
-    ) {
-        if capability == Capability::Keyboard && self.states.keyboard_state.is_some() {
-            info!("Unsetting keyboard capability");
-            self.states.keyboard_state.take().unwrap().release();
-        }
-
-        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_some() {
-            info!("Unsetting pointer capability");
-            self.states.pointer_state.pointer.take().unwrap().release();
-        }
-        if capability == Capability::Touch && self.states.touch_state.is_some() {
-            info!("Unsetting pointer capability");
-            self.states.touch_state.take().unwrap().release();
-        }
-    }
-
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
-}
-
 impl PointerHandler for SpellWin {
     fn pointer_frame(
         &mut self,
@@ -439,6 +369,76 @@ impl PointerHandler for SpellWin {
             }
         }
     }
+}
+
+impl SeatHandler for SpellWin {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.states.seat_state
+    }
+
+    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+
+    fn new_capability(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard && self.states.keyboard_state.is_none() {
+            info!("Setting keyboard capability");
+            let keyboard = self
+                .states
+                .seat_state
+                .get_keyboard(qh, &seat, None)
+                .expect("Failed to create keyboard");
+            self.states.keyboard_state = Some(keyboard);
+        }
+        if capability == Capability::Touch && self.states.touch_state.is_none() {
+            info!("Setting touch Capability");
+            let touch = self
+                .states
+                .seat_state
+                .get_touch(qh, &seat)
+                .expect("Failed to create touch");
+            self.states.touch_state = Some(touch);
+        }
+        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_none() {
+            info!("Setting pointer capability");
+            let pointer = self
+                .states
+                .seat_state
+                .get_pointer(qh, &seat)
+                .expect("Failed to create pointer");
+            let pointer_data = PointerData::new(seat);
+            self.states.pointer_state.pointer = Some(pointer);
+            self.states.pointer_state.pointer_data = Some(pointer_data);
+        }
+    }
+
+    fn remove_capability(
+        &mut self,
+        _conn: &Connection,
+        _: &QueueHandle<Self>,
+        _: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Keyboard && self.states.keyboard_state.is_some() {
+            info!("Unsetting keyboard capability");
+            self.states.keyboard_state.take().unwrap().release();
+        }
+
+        if capability == Capability::Pointer && self.states.pointer_state.pointer.is_some() {
+            info!("Unsetting pointer capability");
+            self.states.pointer_state.pointer.take().unwrap().release();
+        }
+        if capability == Capability::Touch && self.states.touch_state.is_some() {
+            info!("Unsetting pointer capability");
+            self.states.touch_state.take().unwrap().release();
+        }
+    }
+
+    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
 impl PopupHandler for SpellWin {

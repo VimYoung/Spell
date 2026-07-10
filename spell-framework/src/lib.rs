@@ -23,16 +23,23 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::configure::{
-        Dimension, PopupConf, PopupSettings, WindowConf, WindowConfBuilder,
+    pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
+    pub mod internal {
+        pub use smithay_client_toolkit::{
+            reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
+            shell::xdg::popup::Popup,
+        };
+    }
+    pub use smithay_client_toolkit::shell::wlr_layer::{
+        Anchor as LayerAnchor, KeyboardInteractivity as BoardType, Layer as LayerType,
     };
-    pub use smithay_client_toolkit::reexports::client::{
-        QueueHandle, protocol::wl_surface::WlSurface,
-    };
-    pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
-    pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
-    pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
-    pub use smithay_client_toolkit::shell::xdg::popup::Popup;
+    pub mod popup {
+        pub use crate::configure::{PopupConf, PopupSettings};
+        pub use smithay_client_toolkit::reexports::protocols::xdg::shell::client::xdg_positioner::{
+            Anchor as PopupAnchor,
+            Gravity as PopupGravity
+        };
+    }
 }
 /// Components of this module are not be used by end user directly. This module contains
 /// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
@@ -128,6 +135,8 @@ pub fn cast_spells_new(
     }
 }
 
+// TODO: Various functions can be sufficed with pub(super) and not pub(crate), reevaluate every
+// function.
 // TODO: Update code to remove all the todo!() macros with log implementations.
 // TODO: make the converter back to non mut reference if possible.
 // TODO: Update docs of spellock and spellwin to justify their use being purely internal.
