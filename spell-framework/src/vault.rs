@@ -51,15 +51,17 @@ pub enum DbusSignalEvent {
     },
 }
 
-/// Channel to send notification events to the main dbus thread.
-/// Events need to be sent from the main dbus thread that is authenticated as "/org/freedesktop/Notifications" or dbus will reject them.
-pub static DBUS_SIGNAL_SENDER: OnceLock<tokio::sync::mpsc::UnboundedSender<DbusSignalEvent>> = OnceLock::new();
-
 /// Holds blocking methods to notify when a notification has bee closed.
-#[derive(Default)]
-pub struct BlockingNotification;
+pub struct BlockingNotification {
+    sender: tokio::sync::mpsc::UnboundedSender<DbusSignalEvent>,
+}
 
 impl BlockingNotification {
+    /// Constructor accepting the sender as a formal parameter.
+    pub fn new(sender: tokio::sync::mpsc::UnboundedSender<DbusSignalEvent>) -> Self {
+        Self { sender }
+    }
+
     /// Method to ask the server to emit a signal for closing a particular notificaiton.
     pub fn call_close(
         &self,
@@ -68,11 +70,7 @@ impl BlockingNotification {
     ) -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("Close triggered for ID: {}, Reason: {:?}", id, reason);
         
-        if let Some(tx) = DBUS_SIGNAL_SENDER.get() {
-            let _ = tx.send(DbusSignalEvent::NotificationClosed { id, reason: reason as u32 });
-        } else {
-            tracing::error!("DBUS_SIGNAL_SENDER is not initialized!");
-        }
+        let _ = self.sender.send(DbusSignalEvent::NotificationClosed { id, reason: reason as u32 });
         Ok(())
     }
 
@@ -84,11 +82,7 @@ impl BlockingNotification {
     ) -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("Action triggered for ID: {}, Action Key: '{}'", id, action_key);
 
-        if let Some(tx) = DBUS_SIGNAL_SENDER.get() {
-            let _ = tx.send(DbusSignalEvent::ActionInvoked { id, action_key: action_key.to_string() });
-        } else {
-            tracing::error!("DBUS_SIGNAL_SENDER is not initialized!");
-        }
+        let _ = self.sender.send(DbusSignalEvent::ActionInvoked { id, action_key: action_key.to_string() });
         Ok(())
     }
 }
