@@ -1,9 +1,7 @@
 use crate::{
     vault::{
-        BlockingNotification, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout,
-        Urgency,
-    },
-    wayland_adapter::SpellWin,
+        BlockingNotification, DbusSignalEvent, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout, Urgency,
+    }, wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
 use std::{cmp::Ordering, collections::HashMap};
@@ -16,6 +14,9 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
     let (sender, rx) = channel::channel::<NotifyEvent>();
     // let (sender_async, rx_async) = channel::channel::<NotifyEvent>();
     // NOTIFICATION_EVENT.get_or_init(|| sender_async);
+    
+    let (tx, dbus_rx) = tokio::sync::mpsc::unbounded_channel::<DbusSignalEvent>();
+
     let layer_name = win.layer_name.clone();
     let sender_cl = sender.clone();
     std::thread::spawn(move || {
@@ -25,11 +26,11 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
             .unwrap();
         rt.block_on(async move {
             //TODO handle and report the error here
-            let _ = notification_service_enter(sender_cl, layer_name).await;
+            let _ = notification_service_enter(sender_cl, layer_name, dbus_rx).await;
         });
     });
 
-    let _ = NOTIFICATION_EVENT.set(BlockingNotification);
+    let _ = NOTIFICATION_EVENT.set(BlockingNotification::new(tx));
     let _ = win
         .loop_handle
         .clone()
@@ -58,6 +59,7 @@ pub(crate) enum NotifyEvent {
 async fn notification_service_enter(
     sender: Sender<NotifyEvent>,
     layer_name: String,
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<DbusSignalEvent>,
 ) -> zbus::fdo::Result<()> {
     let conn = zbus::Connection::session().await?;
     conn.object_server()
@@ -76,7 +78,25 @@ async fn notification_service_enter(
         warn!("Error When creating notification crate {:?}", err);
     }
     info!("Notification service is live with the provided name");
-    std::future::pending::<()>().await;
+
+    while let Some(event) = rx.recv().await {
+        if let Ok(iface_ref) = conn
+            .object_server()
+            .interface::<_, NotificationHandler>("/org/freedesktop/Notifications")
+            .await
+        {
+            let emitter = iface_ref.signal_emitter();
+            match event {
+                DbusSignalEvent::ActionInvoked { id, action_key } => {
+                    let _ = NotificationHandler::action_invoked(&emitter, id, &action_key).await;
+                }
+                DbusSignalEvent::NotificationClosed { id, reason } => {
+                    let _ = NotificationHandler::notification_closed(&emitter, id, reason).await;
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
