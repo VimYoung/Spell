@@ -738,6 +738,7 @@ impl CompositorHandler for SpellWin {
         _time: u32,
     ) {
         self.converter(qh);
+        self.popup_manager.redraw_popups(qh);
     }
 
     fn surface_enter(
@@ -1347,16 +1348,11 @@ impl LockHandle {
     /// to unlock the lockscreen.
     pub fn verify_fingerprint(&self, error_callback: Box<dyn FnOnce() + Send>) {
         self.0.insert_idle(move |app_data| {
-            // if let Err(err) = app_data.unlock_finger() {
-            //     println!("{:?}", err);
-            //     error_callback();
-            // } else {
-            //     println!("Passed");
-            // }
             app_data.unlock_finger(error_callback);
         });
     }
 }
+
 delegate_keyboard!(SpellLock);
 delegate_compositor!(SpellLock);
 delegate_output!(SpellLock);
@@ -1369,10 +1365,7 @@ delegate_seat!(SpellLock);
 
 /// Future XDGpopup implementation will occur on this struct;
 pub struct SpellXDGPopup {
-    // frontend: Box<dyn PopupSlint>,
     adapter: Rc<SpellSkiaWinAdapter>,
-    // evaluated_width: u32,
-    // evaluated_height: u32,
     popup: Popup,
     buffer: Buffer,
     first_configure: Cell<bool>,

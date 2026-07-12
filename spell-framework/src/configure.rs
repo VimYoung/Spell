@@ -1,3 +1,4 @@
+use crate::layer_properties::popup::{PopupAnchor, PopupGravity};
 use smithay_client_toolkit::{
     shell::{
         wlr_layer::{Anchor, KeyboardInteractivity, Layer},
@@ -34,6 +35,9 @@ pub struct PopupSettings {
 pub struct PopupConf {
     pub width: u32,
     pub height: u32,
+    pub anchor: PopupAnchor,
+    pub gravity: PopupGravity,
+    pub anchor_rect: (i32, i32, i32, i32),
 }
 
 impl From<u32> for Dimension {
@@ -47,9 +51,10 @@ impl From<u32> for Dimension {
 /// or `Percentage` is provided in Dimension, output name is compulsary to be defined.
 /// To maintain backward compatibility, Dimension implements into from `u32` in which
 /// case it simply returns an instant of [`Dimension::Pixel`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Dimension {
     /// Full screen Dimension of the selected monitor.
+    #[default]
     Full,
     /// Whole number percentage Dimension of width/height, relative to the selected monitor.
     Percentage(u32),
@@ -57,11 +62,7 @@ pub enum Dimension {
     Pixel(u32),
 }
 
-impl Default for Dimension {
-    fn default() -> Self {
-        Dimension::Full
-    }
-}
+// FIXME: Privatise WindowConf values and move the documentation to WindowConfBuilder.
 
 /// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
 /// of generated code) for defining the specifications of the widget.

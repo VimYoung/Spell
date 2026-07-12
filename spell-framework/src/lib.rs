@@ -5,7 +5,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico"
 )]
 #![doc = include_str!("../docs/entry.md")]
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 mod configure;
 #[cfg(docsrs)]
 mod dummy_skia_docs;
@@ -23,16 +23,23 @@ pub mod wayland_adapter;
 /// types from this module to implement relevant features. See docs of related objects for
 /// their overview.
 pub mod layer_properties {
-    pub use crate::configure::{
-        Dimension, PopupConf, PopupSettings, WindowConf, WindowConfBuilder,
+    pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
+    pub mod internal {
+        pub use smithay_client_toolkit::{
+            reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
+            shell::xdg::popup::Popup,
+        };
+    }
+    pub use smithay_client_toolkit::shell::wlr_layer::{
+        Anchor as LayerAnchor, KeyboardInteractivity as BoardType, Layer as LayerType,
     };
-    pub use smithay_client_toolkit::reexports::client::{
-        QueueHandle, protocol::wl_surface::WlSurface,
-    };
-    pub use smithay_client_toolkit::shell::wlr_layer::Anchor as LayerAnchor;
-    pub use smithay_client_toolkit::shell::wlr_layer::KeyboardInteractivity as BoardType;
-    pub use smithay_client_toolkit::shell::wlr_layer::Layer as LayerType;
-    pub use smithay_client_toolkit::shell::xdg::popup::Popup;
+    pub mod popup {
+        pub use crate::configure::{PopupConf, PopupSettings};
+        pub use smithay_client_toolkit::reexports::protocols::xdg::shell::client::xdg_positioner::{
+            Anchor as PopupAnchor,
+            Gravity as PopupGravity
+        };
+    }
 }
 /// Components of this module are not be used by end user directly. This module contains
 /// certain reexports used by public facing macros like [cast_spell] and [generate_widgets]
@@ -52,7 +59,9 @@ use smithay_client_toolkit::{
 use std::error::Error;
 use tracing::{Level, span, trace};
 
-use crate::{configure::PopupSettings, wayland_adapter::SpellWin};
+use crate::{
+    configure::PopupSettings, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin,
+};
 
 /// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
@@ -91,15 +100,13 @@ pub trait PopupSlint {
     where
         Self: Sized;
 
-    fn converter_popup<'a>(
-        &self,
-        wl_surface: &'a WlSurface,
-        qh: &'a QueueHandle<SpellWin>,
-    ) -> &'a WlSurface;
+    fn converter_popup(&self, wl_surface: &WlSurface, qh: &QueueHandle<SpellWin>);
 
     fn inner(&self) -> &Popup;
 
     fn first_configure(&self) -> bool;
+
+    fn adapter(&self) -> &std::rc::Rc<SpellSkiaWinAdapter>;
 }
 
 /// event loop function internally used by [`cast_spell`] for single widget setups.
@@ -128,19 +135,22 @@ pub fn cast_spells_new(
     }
 }
 
-// TODO make the converter back to non mut reference if possible.
-// TODO Update docs of spellock and spellwin to justify their use being purely internal.
-// TODO update the blog with latest API changes in spell-framework.
-// TODO update the constant vals so that the new APIs are used.
-// TODO and configuration file to ensure that a single widget is open for a single layer name.
-// TODO IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
-// TODO it is necessary to call join unwrap on spawned threads to ensure
+// TODO: Various functions can be sufficed with pub(super) and not pub(crate), reevaluate every
+// function.
+// TODO: Update code to remove all the todo!() macros with log implementations.
+// TODO: make the converter back to non mut reference if possible.
+// TODO: Update docs of spellock and spellwin to justify their use being purely internal.
+// TODO: update the blog with latest API changes in spell-framework.
+// TODO: update the constant vals so that the new APIs are used.
+// TODO: and configuration file to ensure that a single widget is open for a single layer name.
+// TODO: IMPORTANT LOGGING SUBSCRIBER LOGIC NEEDS TO BE UNIFIED AND NOT WINDOW SPECIFIC.
+// TODO: it is necessary to call join unwrap on spawned threads to ensure
 // that they are closed when main thread closes.
-// TODO linux's DNF Buffers needs to be used to improve rendering and avoid conversions
+// TODO: linux's DNF Buffers needs to be used to improve rendering and avoid conversions
 // from CPU to GPU and vice versa.
 // TO REMEMBER I removed dirty region from spellskiawinadapter but it can be added
 // if I want to make use of the dirty region information to strengthen my rendering.
-// TODO lock screen behaviour in a multi-monitor setup needs to be tested.
+// TODO: lock screen behaviour in a multi-monitor setup needs to be tested.
 // Provide a method in the macro to disable tracing_subsriber completely for some project
 // which want's to do it themselves.
 // cast spell macro should be having following values.
