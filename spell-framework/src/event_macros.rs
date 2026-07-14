@@ -84,7 +84,7 @@ macro_rules! generate_widgets {
 
                     pub fn open_popup<T: $crate::PopupSlint + 'static>(
                         &mut self,
-                        popup_conf: $crate::layer_properties::PopupConf,
+                        popup_conf: $crate::layer_properties::popup::PopupConf,
                     ) -> Result<(), Box<dyn std::error::Error>> {
                         self.way.open_popup::<T>(popup_conf)
                     }
