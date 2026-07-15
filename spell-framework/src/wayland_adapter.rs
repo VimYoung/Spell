@@ -82,7 +82,7 @@ pub use widget_impls::lock_impl::SpellSlintLock;
 mod fractional_scaling;
 mod pointer_button;
 mod slint_to_wl_cursor_mapping;
-mod viewporter;
+pub(crate) mod viewporter;
 mod way_helper;
 mod widget_impls;
 
@@ -100,7 +100,8 @@ pub(crate) struct States {
     pub(crate) keyboard_state: Option<WlKeyboard>,
     pub(crate) touch_state: Option<WlTouch>,
     pub(crate) shm: Shm,
-    pub(crate) viewporter: Option<Viewport>,
+    pub(crate) viewporter_state: ViewporterState,
+    pub(crate) fractional_scale_state: FractionalScaleState,
 }
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
@@ -123,6 +124,7 @@ pub struct SpellWin {
     pub layer_name: String,
     pub(crate) input_region: Region,
     pub(crate) opaque_region: Region,
+    pub(crate) viewport: Option<Viewport>,
     pub(crate) xdg_shell: XdgShell,
     pub(crate) popup_manager: PopupManager,
     /// Event loop which runs and refreshes UI.
@@ -162,6 +164,8 @@ impl SpellWin {
         let surface = compositor.create_surface(&qh);
         let viewporter_state =
             ViewporterState::bind(&globals, &qh).expect("Couldn't set viewporter");
+        let fractional_scale_state: FractionalScaleState =
+            FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let xdg_shell = XdgShell::bind(&globals, &qh).expect("Couldn't bind xdg_shell");
         let pointer_state = PointerState {
             pointer: None,
@@ -188,7 +192,8 @@ impl SpellWin {
                 keyboard_state: None,
                 touch_state: None,
                 shm,
-                viewporter: None,
+                viewporter_state,
+                fractional_scale_state,
             },
             layer: None,
             first_configure: Cell::new(true),
@@ -198,6 +203,7 @@ impl SpellWin {
             layer_name: layer_name.clone(),
             input_region,
             opaque_region,
+            viewport: None,
             xdg_shell,
             popup_manager: PopupManager::new(),
             event_loop: Rc::new(RefCell::new(event_loop)),
@@ -333,12 +339,13 @@ impl SpellWin {
             warn!("Received roundtrip error: {}", err);
         }
         win.layer = Some(layer);
-        let fractional_scale_state: FractionalScaleState =
-            FractionalScaleState::bind(&globals, &qh).expect("Fractional Scale couldn't be set");
         let surface: &WlSurface = win.layer.as_ref().unwrap().wl_surface();
-        let fractional_scale = fractional_scale_state.get_scale(surface, &qh);
-        let viewporter = viewporter_state.get_viewport(surface, &qh, fractional_scale);
-        win.states.viewporter = Some(viewporter);
+        let fractional_scale = win.states.fractional_scale_state.get_scale(surface, &qh);
+        let viewport = win
+            .states
+            .viewporter_state
+            .get_viewport(surface, &qh, fractional_scale);
+        win.viewport = Some(viewport);
 
         win.layer.as_ref().unwrap().commit();
         set_event_sources(
@@ -611,11 +618,22 @@ impl SpellWin {
         popup_conf: PopupConf,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let popup_surface = self.states.compositor_state.create_surface(&self.queue);
-        popup_surface.commit();
+        // popup_surface.commit();
         let position =
             XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
         position.set_size(popup_conf.width as i32, popup_conf.height as i32);
-        popup_surface.commit();
+        position.set_parent_size(
+            self.config.evaluated_width as i32,
+            self.config.evaluated_height as i32,
+        );
+        position.set_anchor(popup_conf.anchor);
+        position.set_anchor_rect(
+            popup_conf.anchor_rect.0,
+            popup_conf.anchor_rect.1,
+            popup_conf.anchor_rect.2,
+            popup_conf.anchor_rect.3,
+        );
+        // popup_surface.commit();
         if let Ok(popup) = Popup::from_surface(
             // Some(self.popup_manager.xdg_surface()),
             None,
@@ -631,8 +649,15 @@ impl SpellWin {
             .expect("Unable to create slot pool for popup");
             self.popup_manager.set_pool(Rc::new(RefCell::new(pool)));
             self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
-            popup.wl_surface().commit();
-            self.popup_manager.create_popup::<T>(popup, popup_conf);
+            // popup.wl_surface().commit();
+
+            self.popup_manager.create_popup::<T>(
+                popup,
+                popup_conf,
+                &self.states.fractional_scale_state,
+                &self.states.viewporter_state,
+                &self.queue,
+            );
             info!("Popup created");
             Ok(())
         } else {
@@ -770,7 +795,7 @@ impl FractionalScaleHandler for SpellWin {
         _: &wl_surface::WlSurface,
         scale: u32,
     ) {
-        info!("Scale factor changed, invoked from custom trait. {}", scale);
+        info!("Scale factor changed, invoked from custom trait: {}", scale);
         let width_old = self.adapter.as_ref().unwrap().size_original.get().width;
         let height_old = self.adapter.as_ref().unwrap().size_original.get().height;
         self.layer.as_ref().unwrap().wl_surface().damage_buffer(
@@ -789,15 +814,14 @@ impl FractionalScaleHandler for SpellWin {
             .unwrap()
             .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
             .unwrap();
-        self.states.viewporter.as_ref().unwrap().set_source(
+        self.viewport.as_ref().unwrap().set_source(
             0.,
             0.,
             self.adapter.as_ref().unwrap().size.get().width.into(),
             self.adapter.as_ref().unwrap().size.get().height.into(),
         );
 
-        self.states
-            .viewporter
+        self.viewport
             .as_ref()
             .unwrap()
             .set_destination(width_old as i32, height_old as i32);
@@ -1369,7 +1393,11 @@ pub struct SpellXDGPopup {
     popup: Popup,
     buffer: Buffer,
     first_configure: Cell<bool>,
+    // viewport: Viewport,
 }
+
+delegate_fractional_scale!(SpellXDGPopup);
+delegate_viewporter!(SpellXDGPopup);
 
 /// Furture virtual keyboard implementation will be on this type. Currently, it is redundent.
 pub struct SpellBoard;

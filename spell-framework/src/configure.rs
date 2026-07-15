@@ -1,4 +1,7 @@
-use crate::layer_properties::popup::{PopupAnchor, PopupGravity};
+use crate::{
+    layer_properties::popup::{PopupAnchor, PopupGravity},
+    wayland_adapter::viewporter::Viewport,
+};
 use smithay_client_toolkit::{
     shell::{
         wlr_layer::{Anchor, KeyboardInteractivity, Layer},
@@ -30,6 +33,7 @@ pub struct PopupSettings {
     pub(crate) popup: Popup,
     pub(crate) popup_conf: PopupConf,
     pub(crate) buffer: Buffer,
+    // pub(crate) viewport: Viewport,
 }
 
 pub struct PopupConf {
@@ -37,6 +41,8 @@ pub struct PopupConf {
     pub height: u32,
     pub anchor: PopupAnchor,
     pub gravity: PopupGravity,
+    // FIXME: setting width and height zero creates protocol errors, create a
+    // builder method for it.
     pub anchor_rect: (i32, i32, i32, i32),
 }
 
@@ -62,7 +68,7 @@ pub enum Dimension {
     Pixel(u32),
 }
 
-// FIXME: Privatise WindowConf values and move the documentation to WindowConfBuilder.
+// FIXME: Privatize WindowConf values and move the documentation to WindowConfBuilder.
 
 /// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
 /// of generated code) for defining the specifications of the widget.

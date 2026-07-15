@@ -481,13 +481,19 @@ impl ProvidesRegistryState for SpellWin {
 
 impl Dispatch<XdgSurface, ()> for SpellWin {
     fn event(
-        _: &mut Self,
-        _: &XdgSurface,
-        _: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
+        state: &mut Self,
+        xdg_surface: &XdgSurface,
+        event: <XdgSurface as smithay_client_toolkit::reexports::client::Proxy>::Event,
         _: &(),
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        todo!()
+        match event {
+            smithay_client_toolkit::reexports::protocols::xdg::shell::client::xdg_surface::Event::Configure { serial } => {
+                info!("[Popup Manager]: ack called with a serial");
+                 state.popup_manager.call_ack(xdg_surface, serial);
+            },
+            event_branch => warn!("Unprocessed event branch from popup configure: {:?}", event_branch),
+        }
     }
 }
