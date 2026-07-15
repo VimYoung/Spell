@@ -173,6 +173,12 @@ cargo run -p spell-demo --bin bar
 cargo run -p spell-demo --bin osd
 ```
 
+1. In order to open a simple popup.
+
+```bash
+cargo run -p spell-demo --bin popup
+```
+
 ## When can we expect a stable release?
 
 I remember adding this section a few months ago, now I can say that the first stable version is out!!.

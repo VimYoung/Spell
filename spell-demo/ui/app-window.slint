@@ -100,10 +100,18 @@ export component TopBar inherits Window {
 }
 
 export component TestPopup inherits Window {
-    width: 200px;
-    height: 200px;
-    background: white;
-    Text {
-        text: "First Popup";
+    property <color> background_color: black;
+    // width: 200px;
+    // height: 200px;
+    background: black;
+
+    VerticalBox {
+        Button {
+            text: "Some button";
+        }
+
+        Text {
+            text: "First Popup";
+        }
     }
 }
