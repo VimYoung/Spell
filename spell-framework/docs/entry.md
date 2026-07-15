@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 Running this code with cargo will display a widget in your wayland compositor. It is important to
 mention that if you have defined width and height in both your window and in the rust
 code,then the renderer will manage the more or less dimensions accordingly, which may lead to undefined behaviour. For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs.
-ehe frontend code for this example is adopted from.[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+the frontend code for this example is adopted from [slint-rust-template](https://github.com/slint-ui/slint-rust-template).
 
 ## Spell CLI
 
@@ -116,7 +116,3 @@ cargo install spell-cli
 ## Inspiration
 
 The inspiration for making spell came from various weird places. First and foremost was my inability to understand the workings of GTK (I didn't spend much time on it), which drifted me away to better alternative,slint. Another reason was to answer the question, "how does wayland actually works?". Moreover, outfoxxed made `quickshell` around the same time, which does a similar thing with Qt and C++, this gave me confidence that a non-gtk framework for widget creation is possible.
-
-## Slint part of Spell
-
-This is future work and here is a note to it. As some more base functionalities will be complete I will also create a slint counterpart of "components" which are most commonly used in the process of widget creation.
