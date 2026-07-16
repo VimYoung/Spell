@@ -1,4 +1,33 @@
 import { VerticalBox, Button } from "std-widgets.slint";
+
+export component PopupParent inherits Window {
+    in-out property <int> counter: 42;
+    in-out property <int> self_id;
+    callback open_pp();
+    callback close_pp(int);
+    width: 276px;
+    height: 576px;
+    VerticalBox {
+        Text {
+            text: "Counter: \{root.counter}";
+        }
+
+        Button {
+            text: "Open Popup";
+            clicked => {
+                root.open_pp();
+            }
+        }
+
+        Button {
+            text: "Close Popup";
+            clicked => {
+                root.close_pp(root.self_id);
+            }
+        }
+    }
+}
+
 export component AppWindow inherits Window {
     in-out property <int> counter: 42;
     callback request-increase-value();

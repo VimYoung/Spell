@@ -12,7 +12,7 @@ use spell_framework::{
     PopupSlint,
 };
 slint::include_modules!();
-spell_framework::generate_widgets![AppWindow];
+spell_framework::generate_widgets![PopupParent];
 
 struct TestPopupSpell {
     frontend: TestPopup,
@@ -67,22 +67,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build()
         .unwrap();
 
-    let mut ui = AppWindowSpell::invoke_spell("counter-widget", window_conf);
-    ui.on_request_increase_value({
+    let ui = PopupParentSpell::invoke_spell("counter-widget", window_conf);
+
+    ui.on_open_pp({
+        let mut handle = ui.get_handler();
         let ui_handle = ui.as_weak();
         move || {
-            let ui = ui_handle.unwrap();
-            ui.set_counter(ui.get_counter() + 1);
+            let val = ui_handle.clone();
+            if let Ok(id) = handle.open_popup::<TestPopupSpell>(
+                PopupConf {
+                    width: 200,
+                    height: 200,
+                    anchor: PopupAnchor::Left,
+                    gravity: PopupGravity::TopRight,
+                    anchor_rect: (10, 100, 10, 10),
+                },
+                Box::new(move |id| {
+                    val.unwrap().set_self_id(id as i32);
+                }),
+            ) {
+                ui_handle.unwrap().set_self_id(id as i32);
+            } else {
+                println!("Error encountered when creating popup");
+            };
         }
     });
-    if let Err(_) = ui.open_popup::<TestPopupSpell>(PopupConf {
-        width: 200,
-        height: 200,
-        anchor: PopupAnchor::Left,
-        gravity: PopupGravity::TopRight,
-        anchor_rect: (10, 100, 10, 10),
-    }) {
-        println!("Error encountered when creating popup");
-    };
+
+    ui.on_close_pp({
+        let handle = ui.get_handler();
+        move |id| {
+            handle.close_popup(id as u32);
+        }
+    });
+
     cast_spell!(ui)
 }
