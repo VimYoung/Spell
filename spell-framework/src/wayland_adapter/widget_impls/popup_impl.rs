@@ -12,9 +12,10 @@ use smithay_client_toolkit::{
 };
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     rc::Rc,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     PopupSlint,
@@ -23,26 +24,27 @@ use crate::{
     wayland_adapter::{
         SpellWin, SpellXDGPopup,
         fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
-        viewporter::{Viewport, ViewporterState},
-        widget_impls::popup_impl,
+        viewporter::ViewporterState,
     },
 };
 
 pub(crate) struct PopupManager {
-    popups: Vec<Box<dyn PopupSlint>>,
+    id_gen: u32,
+    popups: HashMap<u32, Box<dyn PopupSlint>>,
     pool: Option<Rc<RefCell<SlotPool>>>,
 }
 
 impl PopupManager {
     pub(crate) fn new() -> Self {
         PopupManager {
-            popups: Vec::new(),
+            id_gen: 0,
+            popups: HashMap::new(),
             pool: None,
         }
     }
 
     pub(crate) fn return_popup(&self, popup_inner: &Popup) -> Option<&dyn PopupSlint> {
-        for popup in self.popups.iter() {
+        for (_, popup) in self.popups.iter() {
             if popup_inner == popup.inner() {
                 return Some(popup.as_ref());
             }
@@ -61,7 +63,7 @@ impl PopupManager {
         fractional_scale_state: &FractionalScaleState,
         viewporter_state: &ViewporterState,
         qh: &QueueHandle<SpellWin>,
-    ) {
+    ) -> u32 {
         // let fractional_scale = fractional_scale_state.get_scale(popup.wl_surface(), qh);
         // let viewport = viewporter_state.get_viewport(popup.wl_surface(), qh, fractional_scale);
         let stride = popup_conf.width as i32 * 4;
@@ -103,11 +105,13 @@ impl PopupManager {
             buffer,
             // viewport,
         });
-        self.popups.push(Box::new(popup));
+        self.popups.insert(self.id_gen, Box::new(popup));
+        self.id_gen = self.id_gen.wrapping_add(1);
+        self.id_gen - 1
     }
 
     pub(crate) fn redraw_popups(&self, qh: &QueueHandle<SpellWin>) {
-        for popup in self.popups.iter() {
+        for popup in self.popups.values() {
             popup.converter_popup(popup.inner().wl_surface(), qh);
         }
     }
@@ -116,7 +120,7 @@ impl PopupManager {
         &self,
         surface: &WlSurface,
     ) -> Option<&std::rc::Rc<SpellSkiaWinAdapter>> {
-        for popup in self.popups.iter() {
+        for popup in self.popups.values() {
             if popup.inner().wl_surface() == surface {
                 return Some(popup.adapter());
             }
@@ -125,11 +129,23 @@ impl PopupManager {
     }
 
     pub(crate) fn call_ack(&self, xdg_surface: &XdgSurface, serial: u32) {
-        for popup in self.popups.iter() {
+        for popup in self.popups.values() {
             if popup.inner().xdg_surface() == xdg_surface {
                 popup.inner().xdg_surface().ack_configure(serial);
             }
         }
+    }
+
+    pub(crate) fn close_popup(&mut self, id: &u32) {
+        if let Some(rem_popup) = self.popups.remove(id) {
+            rem_popup.inner().xdg_popup().destroy();
+            info!("Removed Popup with id: {}", id);
+        } else {
+            warn!(
+                "[PopupManager]: trying to remove a non-existant popup with id: {}",
+                id
+            );
+        };
     }
 }
 

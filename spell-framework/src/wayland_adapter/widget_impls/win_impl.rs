@@ -467,7 +467,7 @@ impl PopupHandler for SpellWin {
         _: &QueueHandle<Self>,
         _: &smithay_client_toolkit::shell::xdg::popup::Popup,
     ) {
-        todo!()
+        info!("[Popup Manager]: A popup is closed");
     }
 }
 

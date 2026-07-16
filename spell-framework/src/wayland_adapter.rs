@@ -616,7 +616,7 @@ impl SpellWin {
     pub fn open_popup<T: PopupSlint + 'static>(
         &mut self,
         popup_conf: PopupConf,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let popup_surface = self.states.compositor_state.create_surface(&self.queue);
         // popup_surface.commit();
         let position =
@@ -651,19 +651,23 @@ impl SpellWin {
             self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
             // popup.wl_surface().commit();
 
-            self.popup_manager.create_popup::<T>(
+            let id = self.popup_manager.create_popup::<T>(
                 popup,
                 popup_conf,
                 &self.states.fractional_scale_state,
                 &self.states.viewporter_state,
                 &self.queue,
             );
-            info!("Popup created");
-            Ok(())
+            info!("Popup created with id: {}", id);
+            Ok(id)
         } else {
             warn!("couldn't create a popup");
             Err("Couldn't create Popup".into())
         }
+    }
+
+    pub fn close_popup(&mut self, id: u32) {
+        self.popup_manager.close_popup(&id);
     }
 }
 
@@ -906,6 +910,25 @@ impl WinHandle {
     /// Internally calls [`crate::wayland_adapter::SpellWin::set_exclusive_zone`]
     pub fn set_exclusive_zone(&self, val: i32) {
         self.0.insert_idle(move |win| win.set_exclusive_zone(val));
+    }
+
+    pub fn close_popup(&self, id: u32) {
+        self.0.insert_idle(move |win| {
+            win.close_popup(id);
+        });
+    }
+
+    pub fn open_popup<T: PopupSlint + 'static>(
+        &mut self,
+        popup_conf: PopupConf,
+        callback: Box<dyn FnOnce(u32)>,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
+        self.0.insert_idle(|win| {
+            if let Ok(id) = win.open_popup::<T>(popup_conf) {
+                callback(id);
+            }
+        });
+        Ok(0)
     }
 }
 
