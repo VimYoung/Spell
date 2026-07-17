@@ -28,11 +28,6 @@
 
 **Don't forget to star the project if you like it 🌟🌟**
 
-<video src="https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/young-shell-display.mp4"
-       controls
-       width="700">
-</video>
-
 <https://github.com/user-attachments/assets/bd359b91-27cf-4e8b-8158-0f685970fc9a>
 
 > This preview is part of a WIP shell I made using Spell called [Young Shell](https://github.com/VimYoung/Young-Shell).
@@ -40,7 +35,8 @@
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like niri, hyprland) using Slint UI.
 
-> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell) is a tutorial for new comers to get a hang of spell.
+> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell)
+> is a tutorial for new comers to get a hang of spell.
 
 Rather then leveraging Gtk for widget creation.Spell leverages Slint, a declarative
 language provides a very easy but comprehensive way to make aesthetic interfaces.
@@ -51,20 +47,22 @@ arts of rust.
 ## Features 🖊️
 
 1. **Simple frontend with fast backend:** As Spell uses Slint for creating widgets,
-   which is extremely customisable while being easy to use. Backed by rust, the code remains
-   lightweight, memory safe and predictable.
+   which is extremely customisable while being easy to use. Backed by rust, the
+   code remains lightweight, memory safe and predictable.
 2. **Hot Reload:** Once the size of widget is set. Changes in slint code is reflected
    as is in the widget. Leading to faster iterations of code.
 3. **Streamline Project Structure:** Spell doesn't change the project structure
    of slint in any way. So, no new paradigm needs to be learned for working with
    spell.
-4. **Remote Accessibility:** Spell also ships a CLI through which state of widget can be made accessible,
-   enabling integration in compositor settings.
-5. **Prebuilt Components(Material, Vivi):** Spell's CLI can port slint's
-   [material components](https://material.slint.dev/), surreal, sleek etc component
-   libs to your project, Just add `--material` or `--vivi` etc when creating a starter
-   project with `sp`.
-6. **Services:** (WIP) Spell also provides a vault with common functionalities like
+4. **Remote Accessibility:** Spell ships a CLI through which state of widget
+   can be made accessible, enabling integration in compositor settings.
+5. **Prebuilt Components(Material, Vivi, Sleek, Surrealism):** Spell's CLI can
+   port slint's [material components](https://material.slint.dev/), surreal,
+   sleek etc component libs to your project, Just add `--material` or `--vivi`
+   etc when creating a starter project with `sp`.
+6. **XDG Popups:** The crate also provides methods to create and manage popups,
+   these can be lend for smaller tasks and functionalities.
+7. **Services:** (WIP) Spell has a vault with common functionalities like
    app launcher backend, notification backend, MPRIS etc.
 
 ## Minimal Example ✨
@@ -79,12 +77,12 @@ cargo install spell-cli
 sp new project-name
 ```
 
-`sp` CLI offers this clean way to create a project so you wouldn't have to hustle with
-the initial setup. Under the hood, it uses `cargo new` command paired
+`sp` CLI offers this clean way to create a project so you wouldn't have to hustle
+with the initial setup. Under the hood, it uses `cargo new` command paired
 with filling the files with appropriate content.
 
-Now the main code, following code in you slint file create a counter and initialises it
-from default value of 42.
+Now the main code, following code in you slint file create a counter and initialises
+it from default value of 42.
 
 ```slint
 // In path and file name `ui/app-window.slint`
@@ -108,7 +106,8 @@ export component AppWindow inherits Window {
 }
 ```
 
-Now, to increment the data and specify the dimensions of widget add the following to your `src/main.rs` file.
+Now, to increment the data and specify the dimensions of widget add the following
+to your `src/main.rs` file.
 
 ```rust
 use slint::ComponentHandle;
@@ -155,7 +154,9 @@ It is important to mention that if you have defined width and height in both you
 window and in the rust code,then the renderer will manage the more or less dimensions
 accordingly, which may lead to undefined behaviour.
 
-For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`], head to their respective attached docs. The frontend code for this example is adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
+For details of arguments and use of [`layer_properties::WindowConf`] and [`cast_spell`],
+head to their respective attached docs. The frontend code for this example is
+adopted from./[slint-rust-template](https://github.com/slint-ui/slint-rust-template)
 
 ## More Examples
 
@@ -181,8 +182,8 @@ cargo run -p spell-demo --bin popup
 
 ## When can we expect a stable release?
 
-I remember adding this section a few months ago, now I can say that the first stable version is out!!.
-Create a spell project and give it a shot.
+I remember adding this section a few months ago, now I can say that the first
+stable version is out!!.Create a spell project and give it a shot.
 
 ## Caution
 
@@ -193,8 +194,9 @@ Create a spell project and give it a shot.
 2. Hide and show features of widgets work flawlessly in niri but hangs in hyprland
    due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
 
-Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
-to add appropriate patches and dependencies to use spell with slint.
+Efforts are in way to clear out these rough edges. For the time being, you can
+head over to minimal example to add appropriate patches and dependencies to
+use spell with slint.
 
 ## Inspiration 💡
 
@@ -205,31 +207,35 @@ creating tools in rust. Secondly, I had a question:
 
 So, to understand wayland and side-by-side create a client gave birth to Spell.
 I know a lot more about functioning of wayland than I did. Also, a framework
-developed that could be delivered in some time for others to use and create widgets
-in rust.
+developed that could be delivered for others to use and create widgets in rust.
 
 ## Why Slint? 🤔
 
 Slint because it is a simple yet powerful declarative lang that is extremely
-easy to learn (you can even get a sense in just few mins [here](https://docs.slint.dev/latest/docs/slint/guide/language/concepts/slint-language/)). Secondly, unlike
+easy to learn (you can even get its sense in just few mins [here](https://docs.slint.dev/latest/docs/slint/guide/language/concepts/slint-language/)). Secondly, unlike
 other UI toolkits, it has awesome integration for rust. A compatibility that
 is hard to find.
 
 ## Batteries 🔋
 
-Not a lot of batteries included for now, future implementations of common functionalities will occur
-in `vault` module of this crate. For now it has a AppSelector, which can be used to retrieve app information
-for creating a launcher. Other common functionalities like system tray, temp etc, will be added later for
-convenience. I recommend the use of following crates for some basic usage, though you must note
-that I haven't used them extensively myself (for now). For roadmap, view [here](https://github.com/VimYoung/Spell/blob/main/ROADMAP.md).
+Not a lot of batteries included for now, future implementations of common functionalities
+will occur in `vault` module of this crate. For now it has a AppSelector, which
+can be used to retrieve app information for creating a launcher. Other common
+functionalities like system tray, temp etc, will be added later for convenience.
+I recommend the use of following crates for some basic usage, though you must note
+that I haven't used them extensively myself. For roadmap, view
+[here](https://github.com/VimYoung/Spell/blob/main/ROADMAP.md).
 
-1. [sysinfo](https://crates.io/crates/sysinfo): For System info like uptime, cpu, memory usage etc.
+1. [sysinfo](https://crates.io/crates/sysinfo): For System info like uptime, CPU, memory usage etc.
 2. [rusty-network-manger](https://crates.io/crates/rusty_network_manager): For network management.
 3. [bluer](https://docs.rs/bluer/latest/bluer/): For bluetooth management.
 
 ## Contributing 🙌
 
-The library is still in an early stage. Yet I will encourage you to try it out, feel free to open issues and even better, PRs for issues. Feature requests can be posted in the issues section itself, but since a lot of things are planned already, they will take a lower priority.
+The library is still in an early stage. Yet I will encourage you to try it out,
+feel free to open issues and even better, PRs for issues. Feature requests can
+be posted in the issues section itself, but since a lot of things are planned
+already, they will take a lower priority.
 
 ---
 
