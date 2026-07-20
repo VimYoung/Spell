@@ -993,6 +993,7 @@ pub struct SpellLock {
     pub(crate) lock_surfaces: Vec<SessionLockSurface>,
     pub(crate) slint_part: Option<SpellSlintLock>,
     pub(crate) is_locked: bool,
+    pub span: span::Span,
     pub(crate) unlock_screen: Sender<bool>,
     // TODO, check if it need internal mutability?
     pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
@@ -1050,6 +1051,7 @@ impl SpellLock {
             session_lock: None,
             lock_surfaces,
             unlock_screen: sender,
+            span: span!(Level::INFO, "lock", name = "lock-screen",),
             is_locked: true,
             event_loop: Rc::new(RefCell::new(event_loop)),
             backspace: None,
@@ -1263,7 +1265,9 @@ impl SpellLock {
 
     fn unlock_finger(&mut self, error_callback: Box<dyn FnOnce() + Send>) {
         let sender = self.unlock_screen.clone();
+        let span = self.span.clone();
         std::thread::spawn(move || {
+            let _guard = span.enter();
             fn unlock_internal(sender: Sender<bool>) -> PamResult<()> {
                 let finger = FingerprintInfo;
                 let output = Command::new("sh")
@@ -1358,8 +1362,13 @@ impl SpellAssociatedNew for SpellLock {
             .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
     }
+
     fn is_locked(&self) -> bool {
         self.is_locked
+    }
+
+    fn get_span(&self) -> span::Span {
+        self.span.clone()
     }
 }
 

@@ -3,10 +3,14 @@
 //! implementation is public because they had to be set by the user of library
 //! in intial iterations of spell_framework.
 use crate::configure::LayerConf;
-use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
+use slint::platform::{Clipboard::DefaultClipboard, EventLoopProxy, Platform, WindowAdapter};
 use smithay_client_toolkit::reexports::calloop;
-use std::{cell::RefCell, rc::Rc};
-use tracing::{Level, info, span};
+use std::{cell::RefCell, io::Read, rc::Rc};
+use tracing::{Level, info, span, warn};
+use wl_clipboard_rs::{
+    copy::{MimeType as CopyMimeType, Options, Source},
+    paste::{ClipboardType, Error, MimeType as PasteMimeType, Seat, get_contents},
+};
 
 thread_local! {
     pub(crate) static ADAPTERS: RefCell<Vec<Rc<SpellSkiaWinAdapter>>> = const { RefCell::new(Vec::new()) };
@@ -81,6 +85,52 @@ impl Platform for SpellLayerShell {
 
     fn new_event_loop_proxy(&self) -> Option<Box<dyn EventLoopProxy>> {
         Some(Box::new(SlintEventProxy(self.slint_event_sender.clone())))
+    }
+
+    // FIXME: this implementation should be by smithay-clipboard.
+    // fix after state management moved from window to platform.
+    fn set_clipboard_text(&self, text: &str, clipboard: slint::platform::Clipboard) {
+        if let DefaultClipboard = clipboard {
+            let opts = Options::new();
+            if let Err(err) = opts.copy(
+                Source::Bytes(text.to_string().into_bytes().into()),
+                CopyMimeType::Autodetect,
+            ) {
+                warn!("[Clipboard]: error in setting clipboard value: {}", err);
+            }
+        }
+    }
+
+    // FIXME: this implementation should be by smithay-clipboard.
+    // fix after state management moved from window to platform.
+    fn clipboard_text(&self, clipboard: slint::platform::Clipboard) -> Option<String> {
+        if let DefaultClipboard = clipboard {
+            let result = get_contents(
+                ClipboardType::Regular,
+                Seat::Unspecified,
+                PasteMimeType::Text,
+            );
+            match result {
+                Ok((mut pipe, _)) => {
+                    let mut contents = vec![];
+                    // TODO: handle the below unwrap properly.
+                    pipe.read_to_end(&mut contents).unwrap();
+                    Some(String::from_utf8_lossy(&contents).to_string())
+                }
+
+                // In this cases, an empty string is returned.
+                Err(Error::NoSeats) | Err(Error::ClipboardEmpty) | Err(Error::NoMimeType) => {
+                    Some("".to_string())
+                }
+
+                Err(err) => {
+                    warn!("[Clipboard]: error getting clipboard text: {}", err);
+                    None
+                }
+            }
+        } else {
+            None
+        }
     }
 }
 
