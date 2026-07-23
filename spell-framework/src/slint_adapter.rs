@@ -89,47 +89,48 @@ impl Platform for SpellLayerShell {
 
     // FIXME: this implementation should be by smithay-clipboard.
     // fix after state management moved from window to platform.
-    fn set_clipboard_text(&self, text: &str, clipboard: slint::platform::Clipboard) {
-        if let DefaultClipboard = clipboard {
-            let opts = Options::new();
-            if let Err(err) = opts.copy(
-                Source::Bytes(text.to_string().into_bytes().into()),
-                CopyMimeType::Autodetect,
-            ) {
-                warn!("[Clipboard]: error in setting clipboard value: {}", err);
-            }
+    fn set_clipboard_text(&self, text: &str, _clipboard: slint::platform::Clipboard) {
+        // if let DefaultClipboard = clipboard {
+        let opts = Options::new();
+        if let Err(err) = opts.copy(
+            Source::Bytes(text.to_string().into_bytes().into()),
+            CopyMimeType::Autodetect,
+        ) {
+            warn!("[Clipboard]: Error in setting clipboard value: {}", err);
+        } else {
+            info!("[Clipboard]: Successfully copied text");
         }
+        //}
     }
 
     // FIXME: this implementation should be by smithay-clipboard.
     // fix after state management moved from window to platform.
-    fn clipboard_text(&self, clipboard: slint::platform::Clipboard) -> Option<String> {
-        if let DefaultClipboard = clipboard {
-            let result = get_contents(
-                ClipboardType::Regular,
-                Seat::Unspecified,
-                PasteMimeType::Text,
-            );
-            match result {
-                Ok((mut pipe, _)) => {
-                    let mut contents = vec![];
-                    // TODO: handle the below unwrap properly.
-                    pipe.read_to_end(&mut contents).unwrap();
-                    Some(String::from_utf8_lossy(&contents).to_string())
-                }
-
-                // In this cases, an empty string is returned.
-                Err(Error::NoSeats) | Err(Error::ClipboardEmpty) | Err(Error::NoMimeType) => {
-                    Some("".to_string())
-                }
-
-                Err(err) => {
-                    warn!("[Clipboard]: error getting clipboard text: {}", err);
-                    None
-                }
+    fn clipboard_text(&self, _clipboard: slint::platform::Clipboard) -> Option<String> {
+        let result = get_contents(
+            ClipboardType::Regular,
+            Seat::Unspecified,
+            PasteMimeType::Text,
+        );
+        match result {
+            Ok((mut pipe, _)) => {
+                let mut contents = vec![];
+                // TODO: handle the below unwrap properly.
+                pipe.read_to_end(&mut contents).unwrap();
+                let text = String::from_utf8_lossy(&contents).to_string();
+                info!("[Clipboard]: Successfully pasted text: {}", text);
+                Some(text)
             }
-        } else {
-            None
+
+            // In this cases, an empty string is returned.
+            Err(Error::NoSeats) | Err(Error::ClipboardEmpty) | Err(Error::NoMimeType) => {
+                warn!("[Clipboard]: Clipboard was either empty or didn't have text type data");
+                Some("".to_string())
+            }
+
+            Err(err) => {
+                warn!("[Clipboard]: error getting clipboard text: {}", err);
+                None
+            }
         }
     }
 }
