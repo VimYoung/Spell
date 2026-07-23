@@ -1,4 +1,9 @@
-import { VerticalBox, Button } from "std-widgets.slint";
+import {
+    VerticalBox,
+    Button,
+    HorizontalBox,
+    LineEdit,
+} from "std-widgets.slint";
 
 export component PopupParent inherits Window {
     in-out property <int> counter: 42;
@@ -141,6 +146,30 @@ export component TestPopup inherits Window {
 
         Text {
             text: "First Popup";
+        }
+    }
+}
+
+export component CopyPaste inherits Window {
+    width: 276px;
+    height: 576px;
+    VerticalBox {
+        alignment: start;
+        HorizontalBox {
+            alignment: center;
+            Button {
+                text: "Copy";
+                clicked => { l.copy() }
+            }
+
+            Button {
+                text: "Paste";
+                clicked => { l.paste() }
+            }
+        }
+
+        l := LineEdit {
+            text: "Hello";
         }
     }
 }
