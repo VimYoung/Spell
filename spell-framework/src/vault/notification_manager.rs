@@ -1,7 +1,9 @@
 use crate::{
     vault::{
-        BlockingNotification, DbusSignalEvent, Hint, NOTIFICATION_EVENT, Notification, NotificationManager, Timeout, Urgency,
-    }, wayland_adapter::SpellWin,
+        BlockingNotification, DbusSignalEvent, Hint, NOTIFICATION_EVENT, Notification,
+        NotificationManager, Timeout, Urgency,
+    },
+    wayland_adapter::SpellWin,
 };
 use smithay_client_toolkit::reexports::calloop::channel::{self, Sender};
 use std::{cmp::Ordering, collections::HashMap};
@@ -12,9 +14,6 @@ use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter, zvar
 /// if the macro has a notification instance to run.
 pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
     let (sender, rx) = channel::channel::<NotifyEvent>();
-    // let (sender_async, rx_async) = channel::channel::<NotifyEvent>();
-    // NOTIFICATION_EVENT.get_or_init(|| sender_async);
-    
     let (tx, dbus_rx) = tokio::sync::mpsc::unbounded_channel::<DbusSignalEvent>();
 
     let layer_name = win.layer_name.clone();
@@ -32,8 +31,8 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
 
     let _ = NOTIFICATION_EVENT.set(BlockingNotification::new(tx));
     let _ = win
-        .loop_handle
-        .clone()
+        .get_handler()
+        .0
         .insert_source(rx, move |event, _, _| match event {
             channel::Event::Msg(msg) => match msg {
                 NotifyEvent::Noti(notification) => {
@@ -318,3 +317,4 @@ impl NotificationHandler {
         action_key: &str,
     ) -> zbus::Result<()>;
 }
+

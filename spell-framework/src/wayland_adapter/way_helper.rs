@@ -204,9 +204,6 @@ pub(crate) fn set_event_sources(
     let logging_dir = runtime_dir + "/spell/";
     let socket_cli_dir = logging_dir.clone() + "/spell_cli";
 
-    // let _ = fs::create_dir(Path::new(&logging_dir));
-    // let _ = fs::remove_file(&socket_cli_dir);
-
     // This is currently redundent source as it is not working in any way
     event_loop
         .handle()

@@ -9,9 +9,7 @@ use crate::{
         ADAPTERS, SpellLayerShell, SpellLockShell, SpellMultiWinHandler, SpellSkiaWinAdapter,
     },
     wayland_adapter::{
-        fractional_scaling::{
-            FractionalScaleHandler, FractionalScaleState, delegate_fractional_scale,
-        },
+        fractional_scaling::{FractionalScaleState, delegate_fractional_scale},
         viewporter::{Viewport, ViewporterState, delegate_viewporter},
         way_helper::{
             FingerprintInfo, PointerState, UsernamePassConvo, set_config, set_event_sources,
@@ -28,11 +26,11 @@ use slint::{
     platform::{Key, WindowAdapter},
 };
 use smithay_client_toolkit::{
-    compositor::{CompositorHandler, CompositorState, Region},
+    compositor::{CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_session_lock, delegate_shm, delegate_touch,
     delegate_xdg_popup, delegate_xdg_shell,
-    output::{self, OutputHandler, OutputState},
+    output::{self, OutputState},
     reexports::{
         calloop::{
             self, EventLoop, LoopHandle, RegistrationToken,
@@ -47,7 +45,7 @@ use smithay_client_toolkit::{
                 wl_keyboard::WlKeyboard,
                 wl_output::{self, WlOutput},
                 wl_shm,
-                wl_surface::{self, WlSurface},
+                wl_surface::WlSurface,
                 wl_touch::WlTouch,
             },
         },
@@ -57,14 +55,11 @@ use smithay_client_toolkit::{
     session_lock::{SessionLock, SessionLockState, SessionLockSurface},
     shell::{
         WaylandSurface,
-        wlr_layer::{
-            KeyboardInteractivity, LayerShell, LayerShellHandler, LayerSurface,
-            LayerSurfaceConfigure,
-        },
+        wlr_layer::{KeyboardInteractivity, LayerShell, LayerSurface},
         xdg::{XdgPositioner, XdgShell, popup::Popup},
     },
     shm::{
-        Shm, ShmHandler,
+        Shm,
         slot::{Buffer, Slot, SlotPool},
     },
 };
@@ -82,55 +77,54 @@ pub use widget_impls::lock_impl::SpellSlintLock;
 mod fractional_scaling;
 mod pointer_button;
 mod slint_to_wl_cursor_mapping;
-pub(crate) mod viewporter;
+mod viewporter;
 mod way_helper;
 mod widget_impls;
 
+#[allow(clippy::type_complexity)]
 static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, (wl_output::WlOutput, i32, i32)>>> =
     OnceLock::new();
 static SET_SLINT_PLATFORM: Once = Once::new();
 
 #[derive(Debug)]
-pub(crate) struct States {
-    pub(crate) registry_state: RegistryState,
-    pub(crate) seat_state: SeatState,
-    pub(crate) output_state: OutputState,
-    pub(crate) compositor_state: CompositorState,
-    pub(crate) pointer_state: PointerState,
-    pub(crate) keyboard_state: Option<WlKeyboard>,
-    pub(crate) touch_state: Option<WlTouch>,
-    pub(crate) shm: Shm,
-    pub(crate) viewporter_state: ViewporterState,
-    pub(crate) fractional_scale_state: FractionalScaleState,
+struct States {
+    registry_state: RegistryState,
+    seat_state: SeatState,
+    output_state: OutputState,
+    compositor_state: CompositorState,
+    pointer_state: PointerState,
+    keyboard_state: Option<WlKeyboard>,
+    touch_state: Option<WlTouch>,
+    shm: Shm,
+    viewporter_state: ViewporterState,
+    fractional_scale_state: FractionalScaleState,
 }
 
 /// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
 /// implementation, thus providing various features.
 pub struct SpellWin {
-    pub(crate) adapter: Option<Rc<SpellSkiaWinAdapter>>,
-    /// loop handle provided in a wrapper by [get_handler](crate::wayland_adapter::SpellWin::get_handler).
-    pub loop_handle: LoopHandle<'static, SpellWin>,
+    adapter: Option<Rc<SpellSkiaWinAdapter>>,
+    loop_handle: LoopHandle<'static, SpellWin>,
     /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
-    pub(crate) queue: QueueHandle<SpellWin>,
-    pub(crate) buffer: Option<Buffer>,
-    pub(crate) states: States,
-    pub(crate) layer: Option<LayerSurface>,
-    pub(crate) first_configure: Cell<bool>,
-    pub(crate) natural_scroll: bool,
-    pub(crate) is_hidden: Cell<bool>,
-    pub(crate) config: WindowConf,
-    ///Used to define the name of socket for the IPC channel.
+    /// Name of widget's layer.
     pub layer_name: String,
-    pub(crate) input_region: Region,
-    pub(crate) opaque_region: Region,
-    pub(crate) viewport: Option<Viewport>,
-    pub(crate) xdg_shell: XdgShell,
-    pub(crate) popup_manager: PopupManager,
-    /// Event loop which runs and refreshes UI.
-    pub event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
     /// Span required for proper logging.
     pub span: span::Span,
+    queue: QueueHandle<SpellWin>,
+    buffer: Option<Buffer>,
+    states: States,
+    layer: Option<LayerSurface>,
+    first_configure: Cell<bool>,
+    natural_scroll: bool,
+    is_hidden: Cell<bool>,
+    config: WindowConf,
+    input_region: Region,
+    opaque_region: Region,
+    viewport: Option<Viewport>,
+    xdg_shell: XdgShell,
+    popup_manager: PopupManager,
+    event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
 }
 
 impl std::fmt::Debug for SpellWin {
@@ -145,7 +139,7 @@ impl std::fmt::Debug for SpellWin {
 }
 
 impl SpellWin {
-    pub(crate) fn create_window(
+    fn create_window(
         conn: &Connection,
         mut window_conf: WindowConf,
         layer_name: String,
@@ -524,7 +518,7 @@ impl SpellWin {
 
             self.states
                 .pointer_state
-                .update_cursor(self.adapter.as_ref().unwrap().current_cursor.get(), &qh);
+                .update_cursor(self.adapter.as_ref().unwrap().current_cursor.get(), qh);
 
             let buffer = &self.buffer;
             if self.first_configure.get() || redraw_val {
@@ -699,6 +693,13 @@ delegate_layer!(SpellWin);
 delegate_fractional_scale!(SpellWin);
 delegate_viewporter!(SpellWin);
 
+impl SpellAssociatedNew for SpellWin {
+    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let event_loop = self.event_loop.clone();
+        event_loop
+            .borrow_mut()
+            .dispatch(std::time::Duration::from_millis(1), self)?;
+        Ok(())
 impl ShmHandler for SpellWin {
     fn shm_state(&mut self) -> &mut Shm {
         &mut self.states.shm

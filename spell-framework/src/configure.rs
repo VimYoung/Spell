@@ -1,7 +1,4 @@
-use crate::{
-    layer_properties::popup::{PopupAnchor, PopupGravity},
-    wayland_adapter::viewporter::Viewport,
-};
+use crate::layer_properties::popup::{PopupAnchor, PopupGravity};
 use smithay_client_toolkit::{
     shell::{
         wlr_layer::{Anchor, KeyboardInteractivity, Layer},

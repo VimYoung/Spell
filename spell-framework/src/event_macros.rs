@@ -79,7 +79,7 @@ macro_rules! generate_widgets {
                     }
                     /// Returns a handle of [`crate::wayland_adapter::WinHandle`] to invoke wayland specific features.
                     pub fn get_handler(&self) -> WinHandle {
-                        WinHandle(self.way.loop_handle.clone())
+                      self.way.get_handler().clone()
                     }
 
                     pub fn open_popup<T: $crate::PopupSlint + 'static>(
@@ -95,22 +95,16 @@ macro_rules! generate_widgets {
                     }
                 }
 
-                impl $crate::SpellAssociatedNew for [<$slint_win Spell>] {
-                    fn on_call(
-                        &mut self,
-                    ) -> Result<(), Box<dyn std::error::Error>> {
-                        let event_loop = self.way.event_loop.clone();
-                        event_loop
-                            .borrow_mut()
-                            .dispatch(std::time::Duration::from_millis(1), &mut self.way)
-                            .unwrap();
-                        Ok(())
-                    }
-
-                    fn get_span(&self) -> $crate::macro_internal::Span {
-                        self.way.span.clone()
-                    }
-                }
+                // impl $crate::SpellAssociatedNew for [<$slint_win Spell>] {
+                    // fn on_call(
+                        // &mut self,
+                    // ) -> Result<(), Box<dyn std::error::Error>> {
+                      // self.way.on_call()
+                    // }
+                    // fn get_span(&self) -> $crate::macro_internal::Span {
+                        // self.way.get_span()
+                    // }
+                // }
 
                 impl std::ops::Deref for [<$slint_win Spell>] {
                     type Target = [<$slint_win>];
@@ -285,7 +279,7 @@ macro_rules! cast_spell {
         let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
         $way.ipc_handler = Some(listener_clone);
-        let _ = $way.loop_handle.clone().insert_source(
+        let _ = $way.get_handler().0.insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, _, data| {
                 loop {

@@ -13,3 +13,5 @@ Changes in the code for better readability are mentioned below:
 3. [ ] Properties that are implemented for `SpellWin` but not for `SpellLock`.
    - Fractional scaling.
    - Macro creation for helper methods.
+4. [ ] Remover bin binaries from everywhere except the demo.
+5. [ ] remove the match matching in CLI and uses clap for better management.
