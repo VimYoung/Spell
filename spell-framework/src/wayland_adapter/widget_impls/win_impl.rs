@@ -1,14 +1,21 @@
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
-    wayland_adapter::{SpellWin, pointer_button::map_pointer_button, way_helper::get_string},
+    wayland_adapter::{
+        SpellWin, fractional_scaling::FractionalScaleHandler, pointer_button::map_pointer_button,
+        way_helper::get_string,
+    },
 };
-use slint::{SharedString, platform::WindowEvent};
+use slint::{
+    SharedString,
+    platform::{WindowAdapter, WindowEvent},
+};
 use smithay_client_toolkit::{
-    output::OutputState,
+    compositor::CompositorHandler,
+    output::{OutputHandler, OutputState},
     reexports::{
         client::{
             Connection, Dispatch, QueueHandle,
-            protocol::{wl_pointer, wl_seat},
+            protocol::{wl_output, wl_pointer, wl_seat, wl_surface},
         },
         protocols::xdg::shell::client::xdg_surface::XdgSurface,
     },
@@ -22,8 +29,10 @@ use smithay_client_toolkit::{
     },
     shell::{
         WaylandSurface,
+        wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
         xdg::{popup::PopupHandler, window::WindowHandler},
     },
+    shm::{Shm, ShmHandler},
 };
 use tracing::{info, trace, warn};
 
@@ -477,6 +486,158 @@ impl ProvidesRegistryState for SpellWin {
         &mut self.states.registry_state
     }
     registry_handlers![OutputState, SeatState];
+}
+
+impl ShmHandler for SpellWin {
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.states.shm
+    }
+}
+
+impl OutputHandler for SpellWin {
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.states.output_state
+    }
+
+    fn new_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+        trace!("New output Source Added");
+    }
+
+    fn update_output(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+        trace!("Existing output is updated");
+    }
+
+    fn output_destroyed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _output: wl_output::WlOutput,
+    ) {
+        trace!("Output is destroyed");
+    }
+}
+
+impl CompositorHandler for SpellWin {
+    fn scale_factor_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: i32,
+    ) {
+        info!("Scale factor changed, compositor msg");
+    }
+
+    fn transform_changed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_transform: wl_output::Transform,
+    ) {
+        trace!("Compositor transformation changed");
+    }
+
+    fn frame(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _time: u32,
+    ) {
+        self.converter(qh);
+        self.popup_manager.redraw_popups(qh);
+    }
+
+    fn surface_enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
+    ) {
+        trace!("Surface entered");
+    }
+
+    fn surface_leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
+    ) {
+        trace!("Surface left");
+    }
+}
+
+impl FractionalScaleHandler for SpellWin {
+    fn preferred_scale(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        scale: u32,
+    ) {
+        info!("Scale factor changed, invoked from custom trait: {}", scale);
+        let width_old = self.adapter.as_ref().unwrap().size_original.get().width;
+        let height_old = self.adapter.as_ref().unwrap().size_original.get().height;
+        self.layer.as_ref().unwrap().wl_surface().damage_buffer(
+            0,
+            0,
+            self.adapter.as_ref().unwrap().size.get().width as i32,
+            self.adapter.as_ref().unwrap().size.get().height as i32,
+        );
+        let (buffer, width, height, scale_factor) =
+            self.adapter.as_ref().unwrap().changed_scale_factor(scale);
+        self.config.evaluated_width = width;
+        self.config.evaluated_height = height;
+        self.buffer = Some(buffer);
+        self.adapter
+            .as_ref()
+            .unwrap()
+            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
+            .unwrap();
+        self.viewport.as_ref().unwrap().set_source(
+            0.,
+            0.,
+            self.adapter.as_ref().unwrap().size.get().width.into(),
+            self.adapter.as_ref().unwrap().size.get().height.into(),
+        );
+
+        self.viewport
+            .as_ref()
+            .unwrap()
+            .set_destination(width_old as i32, height_old as i32);
+        self.adapter.as_ref().unwrap().request_redraw();
+        self.layer.as_ref().unwrap().commit();
+    }
+}
+
+impl LayerShellHandler for SpellWin {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
+        trace!("Closure of layer called");
+    }
+
+    fn configure(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _layer: &LayerSurface,
+        _configure: LayerSurfaceConfigure,
+        _serial: u32,
+    ) {
+        self.converter(qh);
+    }
 }
 
 impl Dispatch<XdgSurface, ()> for SpellWin {

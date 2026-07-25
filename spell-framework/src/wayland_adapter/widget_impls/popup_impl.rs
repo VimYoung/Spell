@@ -5,9 +5,9 @@ use smithay_client_toolkit::{
             QueueHandle,
             protocol::{wl_shm, wl_surface::WlSurface},
         },
-        protocols::{wp::viewporter, xdg::shell::client::xdg_surface::XdgSurface},
+        protocols::xdg::shell::client::xdg_surface::XdgSurface,
     },
-    shell::xdg::{XdgShellSurface, popup::Popup},
+    shell::xdg::popup::Popup,
     shm::slot::SlotPool,
 };
 use std::{
@@ -44,7 +44,7 @@ impl PopupManager {
     }
 
     pub(crate) fn return_popup(&self, popup_inner: &Popup) -> Option<&dyn PopupSlint> {
-        for (_, popup) in self.popups.iter() {
+        for popup in self.popups.values() {
             if popup_inner == popup.inner() {
                 return Some(popup.as_ref());
             }
@@ -60,9 +60,9 @@ impl PopupManager {
         &mut self,
         popup: Popup,
         popup_conf: PopupConf,
-        fractional_scale_state: &FractionalScaleState,
-        viewporter_state: &ViewporterState,
-        qh: &QueueHandle<SpellWin>,
+        _fractional_scale_state: &FractionalScaleState,
+        _viewporter_state: &ViewporterState,
+        _qh: &QueueHandle<SpellWin>,
     ) -> u32 {
         // let fractional_scale = fractional_scale_state.get_scale(popup.wl_surface(), qh);
         // let viewport = viewporter_state.get_viewport(popup.wl_surface(), qh, fractional_scale);

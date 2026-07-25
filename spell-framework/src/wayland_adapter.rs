@@ -358,9 +358,11 @@ impl SpellWin {
 
     /// Fetches the available monitors from the Wayland registry.
     ///
-    /// This function fetches the available monitors from the Wayland registry and returns a map of
-    /// the available monitors where the key is the name of the monitor and the value is the
-    /// [`wl_output::WlOutput`]. It uses an already registered event queue & spell window.
+    /// This function fetches the available monitors from the Wayland registry
+    /// and returns a map of the available monitors where the key is the name
+    /// of the monitor and the value is [`wl_output::WlOutput`] with its assosiated
+    /// logical size(width, height). Dimentions are later used in size determination.
+    /// It uses an already registered event queue & spell window.
     ///
     /// # Errors
     ///
@@ -665,20 +667,6 @@ impl SpellWin {
     }
 }
 
-impl SpellAssociatedNew for SpellWin {
-    fn on_call(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let event_loop = self.event_loop.clone();
-        event_loop
-            .borrow_mut()
-            .dispatch(std::time::Duration::from_millis(1), self)?;
-        Ok(())
-    }
-
-    fn get_span(&self) -> tracing::span::Span {
-        self.span.clone()
-    }
-}
-
 delegate_compositor!(SpellWin);
 delegate_xdg_shell!(SpellWin);
 delegate_xdg_popup!(SpellWin);
@@ -700,155 +688,10 @@ impl SpellAssociatedNew for SpellWin {
             .borrow_mut()
             .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
-impl ShmHandler for SpellWin {
-    fn shm_state(&mut self) -> &mut Shm {
-        &mut self.states.shm
-    }
-}
-
-impl OutputHandler for SpellWin {
-    fn output_state(&mut self) -> &mut OutputState {
-        &mut self.states.output_state
     }
 
-    fn new_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-        trace!("New output Source Added");
-    }
-
-    fn update_output(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-        trace!("Existing output is updated");
-    }
-
-    fn output_destroyed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _output: wl_output::WlOutput,
-    ) {
-        trace!("Output is destroyed");
-    }
-}
-
-impl CompositorHandler for SpellWin {
-    fn scale_factor_changed(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_surface::WlSurface,
-        _: i32,
-    ) {
-        info!("Scale factor changed, compositor msg");
-    }
-
-    fn transform_changed(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _new_transform: wl_output::Transform,
-    ) {
-        trace!("Compositor transformation changed");
-    }
-
-    fn frame(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _time: u32,
-    ) {
-        self.converter(qh);
-        self.popup_manager.redraw_popups(qh);
-    }
-
-    fn surface_enter(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        trace!("Surface entered");
-    }
-
-    fn surface_leave(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
-        _output: &wl_output::WlOutput,
-    ) {
-        trace!("Surface left");
-    }
-}
-
-impl FractionalScaleHandler for SpellWin {
-    fn preferred_scale(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_surface::WlSurface,
-        scale: u32,
-    ) {
-        info!("Scale factor changed, invoked from custom trait: {}", scale);
-        let width_old = self.adapter.as_ref().unwrap().size_original.get().width;
-        let height_old = self.adapter.as_ref().unwrap().size_original.get().height;
-        self.layer.as_ref().unwrap().wl_surface().damage_buffer(
-            0,
-            0,
-            self.adapter.as_ref().unwrap().size.get().width as i32,
-            self.adapter.as_ref().unwrap().size.get().height as i32,
-        );
-        let (buffer, width, height, scale_factor) =
-            self.adapter.as_ref().unwrap().changed_scale_factor(scale);
-        self.config.evaluated_width = width;
-        self.config.evaluated_height = height;
-        self.buffer = Some(buffer);
-        self.adapter
-            .as_ref()
-            .unwrap()
-            .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
-            .unwrap();
-        self.viewport.as_ref().unwrap().set_source(
-            0.,
-            0.,
-            self.adapter.as_ref().unwrap().size.get().width.into(),
-            self.adapter.as_ref().unwrap().size.get().height.into(),
-        );
-
-        self.viewport
-            .as_ref()
-            .unwrap()
-            .set_destination(width_old as i32, height_old as i32);
-        self.adapter.as_ref().unwrap().request_redraw();
-        self.layer.as_ref().unwrap().commit();
-    }
-}
-
-impl LayerShellHandler for SpellWin {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
-        trace!("Closure of layer called");
-    }
-
-    fn configure(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
-        _configure: LayerSurfaceConfigure,
-        _serial: u32,
-    ) {
-        self.converter(qh);
+    fn get_span(&self) -> tracing::span::Span {
+        self.span.clone()
     }
 }
 
@@ -913,12 +756,6 @@ impl WinHandle {
         self.0.insert_idle(move |win| win.set_exclusive_zone(val));
     }
 
-    pub fn close_popup(&self, id: u32) {
-        self.0.insert_idle(move |win| {
-            win.close_popup(id);
-        });
-    }
-
     pub fn open_popup<T: PopupSlint + 'static>(
         &mut self,
         popup_conf: PopupConf,
@@ -930,6 +767,12 @@ impl WinHandle {
             }
         });
         Ok(0)
+    }
+
+    pub fn close_popup(&self, id: u32) {
+        self.0.insert_idle(move |win| {
+            win.close_popup(id);
+        });
     }
 }
 
@@ -1373,6 +1216,16 @@ impl SpellAssociatedNew for SpellLock {
     }
 }
 
+delegate_keyboard!(SpellLock);
+delegate_compositor!(SpellLock);
+delegate_output!(SpellLock);
+delegate_shm!(SpellLock);
+delegate_registry!(SpellLock);
+delegate_pointer!(SpellLock);
+delegate_touch!(SpellLock);
+delegate_session_lock!(SpellLock);
+delegate_seat!(SpellLock);
+
 /// Struct to handle unlocking of a SpellLock instance. It can be captured from
 /// [`SpellLock::get_handler`].
 #[derive(Debug, Clone)]
@@ -1409,16 +1262,6 @@ impl LockHandle {
         });
     }
 }
-
-delegate_keyboard!(SpellLock);
-delegate_compositor!(SpellLock);
-delegate_output!(SpellLock);
-delegate_shm!(SpellLock);
-delegate_registry!(SpellLock);
-delegate_pointer!(SpellLock);
-delegate_touch!(SpellLock);
-delegate_session_lock!(SpellLock);
-delegate_seat!(SpellLock);
 
 /// Future XDGpopup implementation will occur on this struct;
 pub struct SpellXDGPopup {
