@@ -18,7 +18,7 @@ const BTN_FORWARD: u32 = 0x115;
 const BTN_BACK: u32 = 0x116;
 
 /// Maps evdev pointer button codes to the Slint [PointerEventButton] enum.
-pub fn map_pointer_button(button: u32) -> PointerEventButton {
+pub(super) fn map_pointer_button(button: u32) -> PointerEventButton {
     match button {
         BTN_LEFT => PointerEventButton::Left,
         BTN_RIGHT => PointerEventButton::Right,
@@ -33,7 +33,7 @@ pub fn map_pointer_button(button: u32) -> PointerEventButton {
 ///
 /// [MouseCursor::None] is handled internally by the program because there
 /// is no wayland cursor shape for it
-pub fn mouse_cursor_to_shape(cursor: MouseCursor) -> Shape {
+pub(super) fn mouse_cursor_to_shape(cursor: MouseCursor) -> Shape {
     match cursor {
         MouseCursor::Default => Shape::Default,
         MouseCursor::Help => Shape::Help,

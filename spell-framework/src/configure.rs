@@ -65,8 +65,6 @@ pub enum Dimension {
     Pixel(u32),
 }
 
-// FIXME: Privatize WindowConf values and move the documentation to WindowConfBuilder.
-
 /// WindowConf is an essential struct passed on to widget constructor functions (like invoke_spell
 /// of generated code) for defining the specifications of the widget.
 ///
@@ -76,46 +74,19 @@ pub enum Dimension {
 /// 2. Builder will also panic if percentage or full is used without specifying the monitor explicitly.
 #[derive(Debug, Clone)]
 pub struct WindowConf {
-    /// Defines the widget width in pixels, fullscreen width or pecentage width of full screen.
-    /// On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
-    /// note that the value should be the maximum width the widget will ever attain, not the
-    /// current width in case of resizeable widgets. This value has full screen width as its default.
-    pub width: Dimension,
-    /// Defines the widget height in pixels, fullscreen width or pecentage height of full screen.
-    /// On setting values greater than the provided pixels of
-    /// monitor, the widget offsets from monitor's rectangular monitor space. It is important to
-    /// note that the value should be the maximum height the widget will ever attain, not the
-    /// current height in case of resizeable widgets. This value has full screen height as its default.
-    pub height: Dimension,
+    pub(super) width: Dimension,
+    pub(super) height: Dimension,
     /// width calculated from provided Dimension of width. Not intended for external use.
-    pub evaluated_width: u32,
+    pub(super) evaluated_width: u32,
     /// height provided from evaluated Dimension of height. Not intended for external use.
-    pub evaluated_height: u32,
-    /// Defines the Anchors to which the window needs to be attached. View [`Anchor`] for
-    /// related explaination of usage. If both values are None, then widget is displayed in the
-    /// center of screen.
-    pub anchor: [Option<Anchor>; 4],
-    /// Defines the margin of widget from monitor edges, negative values make the widget go outside
-    /// of monitor pixels if anchored to some edge(s). Otherwise, the widget moves to the opposite
-    /// direction to the given pixels. Defaults to `0` for all sides.
-    pub margin: (i32, i32, i32, i32),
-    /// Defines the possible layer on which to define the widget. View [`Layer`] for more details.
-    /// Defaults to [`Layer::Top`].
-    pub layer_type: Layer,
-    /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`] for more
-    /// details. Defauts to [`KeyboardInteractivity::None`]
-    pub board_interactivity: Cell<KeyboardInteractivity>,
-    /// Defines if the widget is exclusive of not,if not set to None, else set to number of pixels to
-    /// set as exclusive zone as i32. Defaults to no exclusive zone.
-    pub exclusive_zone: Option<i32>,
-    /// Defines the monitor name on which to spawn the window.
-    /// When no monitor is provided, the window is spawned on the default monitor.
-    pub monitor_name: Option<String>,
-    /// Defines if the method of scrolling for the widget should be natural or
-    /// reverse. Defaults to reverse scrolling. Learn more about scrolling types
-    /// [here](https://blog.logrocket.com/ux-design/natural-vs-reverse-scrolling/).
-    pub natural_scroll: bool,
+    pub(super) evaluated_height: u32,
+    pub(super) anchor: [Option<Anchor>; 4],
+    pub(super) margin: (i32, i32, i32, i32),
+    pub(super) layer_type: Layer,
+    pub(super) board_interactivity: Cell<KeyboardInteractivity>,
+    pub(super) exclusive_zone: Option<i32>,
+    pub(super) monitor_name: Option<String>,
+    pub(super) natural_scroll: bool,
 }
 
 impl WindowConf {
@@ -142,84 +113,114 @@ pub struct WindowConfBuilder {
 }
 
 impl WindowConfBuilder {
-    /// Sets [`WindowConf::width`].
+    /// Defines the widget width in pixels, fullscreen width or pecentage width
+    /// of full screen. On setting values greater than the provided pixels of
+    /// monitor, the widget offsets from monitor's rectangular monitor space.
+    /// It is important to note that the value should be the maximum width the
+    /// widget will ever attain, not the current width in case of resizeable widgets.
+    /// This value has full screen width as its default.
     pub fn width<I: Into<Dimension>>(&mut self, width: I) -> &mut Self {
         let new = self;
         new.max_width = width.into();
         new
     }
 
-    /// Sets [`WindowConf::height`].
+    /// Defines the widget height in pixels, fullscreen width or pecentage height
+    /// of full screen. On setting values greater than the provided pixels of
+    /// monitor, the widget offsets from monitor's rectangular monitor space. It
+    /// is important to note that the value should be the maximum height the widget
+    /// will ever attain, not the current height in case of resizeable widgets.
+    /// This value has full screen height as its default.
     pub fn height<I: Into<Dimension>>(&mut self, height: I) -> &mut Self {
         let x = self;
         x.max_height = height.into();
         x
     }
 
-    /// Sets first anchor of [`WindowConf::anchor`].
+    /// Defines the first anchor to which the window needs to be attached. View
+    /// [`Anchor`] for related explaination of usage. If all values are None,
+    /// then widget is displayed in the center of screen.
     pub fn anchor_1(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
         x.anchor[0] = Some(anchor);
         x
     }
 
-    /// Sets second anchor of [`WindowConf::anchor`].
+    /// Defines the second anchor to which the window needs to be attached. View
+    /// [`Anchor`] for related explaination of usage. If all values are None,
+    /// then widget is displayed in the center of screen.
     pub fn anchor_2(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
         x.anchor[1] = Some(anchor);
         x
     }
 
-    /// Sets third anchor of [`WindowConf::anchor`].
+    /// Defines the third anchor to which the window needs to be attached. View
+    /// [`Anchor`] for related explaination of usage. If all values are None,
+    /// then widget is displayed in the center of screen.
     pub fn anchor_3(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
         x.anchor[2] = Some(anchor);
         x
     }
 
-    /// Sets fourth anchor of [`WindowConf::anchor`].
+    /// Defines the fourth anchor to which the window needs to be attached. View
+    /// [`Anchor`] for related explaination of usage. If all values are None,
+    /// then widget is displayed in the center of screen.
     pub fn anchor_4(&mut self, anchor: Anchor) -> &mut Self {
         let x = self;
         x.anchor[3] = Some(anchor);
         x
     }
 
-    /// Sets [`WindowConf::margin`].
+    /// Defines the margin of widget from monitor edges, negative values make the
+    /// widget go outside of monitor pixels if anchored to some edge(s). Otherwise,
+    /// the widget moves to the opposite direction to the given pixels. Defaults to
+    /// `0` for all sides.
     pub fn margins(&mut self, top: i32, right: i32, bottom: i32, left: i32) -> &mut Self {
         let x = self;
         x.margin = (top, right, bottom, left);
         x
     }
 
-    /// Sets [`WindowConf::layer_type`].
+    /// Defines the possible layer on which to define the widget. View [`Layer`]
+    /// for more details. Defaults to [`Layer::Top`].
     pub fn layer_type(&mut self, layer: Layer) -> &mut Self {
         let x = self;
         x.layer_type = Some(layer);
         x
     }
 
-    /// Sets [`WindowConf::board_interactivity`].
+    /// Defines the relation of widget with Keyboard. View [`KeyboardInteractivity`]
+    /// for more details. Defauts to [`KeyboardInteractivity::None`]
     pub fn board_interactivity(&mut self, board: KeyboardInteractivity) -> &mut Self {
         let x = self;
         x.board_interactivity = board;
         x
     }
 
-    /// Sets [`WindowConf::exclusive_zone`].
+    /// Defines if the widget is exclusive of not, if not set, defaults to None,
+    /// else sets to number of pixels to set as exclusive zone as i32.
+    /// Defaults to no exclusive zone (i.e. None as mentioned).
     pub fn exclusive_zone(&mut self, dimension: i32) -> &mut Self {
         let x = self;
         x.exclusive_zone = Some(dimension);
         x
     }
 
-    /// Sets [`WindowConf::monitor_name`].
+    /// Defines the monitor name on which to spawn the window. It is necessary
+    /// to set this value if a percentage dimention is given to either width or
+    /// height; When no monitor is provided, the window is spawned on the
+    /// default monitor.
     pub fn monitor(&mut self, name: String) -> &mut Self {
         let x = self;
         x.monitor_name = Some(name);
         x
     }
 
-    /// Sets [`WindowConf::natural_scroll`].
+    /// Defines if the method of scrolling for the widget should be natural or
+    /// reverse. Defaults to reverse scrolling. Learn more about scrolling types
+    /// [here](https://blog.logrocket.com/ux-design/natural-vs-reverse-scrolling/).
     pub fn natural_scroll(&mut self, scroll: bool) -> &mut Self {
         let x = self;
         x.natural_scroll = scroll;
