@@ -188,15 +188,15 @@ stable version is out!!.Create a spell project and give it a shot.
 ## Caution
 
 > [!WARNING]
-> The crate is under active development and breaking changes are expected.
+> The crate is under active development and breaking changes are expected though
+> rare at the moment.
 
-1. Multi-widget gets unstable sometimes due to changes in slint.
+1. A year or so of bad design and programming decisions have come back to haunt
+   me now, making, feature addition and further changes difficult. Hence, the project
+   is under major restructuring to ease out the process for future development.
+   Internal improvements that are to be done are mentioned in `RESTRUCTURE.md` file.
 2. Hide and show features of widgets work flawlessly in niri but hangs in hyprland
    due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
-
-Efforts are in way to clear out these rough edges. For the time being, you can
-head over to minimal example to add appropriate patches and dependencies to
-use spell with slint.
 
 ## Inspiration 💡
 

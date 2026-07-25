@@ -24,7 +24,7 @@ In the Next release (1.0.0 onwards), following things will be included:
 2. [x] (Partially implemented for slint but not for rust side) Maybe hot reloading
 3. (by trying to integrate subsecond) which I discovered in a rustconf presentation.
 4. [x] Making multi-window system multi-threaded for better performance on niri.
-5. [ ] Addition of compatibility with clipboard.
+5. [x] Addition of compatibility with clipboard.
 
 ---
 
