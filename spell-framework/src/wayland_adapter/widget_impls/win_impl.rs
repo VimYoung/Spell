@@ -1,8 +1,8 @@
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
     wayland_adapter::{
-        SpellWin, fractional_scaling::FractionalScaleHandler, pointer_button::map_pointer_button,
-        way_helper::get_string,
+        SpellWin, fractional_scaling::FractionalScaleHandler, mapping::get_string,
+        mapping::map_pointer_button,
     },
 };
 use slint::{

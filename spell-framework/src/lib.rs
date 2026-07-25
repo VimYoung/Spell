@@ -6,6 +6,7 @@
 )]
 #![doc = include_str!("../docs/entry.md")]
 // #![warn(missing_docs)]
+
 mod configure;
 #[cfg(docsrs)]
 mod dummy_skia_docs;
@@ -18,6 +19,7 @@ mod skia_non_docs;
 pub mod slint_adapter;
 pub mod vault;
 pub mod wayland_adapter;
+
 /// It contains related enums and struct which are used to manage,
 /// define and update various properties of a widget(viz a viz layer). You can import necessary
 /// types from this module to implement relevant features. See docs of related objects for
