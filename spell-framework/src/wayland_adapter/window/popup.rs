@@ -28,14 +28,14 @@ use crate::{
     },
 };
 
-pub(crate) struct PopupManager {
+pub(super) struct PopupManager {
     id_gen: u32,
     popups: HashMap<u32, Box<dyn PopupSlint>>,
     pool: Option<Rc<RefCell<SlotPool>>>,
 }
 
 impl PopupManager {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         PopupManager {
             id_gen: 0,
             popups: HashMap::new(),
@@ -43,7 +43,7 @@ impl PopupManager {
         }
     }
 
-    pub(crate) fn return_popup(&self, popup_inner: &Popup) -> Option<&dyn PopupSlint> {
+    pub(super) fn return_popup(&self, popup_inner: &Popup) -> Option<&dyn PopupSlint> {
         for popup in self.popups.values() {
             if popup_inner == popup.inner() {
                 return Some(popup.as_ref());
@@ -52,11 +52,11 @@ impl PopupManager {
         None
     }
 
-    pub(crate) fn set_pool(&mut self, pool: Rc<RefCell<SlotPool>>) {
+    pub(super) fn set_pool(&mut self, pool: Rc<RefCell<SlotPool>>) {
         self.pool = Some(pool);
     }
 
-    pub(crate) fn create_popup<T: PopupSlint + 'static>(
+    pub(super) fn create_popup<T: PopupSlint + 'static>(
         &mut self,
         popup: Popup,
         popup_conf: PopupConf,
@@ -110,13 +110,13 @@ impl PopupManager {
         self.id_gen - 1
     }
 
-    pub(crate) fn redraw_popups(&self, qh: &QueueHandle<SpellWin>) {
+    pub(super) fn redraw_popups(&self, qh: &QueueHandle<SpellWin>) {
         for popup in self.popups.values() {
             popup.converter_popup(popup.inner().wl_surface(), qh);
         }
     }
 
-    pub(crate) fn return_adapter(
+    pub(super) fn return_adapter(
         &self,
         surface: &WlSurface,
     ) -> Option<&std::rc::Rc<SpellSkiaWinAdapter>> {
@@ -128,7 +128,7 @@ impl PopupManager {
         None
     }
 
-    pub(crate) fn call_ack(&self, xdg_surface: &XdgSurface, serial: u32) {
+    pub(super) fn call_ack(&self, xdg_surface: &XdgSurface, serial: u32) {
         for popup in self.popups.values() {
             if popup.inner().xdg_surface() == xdg_surface {
                 popup.inner().xdg_surface().ack_configure(serial);
@@ -136,7 +136,7 @@ impl PopupManager {
         }
     }
 
-    pub(crate) fn close_popup(&mut self, id: &u32) {
+    pub(super) fn close_popup(&mut self, id: &u32) {
         if let Some(rem_popup) = self.popups.remove(id) {
             rem_popup.inner().xdg_popup().destroy();
             info!("Removed Popup with id: {}", id);

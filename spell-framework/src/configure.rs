@@ -97,8 +97,7 @@ impl WindowConf {
     }
 }
 
-/// A builder method for [`WindowConf`]. For default values, refer to parameters
-/// of [`WindowConf`].
+/// A builder method for [`WindowConf`].
 #[derive(Default)]
 pub struct WindowConfBuilder {
     max_width: Dimension,

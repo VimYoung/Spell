@@ -1,11 +1,60 @@
-// This module contains mapping from slint to wayland and vice versa for pointer,
-// cursor and strings.
-use i_slint_core::items::{MouseCursor, PointerEventButton};
-use slint::{SharedString, platform::Key};
-use smithay_client_toolkit::{
-    reexports::protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
-    seat::keyboard::{KeyEvent, Keysym},
+use i_slint_core::items::MouseCursor;
+// This module contains mapping to strings and pointerdata objects common to both
+// lock and window.
+use slint::{
+    SharedString,
+    platform::{Key, PointerEventButton},
 };
+use smithay_client_toolkit::{
+    reexports::{
+        client::{QueueHandle, protocol::wl_pointer},
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+    },
+    seat::{
+        keyboard::{KeyEvent, Keysym},
+        pointer::{PointerData, cursor_shape::CursorShapeManager},
+    },
+};
+
+use crate::wayland_adapter::SpellWin;
+
+#[derive(Debug)]
+pub(crate) struct PointerState {
+    pub pointer: Option<wl_pointer::WlPointer>,
+    pub pointer_data: Option<PointerData>,
+    pub cursor_shape: CursorShapeManager,
+    pub current_wayland_cursor: MouseCursor,
+    pub last_cursor_enter_serial: Option<u32>,
+}
+
+impl PointerState {
+    /// Updates the cursor shape
+    ///
+    /// If the cursor is [MouseCursor::None], the cursor will be hidden
+    ///
+    /// If the cursor is not [MouseCursor::None], the cursor will be set to the shape corresponding to the cursor
+    ///
+    /// The cursor is only updated when it doesn't match the current cursor
+    pub(crate) fn update_cursor(
+        &mut self,
+        mouse_cursor: MouseCursor,
+        queue: &QueueHandle<SpellWin>,
+    ) {
+        if let Some(serial) = self.last_cursor_enter_serial
+            && let Some(pointer) = self.pointer.as_ref()
+            && mouse_cursor != self.current_wayland_cursor
+        {
+            if mouse_cursor == MouseCursor::None {
+                pointer.set_cursor(serial, None, 0, 0);
+            } else {
+                self.cursor_shape
+                    .get_shape_device(pointer, queue)
+                    .set_shape(serial, mouse_cursor_to_shape(mouse_cursor));
+            }
+            self.current_wayland_cursor = mouse_cursor;
+        }
+    }
+}
 
 // Uses the official evdev pointer button codes defined in:
 // https://github.com/torvalds/linux/blob/8e65320d91cdc3b241d4b94855c88459b91abf66/include/uapi/linux/input-event-codes.h#L357-L361
@@ -67,7 +116,7 @@ pub(super) fn mouse_cursor_to_shape(cursor: MouseCursor) -> Shape {
     }
 }
 
-/// Maps wayland specific keys into slint key events and then parsing the
+// Uses the /// Maps wayland specific keys into slint key events and then parsing the
 /// information as a SharedString.
 /// In case the matching is not present sharedstring is created from utf8
 /// representation of event.

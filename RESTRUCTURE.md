@@ -15,3 +15,4 @@ Changes in the code for better readability are mentioned below:
    - Macro creation for helper methods.
 4. [ ] Remover bin binaries from everywhere except the demo.
 5. [ ] remove the match matching in CLI and uses clap for better management.
+6. [ ] Remove any available todo!() macros with proper error handling or logging.
