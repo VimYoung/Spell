@@ -1,5 +1,3 @@
-use tracing_subscriber::EnvFilter;
-
 use crate::{
     PopupSlint, SpellAssociatedNew,
     configure::{Dimension, HomeHandle, PopupConf, WindowConf, set_up_tracing},
@@ -12,7 +10,6 @@ use crate::{
     },
 };
 use i_slint_core::items::MouseCursor;
-use slint::platform::WindowAdapter;
 use smithay_client_toolkit::{
     compositor::{CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -20,18 +17,14 @@ use smithay_client_toolkit::{
     delegate_xdg_shell,
     output::OutputState,
     reexports::{
-        calloop::{
-            self, EventLoop, LoopHandle,
-            timer::{TimeoutAction, Timer},
-        },
+        calloop::{self, EventLoop, LoopHandle},
         calloop_wayland_source::WaylandSource,
         client::{
-            Connection, EventQueue, QueueHandle,
+            Connection, QueueHandle,
             globals::registry_queue_init,
             protocol::{
                 wl_keyboard::WlKeyboard,
                 wl_output::{self, WlOutput},
-                wl_region::WlRegion,
                 wl_shm,
                 wl_surface::WlSurface,
                 wl_touch::WlTouch,
@@ -53,12 +46,9 @@ use smithay_client_toolkit::{
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    fs,
-    io::{BufRead, BufReader},
     os::unix::net::UnixListener,
     rc::Rc,
     sync::{Once, OnceLock, RwLock},
-    time::Duration,
 };
 use tracing::{Level, info, span, trace, warn};
 
@@ -309,17 +299,12 @@ impl SpellWin {
             target_output,
         );
 
-        window::set_config(
-            &win.config,
-            &layer,
-            //true,
-            Some(win.input_region.wl_region()),
-            None,
-        );
+        win.layer = Some(layer);
+        win.set_config_internal();
+
         if let Err(err) = event_queue.roundtrip(&mut win) {
             warn!("Received roundtrip error: {}", err);
         }
-        win.layer = Some(layer);
         let surface: &WlSurface = win.layer.as_ref().unwrap().wl_surface();
         let fractional_scale = win.states.fractional_scale_state.get_scale(surface, &qh);
         let viewport = win
@@ -329,11 +314,7 @@ impl SpellWin {
         win.viewport = Some(viewport);
 
         win.layer.as_ref().unwrap().commit();
-        window::set_event_sources(
-            &win.event_loop.as_ref().borrow(),
-            handle,
-            slint_event_receiver,
-        );
+        win.set_event_sources(handle, slint_event_receiver);
 
         info!("Win: {} layer created successfully.", layer_name);
 
@@ -341,39 +322,6 @@ impl SpellWin {
             .insert(win.loop_handle.clone())
             .unwrap();
         win
-    }
-
-    /// Fetches the available monitors from the Wayland registry.
-    ///
-    /// This function fetches the available monitors from the Wayland registry
-    /// and returns a map of the available monitors where the key is the name
-    /// of the monitor and the value is [`wl_output::WlOutput`] with its assosiated
-    /// logical size(width, height). Dimentions are later used in size determination.
-    /// It uses an already registered event queue & spell window.
-    ///
-    /// # Errors
-    ///
-    /// Returns `None` if the registry queue could not be initialized.
-    fn get_available_monitors(
-        event_queue: &mut EventQueue<SpellWin>,
-        win: &mut SpellWin,
-    ) -> Option<HashMap<String, (wl_output::WlOutput, i32, i32)>> {
-        // roundtrip to get all available monitors from Wayland
-        event_queue.roundtrip(win).ok()?;
-
-        Some(
-            win.states
-                .output_state
-                .outputs()
-                .filter_map(|output| {
-                    let info = win.states.output_state.info(&output)?;
-                    Some((
-                        info.name?,
-                        (output, info.logical_size?.0, info.logical_size?.1),
-                    ))
-                })
-                .collect(),
-        )
     }
 
     /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
@@ -687,144 +635,5 @@ impl WinHandle {
         self.0.insert_idle(move |win| {
             win.close_popup(id);
         });
-    }
-}
-
-pub(super) fn set_event_sources(
-    event_loop: &EventLoop<'static, SpellWin>,
-    handle: HomeHandle,
-    slint_event_receiver: calloop::channel::Channel<Box<dyn FnOnce() + Send>>,
-) {
-    // let backspace_event = event_loop
-    //     .handle()
-    //     .insert_source(
-    //         Timer::from_duration(Duration::from_millis(1500)),
-    //         |_, _, data| {
-    //             data.adapter
-    //                 .try_dispatch_event(slint::platform::WindowEvent::KeyPressed {
-    //                     text: Key::Backspace.into(),
-    //                 })
-    //                 .unwrap();
-    //             TimeoutAction::ToDuration(Duration::from_millis(1500))
-    //         },
-    //     )
-    //     .unwrap();
-    // event_loop.handle().disable(&backspace_event).unwrap();
-
-    // // Inserting tracing source
-    let runtime_dir = std::env::var("XDG_RUNTIME_DIR").expect("runtime dir is not set");
-    let logging_dir = runtime_dir + "/spell/";
-    let socket_cli_dir = logging_dir.clone() + "/spell_cli";
-
-    // This is currently redundent source as it is not working in any way
-    event_loop
-        .handle()
-        .insert_source(
-            Timer::from_duration(Duration::from_secs(2)),
-            move |_, _, _| {
-                let file = fs::File::open(&socket_cli_dir)
-                    .unwrap_or_else(|_| fs::File::create_new(&socket_cli_dir).unwrap());
-                let buf = BufReader::new(file);
-                let file_contents: Vec<String> = buf
-                    .lines()
-                    .map(|l| l.expect("Could not parse line"))
-                    .collect();
-                if !file_contents.is_empty() {
-                    match file_contents[0].as_str() {
-                        "slint_log" => {
-                            handle
-                                .modify(|layer| {
-                                    *layer.filter_mut() =
-                                        EnvFilter::new("spell_framework::slint_adapter=info,warn");
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                });
-                        }
-                        "debug" => {
-                            handle
-                                .modify(|layer| {
-                                    *layer.filter_mut() =
-                                        EnvFilter::new("spell_framework=info,warn"); //*layer;
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                });
-                        }
-                        "dump" => {
-                            handle
-                                .modify(|layer| {
-                                    *layer.filter_mut() =
-                                        EnvFilter::new("spell_framework=trace,info"); //*layer;
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                });
-                        }
-                        "dev" => {
-                            handle
-                                .modify(|layer| {
-                                    *layer.filter_mut() =
-                                        EnvFilter::new("spell_framework=trace,warn"); //*layer;
-                                })
-                                .unwrap_or_else(|error| {
-                                    warn!("Error when setting slint_log: {}", error);
-                                });
-                        }
-                        val => {
-                            warn!("Something else came: {}", val);
-                        }
-                    }
-                }
-                TimeoutAction::ToDuration(Duration::from_secs(2))
-            },
-        )
-        .unwrap();
-
-    event_loop
-        .handle()
-        .insert_source(slint_event_receiver, |event, _, data| {
-            if let calloop::channel::Event::Msg(callback) = event {
-                callback();
-                data.adapter.as_ref().unwrap().request_redraw();
-            }
-        })
-        .unwrap();
-}
-
-pub(super) fn set_config(
-    window_conf: &WindowConf,
-    layer: &LayerSurface,
-    input_region: Option<&WlRegion>,
-    opaque_region: Option<&WlRegion>,
-) {
-    layer.set_size(window_conf.evaluated_width, window_conf.evaluated_height);
-    layer.set_margin(
-        window_conf.margin.0,
-        window_conf.margin.1,
-        window_conf.margin.2,
-        window_conf.margin.3,
-    );
-    layer.set_keyboard_interactivity(window_conf.board_interactivity.get());
-    if let Some(in_region) = input_region {
-        layer.set_input_region(Some(in_region));
-    }
-    if let Some(op_region) = opaque_region {
-        layer.set_opaque_region(Some(op_region));
-    }
-    layer.set_layer(window_conf.layer_type);
-    set_anchor(window_conf, layer);
-}
-
-fn set_anchor(window_conf: &WindowConf, layer: &LayerSurface) {
-    let mut anchors = window_conf.anchor.into_iter().flatten();
-    if let Some(mut combined) = anchors.next() {
-        for a in anchors {
-            combined.insert(a);
-        }
-        layer.set_anchor(combined);
-    }
-    if let Some(val) = window_conf.exclusive_zone {
-        layer.set_exclusive_zone(val);
     }
 }

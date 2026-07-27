@@ -1,24 +1,22 @@
-use crate::{
-    slint_adapter::SpellSkiaWinAdapter,
-    wayland_adapter::{SpellWin, common, common::get_string},
+use crate::wayland_adapter::{
+    SpellLock,
+    common::{self, get_string},
 };
 use slint::{SharedString, platform::WindowEvent};
 use smithay_client_toolkit::{
-    reexports::client::{Connection, QueueHandle, protocol::wl_pointer},
+    reexports::{
+        client::{Connection, QueueHandle, protocol::wl_pointer},
+        protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape,
+    },
     seat::{
         keyboard::KeyboardHandler,
         pointer::{PointerEvent, PointerEventKind, PointerHandler},
         touch::TouchHandler,
     },
-    shell::WaylandSurface,
 };
 use tracing::{info, trace, warn};
 
-// Slint doesn't hve very specific
-// APIs for touch support (I think). I am talking with them on what
-// can be done so that things like multi-touch support, gestures etc
-// can be made possible. For now I am going to place empty value in here.
-impl TouchHandler for SpellWin {
+impl TouchHandler for SpellLock {
     fn up(
         &mut self,
         _conn: &Connection,
@@ -53,9 +51,7 @@ impl TouchHandler for SpellWin {
         _id: i32,
         position: (f64, f64),
     ) {
-        self.adapter
-            .as_ref()
-            .unwrap()
+        self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::PointerMoved {
                 position: slint::LogicalPosition {
                     x: position.0 as f32,
@@ -96,60 +92,52 @@ impl TouchHandler for SpellWin {
     }
 }
 
-impl PointerHandler for SpellWin {
+impl PointerHandler for SpellLock {
     fn pointer_frame(
         &mut self,
         _conn: &Connection,
-        _qh: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _pointer: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
         use PointerEventKind::*;
         for event in events {
-            let adapter: &std::rc::Rc<SpellSkiaWinAdapter> =
-                if let Some(popup) = self.popup_manager.return_adapter(&event.surface) {
-                    popup
-                } else if &event.surface == self.layer.as_ref().unwrap().wl_surface() {
-                    self.adapter.as_ref().unwrap()
-                } else {
+            // Ignore events for other surfaces
+            for surface in self.lock_surfaces.iter() {
+                if event.surface != *surface.wl_surface() {
                     continue;
-                };
-
+                }
+            }
             match event.kind {
-                Enter { serial } => {
-                    trace!(
-                        "Pointer entered with serial {:?} at: {:?}",
-                        serial, event.position
-                    );
+                Enter { .. } => {
+                    info!("Pointer entered: {:?}", event.position);
 
-                    adapter
-                        .try_dispatch_event(WindowEvent::PointerMoved {
-                            position: slint::LogicalPosition {
-                                x: event.position.0 as f32,
-                                y: event.position.1 as f32,
-                            },
-                        })
-                        .unwrap_or_else(|err| {
-                            warn!(
-                                "Pointer move event after entry failed with error: {:?}",
-                                err
-                            )
-                        });
-                    self.states.pointer_state.last_cursor_enter_serial = Some(serial);
+                    // TODO this code is redundent, as it doesn't set the cursor shape.
+                    let pointer = &self.pointer_state.pointer.as_ref().unwrap();
+                    let serial_no: Option<u32> = self
+                        .pointer_state
+                        .pointer_data
+                        .as_ref()
+                        .unwrap()
+                        .latest_enter_serial();
+                    if let Some(no) = serial_no {
+                        self.pointer_state
+                            .cursor_shape
+                            .get_shape_device(pointer, qh)
+                            .set_shape(no, Shape::Pointer);
+                    }
                 }
                 Leave { .. } => {
-                    trace!("Pointer left: {:?}", event.position);
-
-                    adapter
+                    info!("Pointer left: {:?}", event.position);
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap_or_else(|err| {
-                            warn!("Pointer exit event failed with error: {:?}", err)
+                            warn!("Pointer left event failed with error: {:?}", err)
                         });
                 }
                 Motion { .. } => {
-                    trace!("Pointer entered @{:?}", event.position);
-
-                    adapter
+                    // debug!("Pointer entered @{:?}", event.position);
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerMoved {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -161,9 +149,9 @@ impl PointerHandler for SpellWin {
                         });
                 }
                 Press { button, .. } => {
-                    trace!("Press {:?} @ {:?}", button, event.position);
+                    trace!("Press {:x} @ {:?}", button, event.position);
 
-                    adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerPressed {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -176,9 +164,9 @@ impl PointerHandler for SpellWin {
                         });
                 }
                 Release { button, .. } => {
-                    trace!("Release {:?} @ {:?}", button, event.position);
+                    trace!("Release {:x} @ {:?}", button, event.position);
 
-                    adapter
+                    self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerReleased {
                             position: slint::LogicalPosition {
                                 x: event.position.0 as f32,
@@ -196,41 +184,25 @@ impl PointerHandler for SpellWin {
                     ..
                 } => {
                     trace!("Scroll H:{horizontal:?}, V:{vertical:?}");
-
-                    if !self.natural_scroll {
-                        adapter
-                            .try_dispatch_event(WindowEvent::PointerScrolled {
-                                position: slint::LogicalPosition {
-                                    x: event.position.0 as f32,
-                                    y: event.position.1 as f32,
-                                },
-                                delta_x: horizontal.absolute as f32,
-                                delta_y: vertical.absolute as f32,
-                            })
-                            .unwrap_or_else(|err| {
-                                warn!("Pointer scroll event failed with error: {:?}", err)
-                            });
-                    } else {
-                        adapter
-                            .try_dispatch_event(WindowEvent::PointerScrolled {
-                                position: slint::LogicalPosition {
-                                    x: event.position.0 as f32,
-                                    y: event.position.1 as f32,
-                                },
-                                delta_x: -horizontal.absolute as f32,
-                                delta_y: -vertical.absolute as f32,
-                            })
-                            .unwrap_or_else(|err| {
-                                warn!("Pointer scroll event failed with error: {:?}", err)
-                            });
-                    }
+                    self.slint_part.as_ref().unwrap().adapters[0]
+                        .try_dispatch_event(WindowEvent::PointerScrolled {
+                            position: slint::LogicalPosition {
+                                x: event.position.0 as f32,
+                                y: event.position.1 as f32,
+                            },
+                            delta_x: horizontal.absolute as f32,
+                            delta_y: vertical.absolute as f32,
+                        })
+                        .unwrap_or_else(|err| {
+                            warn!("Pointer scroll event failed with error: {:?}", err)
+                        });
                 }
             }
         }
     }
 }
 
-impl KeyboardHandler for SpellWin {
+impl KeyboardHandler for SpellLock {
     fn enter(
         &mut self,
         _conn: &Connection,
@@ -263,20 +235,18 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        trace!("Key pressed");
         let string_val: SharedString = get_string(event);
         // if string_val == <slint::platform::Key as Into<SharedString>>::into(Key::Backspace) {
-        //     self.loop_handle.enable(&self.backspace).unwrap();
-        //     self.adapter
+        //     self.loop_handle.enable(&self.backspace.unwrap()).unwrap();
+        //     self.slint_part.as_ref().unwrap().adapters[0]
         //         .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
         //         .unwrap();
         // } else {
-        self.adapter
-            .as_ref()
-            .unwrap()
+        info!("Key pressed with value : {:?}", string_val);
+        self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
             .unwrap_or_else(|err| warn!("Key press event failed with error: {:?}", err));
-        // }
+        //}
     }
 
     fn release_key(
@@ -285,18 +255,16 @@ impl KeyboardHandler for SpellWin {
         _qh: &QueueHandle<Self>,
         _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
         _serial: u32,
-        /*mut*/ event: smithay_client_toolkit::seat::keyboard::KeyEvent,
+        event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        trace!("Key released");
-        // if let Err(err) = self.loop_handle.disable(&self.backspace) {
+        info!("Key is released");
+        // if let Err(err) = self.loop_handle.disable(&self.backspace.unwrap()) {
         //     warn!("{}", err);
         // }
         // let key_sym = Keysym::new(event.raw_code);
         // event.keysym = key_sym;
         let string_val: SharedString = get_string(event);
-        self.adapter
-            .as_ref()
-            .unwrap()
+        self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
             .unwrap_or_else(|err| warn!("Key release event failed with error: {:?}", err));
     }
@@ -312,16 +280,7 @@ impl KeyboardHandler for SpellWin {
         _raw_modifiers: smithay_client_toolkit::seat::keyboard::RawModifiers,
         _layout: u32,
     ) {
-    }
-    // TODO This method needs to be implemented after the looping mecha is changed to calloop.
-    fn update_repeat_info(
-        &mut self,
-        _conn: &Connection,
-        _qh: &QueueHandle<Self>,
-        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
-        _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
-    ) {
-        trace!("Key repeat info updated");
+        trace!("Updated modifiers");
     }
 
     fn repeat_key(
@@ -332,6 +291,16 @@ impl KeyboardHandler for SpellWin {
         _serial: u32,
         _event: smithay_client_toolkit::seat::keyboard::KeyEvent,
     ) {
-        trace!("Repeat key called");
+        trace!("Repeated key entered");
+    }
+    // TODO This method needs to be implemented after the looping mecha is changed to calloop.
+    fn update_repeat_info(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _keyboard: &smithay_client_toolkit::reexports::client::protocol::wl_keyboard::WlKeyboard,
+        _info: smithay_client_toolkit::seat::keyboard::RepeatInfo,
+    ) {
+        trace!("Repeat info updation called");
     }
 }
