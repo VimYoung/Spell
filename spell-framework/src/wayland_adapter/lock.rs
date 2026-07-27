@@ -92,25 +92,25 @@ mod wayland;
 /// }
 /// ```
 pub struct SpellLock {
-    pub(crate) loop_handle: LoopHandle<'static, SpellLock>,
-    pub(crate) conn: Connection,
-    pub(crate) compositor_state: CompositorState,
-    pub(crate) registry_state: RegistryState,
-    pub(crate) output_state: OutputState,
-    pub(crate) keyboard_state: Option<WlKeyboard>,
-    pub(crate) pointer_state: PointerState,
-    pub(crate) touch_state: Option<WlTouch>,
-    pub(crate) seat_state: SeatState,
-    pub(crate) shm: Shm,
-    pub(crate) session_lock: Option<SessionLock>,
-    pub(crate) lock_surfaces: Vec<SessionLockSurface>,
-    pub(crate) slint_part: Option<SpellSlintLock>,
-    pub(crate) is_locked: bool,
+    loop_handle: LoopHandle<'static, SpellLock>,
+    conn: Connection,
+    compositor_state: CompositorState,
+    registry_state: RegistryState,
+    output_state: OutputState,
+    keyboard_state: Option<WlKeyboard>,
+    pointer_state: PointerState,
+    touch_state: Option<WlTouch>,
+    seat_state: SeatState,
+    shm: Shm,
+    session_lock: Option<SessionLock>,
+    lock_surfaces: Vec<SessionLockSurface>,
+    slint_part: Option<SpellSlintLock>,
+    is_locked: bool,
     pub span: span::Span,
-    pub(crate) unlock_screen: Sender<bool>,
+    unlock_screen: Sender<bool>,
     // TODO, check if it need internal mutability?
-    pub(crate) event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
-    pub(crate) backspace: Option<RegistrationToken>,
+    event_loop: Rc<RefCell<EventLoop<'static, SpellLock>>>,
+    backspace: Option<RegistrationToken>,
 }
 
 impl std::fmt::Debug for SpellLock {

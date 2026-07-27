@@ -20,11 +20,11 @@ use crate::wayland_adapter::SpellWin;
 
 #[derive(Debug)]
 pub(crate) struct PointerState {
-    pub pointer: Option<wl_pointer::WlPointer>,
-    pub pointer_data: Option<PointerData>,
-    pub cursor_shape: CursorShapeManager,
-    pub current_wayland_cursor: MouseCursor,
-    pub last_cursor_enter_serial: Option<u32>,
+    pub(crate) pointer: Option<wl_pointer::WlPointer>,
+    pub(crate) pointer_data: Option<PointerData>,
+    pub(crate) cursor_shape: CursorShapeManager,
+    pub(crate) current_wayland_cursor: MouseCursor,
+    pub(crate) last_cursor_enter_serial: Option<u32>,
 }
 
 impl PointerState {

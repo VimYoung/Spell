@@ -306,6 +306,9 @@ impl SpellWin {
             warn!("Received roundtrip error: {}", err);
         }
         let surface: &WlSurface = win.layer.as_ref().unwrap().wl_surface();
+
+        // This needs to occur after layer creation so as to ensure that layer
+        // used in window is not null during use to scale. Details in issue 34.
         let fractional_scale = win.states.fractional_scale_state.get_scale(surface, &qh);
         let viewport = win
             .states

@@ -232,10 +232,12 @@ that I haven't used them extensively myself. For roadmap, view
 
 ## Contributing 🙌
 
-The library is still in an early stage. Yet I will encourage you to try it out,
-feel free to open issues and even better, PRs for issues. Feature requests can
-be posted in the issues section itself, but since a lot of things are planned
-already, they will take a lower priority.
+I encourage you to try it out, feel free to open issues and even better, PRs for
+issues. Feature requests can be posted in the issues section itself. Before posting
+make sure that the problem isn't already reported or present in [ROADMAP](https://github.com/VimYoung/Spell/blob/main/ROADMAP.md).
+If you want to contribute, refer to [CONTRIBUTE.md](https://github.com/VimYoung/Spell/blob/main/CONTRIBUTE.md)
+for project structure and code principles that are generally followed in writing
+spell.
 
 ---
 
