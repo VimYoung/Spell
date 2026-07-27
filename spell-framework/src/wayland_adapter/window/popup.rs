@@ -8,7 +8,7 @@ use smithay_client_toolkit::{
         protocols::xdg::shell::client::xdg_surface::XdgSurface,
     },
     shell::xdg::popup::Popup,
-    shm::slot::SlotPool,
+    shm::slot::{Buffer, SlotPool},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -22,9 +22,11 @@ use crate::{
     configure::{PopupConf, PopupSettings},
     slint_adapter::{ADAPTERS, SpellSkiaWinAdapter},
     wayland_adapter::{
-        SpellWin, SpellXDGPopup,
-        fractional_scaling::{FractionalScaleHandler, FractionalScaleState},
-        viewporter::ViewporterState,
+        SpellWin,
+        fractional_scaling::{
+            FractionalScaleHandler, FractionalScaleState, delegate_fractional_scale,
+        },
+        viewporter::{ViewporterState, delegate_viewporter},
     },
 };
 
@@ -148,6 +150,18 @@ impl PopupManager {
         };
     }
 }
+
+/// Future XDGpopup implementation will occur on this struct;
+pub struct SpellXDGPopup {
+    adapter: Rc<SpellSkiaWinAdapter>,
+    popup: Popup,
+    buffer: Buffer,
+    first_configure: Cell<bool>,
+    // viewport: Viewport,
+}
+
+delegate_fractional_scale!(SpellXDGPopup);
+delegate_viewporter!(SpellXDGPopup);
 
 impl SpellXDGPopup {
     pub fn new(popup_settings: PopupSettings) -> Self {

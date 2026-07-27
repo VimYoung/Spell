@@ -66,6 +66,7 @@ mod input;
 mod internal;
 mod popup;
 mod wayland;
+pub use popup::SpellXDGPopup;
 
 #[allow(clippy::type_complexity)]
 static AVAILABLE_MONITORS: OnceLock<RwLock<HashMap<String, (wl_output::WlOutput, i32, i32)>>> =
@@ -86,8 +87,8 @@ struct States {
     fractional_scale_state: FractionalScaleState,
 }
 
-/// `SpellWin` is the main type for implementing widgets, it covers various properties and trait
-/// implementation, thus providing various features.
+/// `SpellWin` is the main type for implementing widgets, it covers various properties
+/// and trait implementation, thus providing various features.
 pub struct SpellWin {
     adapter: Option<Rc<SpellSkiaWinAdapter>>,
     loop_handle: LoopHandle<'static, SpellWin>,

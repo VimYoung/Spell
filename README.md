@@ -35,7 +35,7 @@
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like niri, hyprland) using Slint UI.
 
-> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell)
+> [Here](https://vimyoung.github.io/Make_your_first_widget_with_Spell.html)
 > is a tutorial for new comers to get a hang of spell.
 
 Rather then leveraging Gtk for widget creation.Spell leverages Slint, a declarative

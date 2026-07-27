@@ -31,7 +31,8 @@
 Spell is a framework that provides necessary tooling to create highly customisable,
 shells for your wayland compositors (like niri, hyprland) using Slint UI.
 
-> [Here](https://ramayen.netlify.app/#/page/make%20your%20first%20widget%20with%20spell) is a tutorial for new comers to get a hang of spell.
+> [Here](https://vimyoung.github.io/Make_your_first_widget_with_Spell.html)
+> is a tutorial for new comers to get a hang of spell.
 
 Rather then leveraging Gtk for widget creation.Spell leverages Slint, a declarative
 language provides a very easy but comprehensive way to make aesthetic interfaces.
@@ -158,7 +159,7 @@ You can clone this repository and run the following examples.
 cargo run -p spell-demo --bin bar
 ```
 
-2. OSD from the tutorial blog can also be executed.
+1. OSD from the tutorial blog can also be executed.
 
 ```bash
 cargo run -p spell-demo --bin osd
@@ -176,7 +177,7 @@ Create a spell project and give it a shot.
 
 1. Multi-widget gets unstable sometimes due to changes in slint.
 2. Hide and show features of widgets work flawlessly in niri but hangs in hyprland
-  due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
+   due to an underlying [bug](https://github.com/hyprwm/Hyprland/discussions/11654).
 
 Efforts are in way to clear out these rough edges. For the time being, you can head over to minimal example
 to add appropriate patches and dependencies to use spell with slint.

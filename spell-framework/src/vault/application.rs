@@ -108,10 +108,10 @@ fn lookup_icon(icon_name: &str, theme_name: &str, search_dirs: &[PathBuf]) -> Op
     }
 
     // 2. hicolor fallback (skip if already visited through inheritance)
-    if !visited.iter().any(|v| v == "hicolor") {
-        if let Some(path) = lookup_in_theme_chain(icon_name, "hicolor", search_dirs, &mut visited) {
-            return Some(path);
-        }
+    if !visited.iter().any(|v| v == "hicolor")
+        && let Some(path) = lookup_in_theme_chain(icon_name, "hicolor", search_dirs, &mut visited)
+    {
+        return Some(path);
     }
 
     // 3. /usr/share/pixmaps — spec-mandated last resort
@@ -294,10 +294,10 @@ fn size_distance(subdir: &str) -> u32 {
     }
 
     // Parse "WxH" — only W is used (icons are square)
-    if let Some(w_str) = base.split('x').next() {
-        if let Ok(w) = w_str.parse::<u32>() {
-            return w.abs_diff(PREFERRED_SIZE);
-        }
+    if let Some(w_str) = base.split('x').next()
+        && let Ok(w) = w_str.parse::<u32>()
+    {
+        return w.abs_diff(PREFERRED_SIZE);
     }
 
     // Unrecognised format — sort to the back

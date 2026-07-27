@@ -29,7 +29,7 @@ use tracing::{info, trace, warn};
 
 use crate::{
     slint_adapter::SpellSkiaWinAdapter,
-    wayland_adapter::{SpellLock, common::get_string},
+    wayland_adapter::{common::get_string, lock::SpellLock},
 };
 
 impl ProvidesRegistryState for SpellLock {

@@ -3,7 +3,7 @@
 //! implementation is public because they had to be set by the user of library
 //! in intial iterations of spell_framework.
 use crate::configure::LayerConf;
-use slint::platform::{Clipboard::DefaultClipboard, EventLoopProxy, Platform, WindowAdapter};
+use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use smithay_client_toolkit::reexports::calloop;
 use std::{cell::RefCell, io::Read, rc::Rc};
 use tracing::{Level, info, span, warn};

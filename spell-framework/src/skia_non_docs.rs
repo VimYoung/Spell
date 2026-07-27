@@ -34,7 +34,7 @@ pub struct SkiaSoftwareBufferReal {
 
 impl SkiaSoftwareBufferReal {
     fn refresh_buffer(&self, width: i32, height: i32) -> Buffer {
-        let stride = width as i32 * 4;
+        let stride = width * 4;
         let (buffer, _raw_canvas) = self
             .pool
             .borrow_mut()
@@ -203,9 +203,10 @@ impl SpellSkiaWinAdapterReal {
         })
     }
 
-    pub fn draw(&self) -> bool {
+    fn draw(&self) -> bool {
         if self.needs_redraw.replace(false) {
-            self.renderer.render().unwrap_or_else(|err| {
+            // FIXME: add the outcome in adapter and use in wayland renderer/converter.
+            let _ = self.renderer.render().unwrap_or_else(|err| {
                 warn!("Panicking because of error: {}", err);
                 panic!("Seems like you have initialised slint before SpellWin");
             });

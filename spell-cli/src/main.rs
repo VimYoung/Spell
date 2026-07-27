@@ -24,10 +24,10 @@ use crate::constant_files::{
     BUILD_FILE_MATERIAL, BUILD_FILE_SLEEK, BUILD_FILE_SUI, BUILD_FILE_VIVI,
 };
 
-static MATERIAL_LIB: &'static [u8] = include_bytes!("../component_libs/material-1.0.zip");
-static SLEEK_LIB: &'static [u8] = include_bytes!("../component_libs/sleek.zip");
-static SUI_LIB: &'static [u8] = include_bytes!("../component_libs/surrealism-ui.zip");
-static VIVI_LIB: &'static [u8] = include_bytes!("../component_libs/vivi.zip");
+static MATERIAL_LIB: &[u8] = include_bytes!("../component_libs/material-1.0.zip");
+static SLEEK_LIB: &[u8] = include_bytes!("../component_libs/sleek.zip");
+static SUI_LIB: &[u8] = include_bytes!("../component_libs/surrealism-ui.zip");
+static VIVI_LIB: &[u8] = include_bytes!("../component_libs/vivi.zip");
 
 #[proxy(
     default_path = "/net/reactivated/Fprint/Manager",
@@ -342,28 +342,28 @@ fn create_spell_project(
 
     match external_lib {
         ThirdPartyComponents::Material => {
-            copy_dir(&MATERIAL_LIB, &path_ui)?;
+            copy_dir(MATERIAL_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_MATERIAL.as_bytes())?;
             println!("Writing slint file with material lib...");
             build_rs.write_all(BUILD_FILE_MATERIAL.as_bytes())?;
             println!("Writing build file with material...");
         }
         ThirdPartyComponents::Sleek => {
-            copy_dir(&SLEEK_LIB, &path_ui)?;
+            copy_dir(SLEEK_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_SLEEK.as_bytes())?;
             println!("Writing slint file with sleek external lib...");
             build_rs.write_all(BUILD_FILE_SLEEK.as_bytes())?;
             println!("Writing build file with sleek...");
         }
         ThirdPartyComponents::Surrealism => {
-            copy_dir(&SUI_LIB, &path_ui)?;
+            copy_dir(SUI_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_SUI.as_bytes())?;
             println!("Writing slint file surrealism lib...");
             build_rs.write_all(BUILD_FILE_SUI.as_bytes())?;
             println!("Writing build file surrealism...");
         }
         ThirdPartyComponents::Vivi => {
-            copy_dir(&VIVI_LIB, &path_ui)?;
+            copy_dir(VIVI_LIB, &path_ui)?;
             app_window_slint.write_all(APP_WINDOW_SLINT_VIVI.as_bytes())?;
             println!("Writing slint file with vivi lib...");
             build_rs.write_all(BUILD_FILE_VIVI.as_bytes())?;
@@ -492,7 +492,7 @@ async fn look_value(layer_name: String, mut values: Args) -> Result<(), SpellErr
 }
 
 async fn custom_called(layer_name: String, command: &str) -> Result<(), SpellError> {
-    let request = format!("{}", command);
+    let request = command.to_string();
     let path = format!("/tmp/{}_ipc.sock", layer_name.trim());
     let mut stream = UnixStream::connect(path)?;
     stream.write_all(request.as_bytes())?;
