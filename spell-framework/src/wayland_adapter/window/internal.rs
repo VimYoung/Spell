@@ -42,15 +42,10 @@ impl SpellWin {
         let height: u32 = self.adapter.as_ref().unwrap().size.get().height;
         let window_adapter = self.adapter.clone();
 
-        // Rendering from Skia
         if !self.is_hidden.get() {
-            // let skia_now = std::time::Instant::now();
+            // FIXME: Rendering should take place between the sources, here it
+            // should just be setting the buffers.
             let redraw_val: bool = window_adapter.unwrap().draw_if_needed();
-            // let elasped_time = skia_now.elapsed().as_millis();
-            // if elasped_time != 0 {
-            //     debug!("Skia Elapsed Time: {}", skia_now.elapsed().as_millis());
-            // }
-
             self.states
                 .pointer_state
                 .update_cursor(self.adapter.as_ref().unwrap().current_cursor.get(), qh);
