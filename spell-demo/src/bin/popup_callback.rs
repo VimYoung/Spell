@@ -14,7 +14,7 @@ slint::include_modules!();
 spell_framework::generate_widgets![PopupParent];
 
 struct TestPopupSpell {
-    frontend: TestPopup,
+    frontend: TestInstancePopup,
     backend: SpellXDGPopup,
 }
 
@@ -25,7 +25,7 @@ impl PopupSlint for TestPopupSpell {
     {
         let popup = SpellXDGPopup::new(settings);
         TestPopupSpell {
-            frontend: TestPopup::new().unwrap(),
+            frontend: TestInstancePopup::new().unwrap(),
             backend: popup,
         }
     }
@@ -48,7 +48,7 @@ impl PopupSlint for TestPopupSpell {
 }
 
 impl std::ops::Deref for TestPopupSpell {
-    type Target = TestPopup;
+    type Target = TestInstancePopup;
     fn deref(&self) -> &Self::Target {
         &self.frontend
     }

@@ -87,10 +87,10 @@ async fn notification_service_enter(
             let emitter = iface_ref.signal_emitter();
             match event {
                 DbusSignalEvent::ActionInvoked { id, action_key } => {
-                    let _ = NotificationHandler::action_invoked(&emitter, id, &action_key).await;
+                    let _ = NotificationHandler::action_invoked(emitter, id, &action_key).await;
                 }
                 DbusSignalEvent::NotificationClosed { id, reason } => {
-                    let _ = NotificationHandler::notification_closed(&emitter, id, reason).await;
+                    let _ = NotificationHandler::notification_closed(emitter, id, reason).await;
                 }
             }
         }
@@ -112,7 +112,7 @@ impl NotificationHandler {
         info!("capabilities called");
         // body-markup will be implemented in the future maybe. icon-multi is not
         // added since slint doen't yet support animated images.
-        Ok(vec![
+        Ok([
             "actions",
             "body",
             "body-images",
@@ -124,6 +124,7 @@ impl NotificationHandler {
         .collect())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn notify(
         &mut self,
         app_name: String,
@@ -317,4 +318,3 @@ impl NotificationHandler {
         action_key: &str,
     ) -> zbus::Result<()>;
 }
-

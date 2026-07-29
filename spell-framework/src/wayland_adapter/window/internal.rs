@@ -1,12 +1,14 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fs,
     io::{BufRead, BufReader},
+    rc::Rc,
     time::Duration,
 };
 
 use crate::{
-    configure::{HomeHandle, WindowConf},
+    configure::{HomeHandle, PopupConf, PopupCore, WindowConf},
     wayland_adapter::window::SpellWin,
 };
 use slint::platform::WindowAdapter;
@@ -21,9 +23,14 @@ use smithay_client_toolkit::{
             protocol::{wl_output, wl_region::WlRegion},
         },
     },
-    shell::{WaylandSurface, wlr_layer::LayerSurface},
+    shell::{
+        WaylandSurface,
+        wlr_layer::LayerSurface,
+        xdg::{XdgPositioner, popup::Popup},
+    },
+    shm::slot::SlotPool,
 };
-use tracing::warn;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 impl SpellWin {
@@ -230,6 +237,54 @@ impl SpellWin {
                 }
             })
             .unwrap();
+    }
+
+    pub(super) fn create_popup_core(&mut self, popup_conf: PopupConf) -> Option<PopupCore> {
+        let popup_surface = self.states.compositor_state.create_surface(&self.queue);
+        // popup_surface.commit();
+        let position =
+            XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
+        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
+        position.set_parent_size(
+            self.config.evaluated_width as i32,
+            self.config.evaluated_height as i32,
+        );
+        position.set_anchor(popup_conf.anchor);
+        position.set_anchor_rect(
+            popup_conf.anchor_rect.0,
+            popup_conf.anchor_rect.1,
+            popup_conf.anchor_rect.2,
+            popup_conf.anchor_rect.3,
+        );
+        // popup_surface.commit();
+        if let Ok(popup) = Popup::from_surface(
+            // Some(self.popup_manager.xdg_surface()),
+            None,
+            &position,
+            &self.queue,
+            popup_surface,
+            &self.xdg_shell,
+        ) {
+            let pool = SlotPool::new(
+                (popup_conf.width * popup_conf.height * 4) as usize,
+                &self.states.shm,
+            )
+            .expect("Unable to create slot pool for popup");
+            self.popup_manager.set_pool(Rc::new(RefCell::new(pool)));
+            self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
+            // popup.wl_surface().commit();
+            info!("Popupcore is created and returned");
+            Some(self.popup_manager.create_popup_core(
+                popup,
+                popup_conf,
+                &self.states.fractional_scale_state,
+                &self.states.viewporter_state,
+                &self.queue,
+            ))
+        } else {
+            warn!("couldn't create a popup");
+            None
+        }
     }
 }
 

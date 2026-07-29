@@ -106,6 +106,7 @@ pub struct SpellLock {
     lock_surfaces: Vec<SessionLockSurface>,
     slint_part: Option<SpellSlintLock>,
     is_locked: bool,
+    /// span used for logging and tracing lockscreen eveents.
     pub span: span::Span,
     unlock_screen: Sender<bool>,
     // TODO, check if it need internal mutability?

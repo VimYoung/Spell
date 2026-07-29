@@ -36,7 +36,7 @@ use smithay_client_toolkit::{
     shell::{
         WaylandSurface,
         wlr_layer::{KeyboardInteractivity, LayerShell, LayerSurface},
-        xdg::{XdgPositioner, XdgShell, popup::Popup},
+        xdg::XdgShell,
     },
     shm::{
         Shm,
@@ -474,51 +474,16 @@ impl SpellWin {
         self.layer.as_ref().unwrap().commit();
     }
 
+    /// Opens a popup given the [`PopupConf`]. It returns the ID of the popup if
+    /// created successfully. The method fails if the concerned compositor fails
+    /// to create a popup instance or doesn't support the protocol.
     pub fn open_popup<T: PopupSlint + 'static>(
         &mut self,
         popup_conf: PopupConf,
     ) -> Result<u32, Box<dyn std::error::Error>> {
-        let popup_surface = self.states.compositor_state.create_surface(&self.queue);
-        // popup_surface.commit();
-        let position =
-            XdgPositioner::new(&self.xdg_shell).expect("Failed to created XdgPositioner");
-        position.set_size(popup_conf.width as i32, popup_conf.height as i32);
-        position.set_parent_size(
-            self.config.evaluated_width as i32,
-            self.config.evaluated_height as i32,
-        );
-        position.set_anchor(popup_conf.anchor);
-        position.set_anchor_rect(
-            popup_conf.anchor_rect.0,
-            popup_conf.anchor_rect.1,
-            popup_conf.anchor_rect.2,
-            popup_conf.anchor_rect.3,
-        );
-        // popup_surface.commit();
-        if let Ok(popup) = Popup::from_surface(
-            // Some(self.popup_manager.xdg_surface()),
-            None,
-            &position,
-            &self.queue,
-            popup_surface,
-            &self.xdg_shell,
-        ) {
-            let pool = SlotPool::new(
-                (popup_conf.width * popup_conf.height * 4) as usize,
-                &self.states.shm,
-            )
-            .expect("Unable to create slot pool for popup");
-            self.popup_manager.set_pool(Rc::new(RefCell::new(pool)));
-            self.layer.as_ref().unwrap().get_popup(popup.xdg_popup());
-            // popup.wl_surface().commit();
-
-            let id = self.popup_manager.create_popup::<T>(
-                popup,
-                popup_conf,
-                &self.states.fractional_scale_state,
-                &self.states.viewporter_state,
-                &self.queue,
-            );
+        if let Some(core) = self.create_popup_core(popup_conf) {
+            let popup = T::create_new(core);
+            let id = self.popup_manager.add_popup(popup);
             info!("Popup created with id: {}", id);
             Ok(id)
         } else {
@@ -527,6 +492,26 @@ impl SpellWin {
         }
     }
 
+    /// WIP method not to be used.
+    pub fn open_popup_with_instance<T: PopupSlint + 'static>(
+        &mut self,
+        popup_conf: PopupConf,
+    ) -> Result<T, Box<dyn std::error::Error>> {
+        if let Some(core) = self.create_popup_core(popup_conf) {
+            info!("Popup created without id");
+            Ok(T::create_new(core))
+        } else {
+            warn!("couldn't create a popup");
+            Err("Couldn't create Popup".into())
+        }
+    }
+
+    /// WIP method not to be used.
+    pub fn add_popup<T: PopupSlint + 'static>(&mut self, popup_instance: T) -> u32 {
+        self.popup_manager.add_popup(popup_instance)
+    }
+
+    /// Closes a popup given its ID.
     pub fn close_popup(&mut self, id: u32) {
         self.popup_manager.close_popup(&id);
     }
@@ -621,6 +606,10 @@ impl WinHandle {
         self.0.insert_idle(move |win| win.set_exclusive_zone(val));
     }
 
+    /// Internally calls [`crate::wayland_adapter::SpellWin::open_popup`]. Since,
+    /// the handler can't be tuned to return anything(in this case the id), a callback
+    /// is instead taken with ID as input, this is called after receiving the ID.
+    /// It can be used to used to save the ID and perform actions with it.
     pub fn open_popup<T: PopupSlint + 'static>(
         &mut self,
         popup_conf: PopupConf,
@@ -634,6 +623,7 @@ impl WinHandle {
         Ok(0)
     }
 
+    /// Internally calls [`crate::wayland_adapter::SpellWin::close_popup`].
     pub fn close_popup(&self, id: u32) {
         self.0.insert_idle(move |win| {
             win.close_popup(id);

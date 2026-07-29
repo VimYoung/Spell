@@ -19,7 +19,7 @@ use tracing::{info, warn};
 
 use crate::{
     PopupSlint,
-    configure::{PopupConf, PopupSettings},
+    configure::{PopupConf, PopupCore},
     slint_adapter::{ADAPTERS, SpellSkiaWinAdapter},
     wayland_adapter::{
         SpellWin,
@@ -58,14 +58,14 @@ impl PopupManager {
         self.pool = Some(pool);
     }
 
-    pub(super) fn create_popup<T: PopupSlint + 'static>(
+    pub(super) fn create_popup_core(
         &mut self,
         popup: Popup,
         popup_conf: PopupConf,
         _fractional_scale_state: &FractionalScaleState,
         _viewporter_state: &ViewporterState,
         _qh: &QueueHandle<SpellWin>,
-    ) -> u32 {
+    ) -> PopupCore {
         // let fractional_scale = fractional_scale_state.get_scale(popup.wl_surface(), qh);
         // let viewport = viewporter_state.get_viewport(popup.wl_surface(), qh, fractional_scale);
         let stride = popup_conf.width as i32 * 4;
@@ -100,14 +100,18 @@ impl PopupManager {
         // popup.wl_surface().set_buffer_scale(1);
         // popup.wl_surface().commit();
 
-        let popup = T::create_new(PopupSettings {
+        PopupCore {
             pool: self.pool.as_ref().unwrap().clone(),
             popup,
             popup_conf,
             buffer,
             // viewport,
-        });
-        self.popups.insert(self.id_gen, Box::new(popup));
+        }
+    }
+
+    pub(super) fn add_popup<T: PopupSlint + 'static>(&mut self, popup_instance: T) -> u32 {
+        self.popups.insert(self.id_gen, Box::new(popup_instance));
+        info!("[Popup Manager]: Popup added for rendering");
         self.id_gen = self.id_gen.wrapping_add(1);
         self.id_gen - 1
     }
@@ -151,7 +155,12 @@ impl PopupManager {
     }
 }
 
-/// Future XDGpopup implementation will occur on this struct;
+/// This struct holds the backend information for creating and managing a XDG
+/// popup in spell. It needs a [`PopupCore`] instance for initialisation
+/// and it needs to be initialsed before the corresponding slint frontend. It is
+/// better to wrap it in an external wrapper object along with frontend to satisfy
+/// trait requirements of [`PopupSlint`]. For example, refer to popup example in
+/// spell-demo.
 pub struct SpellXDGPopup {
     adapter: Rc<SpellSkiaWinAdapter>,
     popup: Popup,
@@ -164,7 +173,8 @@ delegate_fractional_scale!(SpellXDGPopup);
 delegate_viewporter!(SpellXDGPopup);
 
 impl SpellXDGPopup {
-    pub fn new(popup_settings: PopupSettings) -> Self {
+    /// Creates an instance provided [`PopupCore`].
+    pub fn new(popup_settings: PopupCore) -> Self {
         let adapter_value: Rc<SpellSkiaWinAdapter> = SpellSkiaWinAdapter::new(
             popup_settings.pool,
             RefCell::new(popup_settings.buffer.slot()),
@@ -181,10 +191,12 @@ impl SpellXDGPopup {
         }
     }
 
+    /// Method necessary for a [`PopupSlint`] implementation.
     pub fn popup(&self) -> &Popup {
         &self.popup
     }
 
+    /// Method necessary for a [`PopupSlint`] implementation.
     pub fn first_configure(&self) -> bool {
         if self.first_configure.get() {
             self.first_configure.set(false);
@@ -194,10 +206,12 @@ impl SpellXDGPopup {
         }
     }
 
+    /// Method necessary for a [`PopupSlint`] implementation.
     pub fn adapter(&self) -> &std::rc::Rc<SpellSkiaWinAdapter> {
         &self.adapter
     }
 
+    /// Method necessary for a [`PopupSlint`] implementation.
     pub fn converter_popup<'a>(&self, wl_surface: &'a WlSurface, qh: &'a QueueHandle<SpellWin>) {
         slint::platform::update_timers_and_animations();
         let width: u32 = self.adapter.as_ref().size.get().width;
@@ -248,15 +262,17 @@ impl FractionalScaleHandler for SpellXDGPopup {
             "Scale factor of popup changed, invoked from custom trait: {}",
             scale
         );
-        let width_old = self.adapter.size_original.get().width;
-        let height_old = self.adapter.size_original.get().height;
+        // FIXME: Make use of this for proper scaling implementation.
+        let _width_old = self.adapter.size_original.get().width;
+        let _height_old = self.adapter.size_original.get().height;
         self.popup.wl_surface().damage_buffer(
             0,
             0,
             self.adapter.size.get().width as i32,
             self.adapter.size.get().height as i32,
         );
-        let (buffer, width, height, scale_factor) = self.adapter.changed_scale_factor(scale);
+        // FIXME: Make use of this for proper scaling implementation.
+        let (buffer, _width, _height, scale_factor) = self.adapter.changed_scale_factor(scale);
         // self.width = width;
         // self.height = height;
         self.buffer = buffer;

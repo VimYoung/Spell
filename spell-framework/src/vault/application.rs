@@ -179,7 +179,7 @@ fn find_icon_in_theme_dir(theme_path: &Path, icon_name: &str) -> Option<PathBuf>
         for ext in ICON_EXTENSIONS {
             let candidate = subdir_path.join(format!("{}.{}", icon_name, ext));
             if candidate.exists() {
-                let is_better = best.as_ref().map_or(true, |(d, _)| dist < *d);
+                let is_better = best.as_ref().is_none_or(|(d, _)| dist < *d);
                 if is_better {
                     best = Some((dist, candidate));
                 }

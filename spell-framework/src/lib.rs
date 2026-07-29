@@ -5,7 +5,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/VimYoung/Spell/main/spell-framework/assets/spell_trans.ico"
 )]
 #![doc = include_str!("../docs/entry.md")]
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 
 mod configure;
 #[cfg(docsrs)]
@@ -27,6 +27,10 @@ pub mod wayland_adapter;
 pub mod layer_properties {
     pub use crate::configure::{Dimension, WindowConf, WindowConfBuilder};
     pub mod internal {
+        //! It is an internal trait required for the implementation of [`PopupSlint`](crate::PopupSlint)
+        //!  .It is not to be used directly and contains internal types which are
+        //! reluctantly exposed due to trait implementation. This module will probably
+        //! be removed for a better alternative.
         pub use smithay_client_toolkit::{
             reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
             shell::xdg::popup::Popup,
@@ -36,7 +40,9 @@ pub mod layer_properties {
         Anchor as LayerAnchor, KeyboardInteractivity as BoardType, Layer as LayerType,
     };
     pub mod popup {
-        pub use crate::configure::{PopupConf, PopupSettings};
+        //! This module holds all the related objects for creating and configuring
+        //1 the XDG popup.
+        pub use crate::configure::{PopupConf, PopupCore};
         pub use smithay_client_toolkit::reexports::protocols::xdg::shell::client::xdg_positioner::{
             Anchor as PopupAnchor,
             Gravity as PopupGravity
@@ -61,9 +67,7 @@ use smithay_client_toolkit::{
 use std::error::Error;
 use tracing::{Level, span, trace};
 
-use crate::{
-    configure::PopupSettings, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin,
-};
+use crate::{configure::PopupCore, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin};
 
 /// This trait is implemented upon slint generated windows to enable IPC handling
 pub trait IpcController {
@@ -97,17 +101,26 @@ pub trait SpellAssociatedNew: std::fmt::Debug {
     }
 }
 
+/// Trait necessary to be implemented for an UI object to become a popup. It is
+/// not the cleanest implementation and can be removed for a better/lighter alternative
+/// or design pattern. To see an implementation, check the popup example from
+/// spell-demo.
 pub trait PopupSlint {
-    fn create_new(settings: PopupSettings) -> Self
+    /// Creates a new Instance of a slint frontend, wayland backend XDG popup.
+    fn create_new(settings: PopupCore) -> Self
     where
         Self: Sized;
 
+    /// Internal method not to be called directly.
     fn converter_popup(&self, wl_surface: &WlSurface, qh: &QueueHandle<SpellWin>);
 
+    /// Internal method not to be called directly.
     fn inner(&self) -> &Popup;
 
+    /// Internal method not to be called directly.
     fn first_configure(&self) -> bool;
 
+    /// Internal method not to be called directly.
     fn adapter(&self) -> &std::rc::Rc<SpellSkiaWinAdapter>;
 }
 

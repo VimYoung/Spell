@@ -25,7 +25,9 @@ use tracing_subscriber::{
     reload::Layer as LoadLayer,
 };
 
-pub struct PopupSettings {
+/// It is an object required to create a [`SpellXDGPopup`](crate::wayland_adapter::SpellXDGPopup)
+/// instance.
+pub struct PopupCore {
     pub(crate) pool: Rc<RefCell<SlotPool>>,
     pub(crate) popup: Popup,
     pub(crate) popup_conf: PopupConf,
@@ -33,13 +35,19 @@ pub struct PopupSettings {
     // pub(crate) viewport: Viewport,
 }
 
+/// Configure type used to determine the properties of a XDG poup.
 pub struct PopupConf {
+    /// width of popup in pixels.
     pub width: u32,
+    /// height of popup in pixels.
     pub height: u32,
+    /// Anchor corner/edge of popup.
     pub anchor: PopupAnchor,
+    /// Gravity direction of popup.
     pub gravity: PopupGravity,
     // FIXME: setting width and height zero creates protocol errors, create a
     // builder method for it.
+    /// Anchor rectangle for popup.
     pub anchor_rect: (i32, i32, i32, i32),
 }
 

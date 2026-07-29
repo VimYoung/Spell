@@ -1,11 +1,26 @@
-# 1.0.5 & 1.0.5 CLI (26-05-15)
+# 1.0.6 (16-07-29)
 
 Changes:
 
-1. Mouse cursor implementation not supports various cursors over hovering (thanks dotsem).
-1. Activated touch screen inputs in SpellWin and SpellLock.
-1. Added support for lock in `generate_widgets` macro.
-1. Added notification manger.
+1. Event loop optimisation to minimise waking if UI is not changing. Hence, saving
+   CPU cycles and reducing usage to less than unity in idle scenarios.
+2. Primary implementation of XDG Popup is out, it is the implementation of Popup
+   on which future improvements will be based on. This opens a new section of possible
+   addition for someone creating a shell with spell.
+3. This version also introduces two other ways to specify the dimension of a widget
+   other than in pixels. You can now specify it to percentage of the monitor dimension
+   and full_length. This enables dynamic calculation of dimensions rather than hardcoded
+   values, making the widget reusable across monitors.
+4. Implements copy-paste, Now you can copy paste text from slint's input field defined
+   by spell.
+
+# 1.0.5 (26-05-15)
+
+Changes:
+
+1. Mouse cursor implementation now supports various cursors over hovering (thanks dotsem).
+2. Activated touch screen inputs in SpellWin and SpellLock.
+3. Added notification manager.
 
 Changes(spell-cli):
 

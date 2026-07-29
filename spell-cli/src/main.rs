@@ -68,7 +68,7 @@ async fn main() -> Result<(), SpellError> {
     if let Some(sub_command) = values.next() {
         let return_value = match sub_command.trim() {
             "--version" | "-v" => {
-                println!("spell-cli version 1.0.2");
+                println!("spell-cli version 1.0.6");
             Ok(())
             },
             "update" | "look" | "show" | "hide" => Err(SpellError::CLI(Cli::BadSubCommand("`-l` is not defined. Call these sub commands after specifying name with spell-cli -l|--layer `name` sub command".to_string()))),

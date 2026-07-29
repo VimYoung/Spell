@@ -150,6 +150,23 @@ export component TestPopup inherits Window {
     }
 }
 
+export component TestInstancePopup inherits Window {
+    property <color> background_color: black;
+    // width: 200px;
+    // height: 200px;
+    background: black;
+
+    VerticalBox {
+        Button {
+            text: "Some button";
+        }
+
+        Text {
+            text: "First Popup";
+        }
+    }
+}
+
 export component CopyPaste inherits Window {
     width: 376px;
     height: 576px;

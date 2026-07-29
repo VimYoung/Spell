@@ -5044,7 +5044,7 @@ version = "1.0.3"
 dependencies = [
  "futures-util",
  "slint-build",
- "spell-framework 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spell-framework 1.0.5",
  "tokio",
  "zbus",
  "zip",
@@ -5057,29 +5057,7 @@ dependencies = [
  "chrono",
  "slint",
  "slint-build",
- "spell-framework 1.0.5",
-]
-
-[[package]]
-name = "spell-framework"
-version = "1.0.5"
-dependencies = [
- "event-listener",
- "futures-util",
- "i-slint-core",
- "i-slint-renderer-skia",
- "mpris",
- "nonstick",
- "paste",
- "rust-fuzzy-search",
- "slint",
- "smithay-client-toolkit 0.20.0",
- "tokio",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "wl-clipboard-rs",
- "zbus",
+ "spell-framework 1.0.6",
 ]
 
 [[package]]
@@ -5103,6 +5081,28 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "zbus",
+]
+
+[[package]]
+name = "spell-framework"
+version = "1.0.6"
+dependencies = [
+ "event-listener",
+ "futures-util",
+ "i-slint-core",
+ "i-slint-renderer-skia",
+ "mpris",
+ "nonstick",
+ "paste",
+ "rust-fuzzy-search",
+ "slint",
+ "smithay-client-toolkit 0.20.0",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "wl-clipboard-rs",
  "zbus",
 ]
 
