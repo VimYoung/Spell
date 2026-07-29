@@ -27,6 +27,7 @@ slint = { version = "1.17.1", default-features = false, features = [
 ] }
 smithay-client-toolkit = { version = "0.20.0", default-features = false, features = [
   "xkbcommon",
+  "calloop",
 ] }
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync"] }
 tracing = { version = "0.1.44", features = ["max_level_trace"] }

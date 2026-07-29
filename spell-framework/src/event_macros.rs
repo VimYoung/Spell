@@ -222,7 +222,7 @@ macro_rules! cast_spell {
         let listener_clone = listener.try_clone().unwrap();
         listener.set_nonblocking(true)?;
         $way.ipc_handler = Some(listener_clone);
-        let _ = $way.loop_handle.clone().insert_source(
+        let _ = $way.get_handler().0.insert_source(
             $crate::macro_internal::Generic::new(listener, $crate::macro_internal::Interest::READ, $crate::macro_internal::Mode::Level),
             move |_, _, data| {
                 loop {
