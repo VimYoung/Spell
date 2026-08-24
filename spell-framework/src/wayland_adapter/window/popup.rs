@@ -1,5 +1,6 @@
 use slint::platform::WindowAdapter;
 use smithay_client_toolkit::{
+    compositor::FrameCallbackData,
     reexports::{
         client::{
             QueueHandle,
@@ -242,7 +243,7 @@ impl SpellXDGPopup {
             // }
             // Request our next frame
             wl_surface.attach(Some(buffer.wl_buffer()), 0, 0);
-            wl_surface.frame(qh, wl_surface.clone());
+            wl_surface.frame(qh, FrameCallbackData(wl_surface.clone()));
             wl_surface.commit();
         } else {
             wl_surface.commit();

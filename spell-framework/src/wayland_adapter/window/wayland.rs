@@ -83,7 +83,7 @@ impl SeatHandler for SpellWin {
                 .seat_state
                 .get_pointer(qh, &seat)
                 .expect("Failed to create pointer");
-            let pointer_data = PointerData::new(seat);
+            let pointer_data = PointerData::new(seat, ());
             self.states.pointer_state.pointer = Some(pointer);
             self.states.pointer_state.pointer_data = Some(pointer_data);
         }

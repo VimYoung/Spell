@@ -1,11 +1,14 @@
 use slint::platform::{Key, WindowAdapter};
-use smithay_client_toolkit::reexports::{
-    calloop::{
-        self,
-        channel::{self, Channel},
-        timer::{TimeoutAction, Timer},
+use smithay_client_toolkit::{
+    compositor::FrameCallbackData,
+    reexports::{
+        calloop::{
+            self,
+            channel::{self, Channel},
+            timer::{TimeoutAction, Timer},
+        },
+        client::QueueHandle,
     },
-    client::QueueHandle,
 };
 use tracing::warn;
 
@@ -23,9 +26,10 @@ impl SpellLock {
         self.lock_surfaces[0]
             .wl_surface()
             .damage_buffer(0, 0, width as i32, height as i32);
-        self.lock_surfaces[0]
-            .wl_surface()
-            .frame(qh, self.lock_surfaces[0].wl_surface().clone());
+        self.lock_surfaces[0].wl_surface().frame(
+            qh,
+            FrameCallbackData(self.lock_surfaces[0].wl_surface().clone()),
+        );
         self.lock_surfaces[0]
             .wl_surface()
             .attach(Some(buffer.wl_buffer()), 0, 0);

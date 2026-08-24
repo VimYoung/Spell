@@ -13,9 +13,8 @@ use nonstick::{
 };
 use slint::PhysicalSize;
 use smithay_client_toolkit::{
+    self as sctk,
     compositor::CompositorState,
-    delegate_compositor, delegate_keyboard, delegate_output, delegate_pointer, delegate_registry,
-    delegate_seat, delegate_session_lock, delegate_shm, delegate_touch,
     output::{self, OutputState},
     reexports::{
         calloop::{
@@ -382,15 +381,9 @@ impl SpellAssociatedNew for SpellLock {
     }
 }
 
-delegate_keyboard!(SpellLock);
-delegate_compositor!(SpellLock);
-delegate_output!(SpellLock);
-delegate_shm!(SpellLock);
-delegate_registry!(SpellLock);
-delegate_pointer!(SpellLock);
-delegate_touch!(SpellLock);
-delegate_session_lock!(SpellLock);
-delegate_seat!(SpellLock);
+// delegates keyboard, compositor, output, shm, pointer, touch session_lock, seat.
+sctk::delegate_registry!(SpellLock);
+sctk::delegate_dispatch2!(SpellLock);
 
 /// Struct to handle unlocking of a SpellLock instance. It can be captured from
 /// [`SpellLock::get_handler`].

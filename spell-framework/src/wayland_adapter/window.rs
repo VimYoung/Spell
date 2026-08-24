@@ -11,10 +11,8 @@ use crate::{
 };
 use i_slint_core::items::MouseCursor;
 use smithay_client_toolkit::{
+    self as sctk,
     compositor::{CompositorState, Region},
-    delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm, delegate_touch, delegate_xdg_popup,
-    delegate_xdg_shell,
     output::OutputState,
     reexports::{
         calloop::{self, EventLoop, LoopHandle},
@@ -517,17 +515,10 @@ impl SpellWin {
     }
 }
 
-delegate_compositor!(SpellWin);
-delegate_xdg_shell!(SpellWin);
-delegate_xdg_popup!(SpellWin);
-delegate_registry!(SpellWin);
-delegate_output!(SpellWin);
-delegate_shm!(SpellWin);
-delegate_seat!(SpellWin);
-delegate_keyboard!(SpellWin);
-delegate_pointer!(SpellWin);
-delegate_touch!(SpellWin);
-delegate_layer!(SpellWin);
+// delegates compositor, xdg_shell, xdg_popup, output, shm, seat, keyboard, pointer
+// touch, layer.
+sctk::delegate_dispatch2!(SpellWin);
+sctk::delegate_registry!(SpellWin);
 delegate_fractional_scale!(SpellWin);
 delegate_viewporter!(SpellWin);
 

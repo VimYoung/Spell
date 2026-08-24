@@ -13,6 +13,7 @@ use crate::{
 };
 use slint::platform::WindowAdapter;
 use smithay_client_toolkit::{
+    compositor::FrameCallbackData,
     reexports::{
         calloop::{
             self,
@@ -91,11 +92,10 @@ impl SpellWin {
                 );
             }
 
-            self.layer
-                .as_ref()
-                .unwrap()
-                .wl_surface()
-                .frame(qh, self.layer.as_ref().unwrap().wl_surface().clone());
+            self.layer.as_ref().unwrap().wl_surface().frame(
+                qh,
+                FrameCallbackData(self.layer.as_ref().unwrap().wl_surface().clone()),
+            );
             self.layer.as_ref().unwrap().commit();
         } else {
             self.layer.as_ref().unwrap().commit();

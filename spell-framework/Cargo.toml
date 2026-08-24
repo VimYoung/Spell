@@ -21,11 +21,8 @@ i-slint-core = { version = "1.17.1", default-features = false }
 i-slint-renderer-skia = { version = "1.17.1", default-features = false, optional = true }
 rust-fuzzy-search = "0.1.1"
 # signal-hook = "0.4.3"
-slint = { version = "1.17.1", default-features = false, features = [
-  "renderer-skia",
-  "compat-1-2",
-] }
-smithay-client-toolkit = { version = "0.20.0", default-features = false, features = [
+slint = { version = "1.17.1", default-features = false, features = ["renderer-skia", "compat-1-2"] }
+smithay-client-toolkit = { version = "0.21.1", default-features = false, features = [
   "xkbcommon",
   "calloop",
 ] }
