@@ -44,7 +44,7 @@ use smithay_client_toolkit::{
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    os::unix::net::UnixListener,
+    os::{fd::AsFd, unix::net::UnixListener},
     rc::Rc,
     sync::{Once, OnceLock, RwLock},
 };
@@ -529,6 +529,14 @@ impl SpellAssociatedNew for SpellWin {
             .borrow_mut()
             .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
+    }
+
+    fn get_fd_owned(&self) -> std::os::unix::prelude::OwnedFd {
+        self.event_loop
+            .borrow()
+            .as_fd()
+            .try_clone_to_owned()
+            .unwrap()
     }
 
     fn get_span(&self) -> tracing::span::Span {

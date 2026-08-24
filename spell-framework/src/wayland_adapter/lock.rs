@@ -36,7 +36,12 @@ use smithay_client_toolkit::{
         slot::{Buffer, Slot, SlotPool},
     },
 };
-use std::{cell::RefCell, process::Command, rc::Rc};
+use std::{
+    cell::RefCell,
+    os::fd::{AsFd, OwnedFd},
+    process::Command,
+    rc::Rc,
+};
 use tracing::{Level, info, span, warn};
 
 mod input;
@@ -370,6 +375,14 @@ impl SpellAssociatedNew for SpellLock {
             .borrow_mut()
             .dispatch(std::time::Duration::from_millis(1), self)?;
         Ok(())
+    }
+
+    fn get_fd_owned(&self) -> OwnedFd {
+        self.event_loop
+            .borrow()
+            .as_fd()
+            .try_clone_to_owned()
+            .unwrap()
     }
 
     fn is_locked(&self) -> bool {

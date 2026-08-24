@@ -61,10 +61,16 @@ pub mod macro_internal {
     pub use tracing::{info, span::Span, warn};
 }
 use smithay_client_toolkit::{
-    reexports::client::{QueueHandle, protocol::wl_surface::WlSurface},
+    reexports::{
+        calloop::{EventLoop, Mode, PostAction, generic::Generic},
+        client::{QueueHandle, protocol::wl_surface::WlSurface},
+    },
     shell::xdg::popup::Popup,
 };
-use std::error::Error;
+use std::{
+    error::Error,
+    os::fd::{BorrowedFd, OwnedFd, RawFd},
+};
 use tracing::{Level, span, trace};
 
 use crate::{configure::PopupCore, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin};
@@ -89,6 +95,9 @@ pub trait IpcController {
 pub trait SpellAssociatedNew: std::fmt::Debug {
     /// Internal method used to call to update UI in a loop.
     fn on_call(&mut self) -> Result<(), Box<dyn Error>>;
+
+    /// Internal method to receive handle
+    fn get_fd_owned(&self) -> OwnedFd;
 
     /// Internal method used to retrive logging span of a window.
     fn get_span(&self) -> span::Span {
@@ -141,13 +150,27 @@ pub fn cast_spell_inner<S: SpellAssociatedNew>(mut waywindow: S) -> Result<(), B
 pub fn cast_spells_new(
     mut windows: Vec<Box<dyn SpellAssociatedNew>>,
 ) -> Result<(), Box<dyn Error>> {
-    loop {
-        for win in windows.iter_mut() {
-            let span = win.get_span().clone();
-            let _gaurd = span.enter();
-            win.on_call()?;
-        }
+    let mut event_loop = EventLoop::try_new().unwrap();
+    let handle = event_loop.handle();
+    for (id, win) in windows.iter().enumerate() {
+        let inner_handle = win.get_fd_owned();
+        let span = win.get_span().clone();
+        let _ = handle.insert_source(
+            Generic::new(
+                inner_handle,
+                smithay_client_toolkit::reexports::calloop::Interest::READ,
+                Mode::Level,
+            ),
+            move |_, _, shared_data: &mut Vec<Box<dyn SpellAssociatedNew>>| {
+                span.in_scope(|| {
+                    shared_data[id].on_call();
+                });
+                Ok(PostAction::Continue)
+            },
+        );
     }
+    event_loop.run(None, &mut windows, |_| {})?;
+    Ok(())
 }
 
 // TODO: Various functions can be sufficed with pub(super) and not pub(crate), reevaluate every
