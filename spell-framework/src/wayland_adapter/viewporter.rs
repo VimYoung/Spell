@@ -21,7 +21,7 @@ pub struct ViewporterState {
 
 /// An owned instance of WpViewport, when this is dropped, the underlying interface is
 /// destroyed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Viewport {
     viewport: WpViewport,
     // This is not required but yet stored so that it doesn't get distroyed.

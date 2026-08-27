@@ -97,7 +97,7 @@ pub struct SpellWin {
     config: WindowConf,
     input_region: Region,
     opaque_region: Region,
-    viewport: Option<Viewport>,
+    viewport: Option<Rc<Viewport>>,
     xdg_shell: XdgShell,
     popup_manager: window::popup::PopupManager,
     event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
@@ -301,6 +301,12 @@ impl SpellWin {
             target_output,
         );
 
+        win.adapter
+            .as_ref()
+            .unwrap()
+            .layer
+            .borrow_mut()
+            .replace(layer.clone());
         win.layer = Some(layer);
         win.set_config_internal();
 
@@ -312,10 +318,18 @@ impl SpellWin {
         // This needs to occur after layer creation so as to ensure that layer
         // used in window is not null during use to scale. Details in issue 34.
         let fractional_scale = win.states.fractional_scale_state.get_scale(surface, &qh);
-        let viewport = win
-            .states
-            .viewporter_state
-            .get_viewport(surface, &qh, fractional_scale);
+        let viewport = Rc::new(win.states.viewporter_state.get_viewport(
+            surface,
+            &qh,
+            fractional_scale,
+        ));
+
+        win.adapter
+            .as_ref()
+            .unwrap()
+            .viewport
+            .borrow_mut()
+            .replace(Rc::clone(&viewport));
         win.viewport = Some(viewport);
 
         win.layer.as_ref().unwrap().commit();

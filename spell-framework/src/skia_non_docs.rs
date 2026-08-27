@@ -8,6 +8,9 @@ use slint::PlatformError;
 use slint::platform::WindowEventDispatchResult;
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window};
+use smithay_client_toolkit::shell::WaylandSurface;
+#[cfg(feature = "i-slint-renderer-skia")]
+use smithay_client_toolkit::shell::wlr_layer::LayerSurface;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::{
@@ -110,6 +113,11 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
 
 #[cfg(feature = "i-slint-renderer-skia")]
 use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
+
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::wayland_adapter;
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::wayland_adapter::viewporter::Viewport;
 #[cfg(feature = "i-slint-renderer-skia")]
 /// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
 /// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
@@ -126,6 +134,8 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
     pub(crate) current_cursor: RefCell<MouseCursorInner>,
+    pub(crate) layer: RefCell<Option<LayerSurface>>,
+    pub(crate) viewport: RefCell<Option<Rc<Viewport>>>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -162,11 +172,33 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
 
     fn set_size(&self, size: slint::WindowSize) {
         info!("Set_size is called");
-        self.size.set(size.to_physical(self.scale_factor.get()));
+        let physical_size = size.to_physical(self.scale_factor.get());
+        let logical_size = size.to_logical(self.scale_factor.get());
+
+        if let Some(layer) = self.layer.borrow().as_ref() {
+            layer.set_size(logical_size.width as u32, logical_size.height as u32);
+            if let Some(viewport) = self.viewport.borrow().as_ref() {
+                viewport.set_source(
+                    0.0,
+                    0.0,
+                    physical_size.width.into(),
+                    physical_size.height.into(),
+                );
+                viewport.set_destination(logical_size.width as i32, logical_size.height as i32);
+            }
+            layer.wl_surface().commit();
+        }
+
+        self.size_original.set(PhysicalSize {
+            width: logical_size.width as u32,
+            height: logical_size.height as u32,
+        });
+        self.size.set(physical_size);
+
         self.window
-            .dispatch_event(slint::platform::WindowEvent::Resized {
-                size: size.to_logical(self.scale_factor.get()),
-            })
+            .dispatch_event(slint::platform::WindowEvent::Resized { size: logical_size });
+
+        self.request_redraw();
     }
 
     fn request_redraw(&self) {
@@ -206,6 +238,8 @@ impl SpellSkiaWinAdapterReal {
             current_cursor: RefCell::new(MouseCursorInner::BuiltIn(
                 i_slint_core::items::BuiltInMouseCursor::Default,
             )),
+            layer: RefCell::new(None),
+            viewport: RefCell::new(None),
         })
     }
 
