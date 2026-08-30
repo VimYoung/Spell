@@ -165,7 +165,6 @@ impl PopupManager {
 pub struct SpellXDGPopup {
     adapter: Rc<SpellSkiaWinAdapter>,
     popup: Popup,
-    buffer: Buffer,
     first_configure: Cell<bool>,
     // viewport: Viewport,
 }
@@ -183,10 +182,13 @@ impl SpellXDGPopup {
             popup_settings.popup_conf.height,
         );
         ADAPTERS.with_borrow_mut(|v| v.push(adapter_value.clone()));
+        adapter_value
+            .buffer
+            .borrow_mut()
+            .replace(popup_settings.buffer);
         SpellXDGPopup {
             adapter: adapter_value,
             popup: popup_settings.popup,
-            buffer: popup_settings.buffer,
             first_configure: Cell::new(true),
             // viewport: popup_settings.viewport,
         }
@@ -220,7 +222,6 @@ impl SpellXDGPopup {
         let window_adapter = self.adapter.clone();
 
         let redraw_val: bool = window_adapter.draw_if_needed();
-        let buffer = &self.buffer;
         if self.first_configure.get() || redraw_val {
             // if self.first_configure {
             // self.first_configure.set(false);
@@ -242,7 +243,9 @@ impl SpellXDGPopup {
             //     }
             // }
             // Request our next frame
-            wl_surface.attach(Some(buffer.wl_buffer()), 0, 0);
+            if let Some(buffer) = self.adapter.buffer.borrow().as_ref() {
+                wl_surface.attach(Some(buffer.wl_buffer()), 0, 0);
+            }
             wl_surface.frame(qh, FrameCallbackData(wl_surface.clone()));
             wl_surface.commit();
         } else {
@@ -273,10 +276,9 @@ impl FractionalScaleHandler for SpellXDGPopup {
             self.adapter.size.get().height as i32,
         );
         // FIXME: Make use of this for proper scaling implementation.
-        let (buffer, _width, _height, scale_factor) = self.adapter.changed_scale_factor(scale);
+        let (_width, _height, scale_factor) = self.adapter.changed_scale_factor(scale);
         // self.width = width;
         // self.height = height;
-        self.buffer = buffer;
         self.adapter
             .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
             .unwrap();

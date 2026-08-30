@@ -269,8 +269,8 @@ impl SpellWin {
             window_conf.evaluated_height,
         );
         // win.popup_manager.set_pool(pool_mut.clone());
+        adapter_value.buffer.borrow_mut().replace(way_pri_buffer);
         win.adapter = Some(adapter_value.clone());
-        win.buffer = Some(way_pri_buffer);
 
         let (slint_event_sender, slint_event_receiver) =
             calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
