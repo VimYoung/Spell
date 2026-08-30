@@ -292,6 +292,5 @@ impl FractionalScaleHandler for SpellXDGPopup {
         // self.viewport
         //     .set_destination(width_old as i32, height_old as i32);
         self.adapter.request_redraw();
-        self.popup.wl_surface().commit();
     }
 }

@@ -248,7 +248,7 @@ impl FractionalScaleHandler for SpellWin {
     fn preferred_scale(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_surface::WlSurface,
         scale: u32,
     ) {
@@ -276,7 +276,9 @@ impl FractionalScaleHandler for SpellWin {
             .unwrap()
             .set_destination(width_old as i32, height_old as i32);
         self.adapter.as_ref().unwrap().request_redraw();
-        self.layer.as_ref().unwrap().commit();
+        if !self.first_configure.get() {
+            self.converter(qh);
+        }
     }
 }
 

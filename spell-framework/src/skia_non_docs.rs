@@ -193,7 +193,6 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
             if let Some(viewport) = self.viewport.borrow().as_ref() {
                 viewport.set_destination(logical_size.width as i32, logical_size.height as i32);
             }
-            layer.wl_surface().commit();
         }
 
         self.size_original.set(PhysicalSize {
