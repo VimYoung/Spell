@@ -67,11 +67,8 @@ use smithay_client_toolkit::{
     },
     shell::xdg::popup::Popup,
 };
-use std::{
-    error::Error,
-    os::fd::{BorrowedFd, OwnedFd, RawFd},
-};
-use tracing::{Level, span, trace};
+use std::{error::Error, os::fd::OwnedFd};
+use tracing::{Level, span, trace, warn};
 
 use crate::{configure::PopupCore, slint_adapter::SpellSkiaWinAdapter, wayland_adapter::SpellWin};
 
@@ -163,7 +160,9 @@ pub fn cast_spells_new(
             ),
             move |_, _, shared_data: &mut Vec<Box<dyn SpellAssociatedNew>>| {
                 span.in_scope(|| {
-                    shared_data[id].on_call();
+                    if let Err(error) = shared_data[id].on_call() {
+                        warn!("Error executing dispatch: {}", error);
+                    };
                 });
                 Ok(PostAction::Continue)
             },
@@ -175,7 +174,6 @@ pub fn cast_spells_new(
 
 // TODO: Various functions can be sufficed with pub(super) and not pub(crate), reevaluate every
 // function.
-// TODO: Update code to remove all the todo!() macros with log implementations.
 // TODO: make the converter back to non mut reference if possible.
 // TODO: Update docs of spellock and spellwin to justify their use being purely internal.
 // TODO: update the blog with latest API changes in spell-framework.

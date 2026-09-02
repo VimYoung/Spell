@@ -29,7 +29,7 @@ impl WindowHandler for SpellWin {
         _: &QueueHandle<Self>,
         _: &smithay_client_toolkit::shell::xdg::window::Window,
     ) {
-        todo!()
+        warn!("Window close requested");
     }
 
     fn configure(
@@ -40,7 +40,7 @@ impl WindowHandler for SpellWin {
         _: smithay_client_toolkit::shell::xdg::window::WindowConfigure,
         _: u32,
     ) {
-        todo!()
+        warn!("Window config called from WindowHandler");
     }
 }
 

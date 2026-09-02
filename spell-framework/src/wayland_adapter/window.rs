@@ -15,7 +15,7 @@ use smithay_client_toolkit::{
     compositor::{CompositorState, Region},
     output::OutputState,
     reexports::{
-        calloop::{self, EventLoop, LoopHandle},
+        calloop::{self, EventLoop, LoopHandle, LoopSignal},
         calloop_wayland_source::WaylandSource,
         client::{
             Connection, QueueHandle,
@@ -80,6 +80,7 @@ struct States {
 pub struct SpellWin {
     adapter: Option<Rc<SpellSkiaWinAdapter>>,
     loop_handle: LoopHandle<'static, SpellWin>,
+    signal: LoopSignal,
     /// UnixListener storing remote instructions from CLI.
     pub ipc_handler: Option<UnixListener>,
     /// Name of widget's layer.
@@ -149,6 +150,7 @@ impl SpellWin {
         let mut win = SpellWin {
             adapter: None,
             loop_handle: event_loop.handle(),
+            signal: event_loop.get_signal(),
             ipc_handler: None,
             queue: qh.clone(),
             buffer: None,
@@ -328,7 +330,10 @@ impl SpellWin {
     /// Returns a handle of [`WinHandle`] to invoke wayland specific features.
     pub fn get_handler(&self) -> WinHandle {
         info!("Win: Handle provided.");
-        WinHandle(self.loop_handle.clone())
+        WinHandle(
+            self.loop_handle.clone(),
+            self.event_loop.borrow().get_signal(),
+        )
     }
 
     /// This function is called to create a instance of window. This window is then
@@ -349,6 +354,7 @@ impl SpellWin {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
+            self.signal.wakeup();
         }
     }
 
@@ -359,6 +365,7 @@ impl SpellWin {
             self.set_config_internal();
             self.first_configure.set(true);
             self.layer.as_ref().unwrap().commit();
+            self.signal.wakeup();
         }
     }
 
@@ -385,6 +392,7 @@ impl SpellWin {
         self.input_region.add(x, y, width, height);
         self.set_config_internal();
         self.layer.as_ref().unwrap().commit();
+        self.signal.wakeup();
     }
 
     /// This function subtracts specific rectangular regions of your complete layer from receiving
@@ -399,6 +407,7 @@ impl SpellWin {
         self.input_region.subtract(x, y, width, height);
         self.set_config_internal();
         self.layer.as_ref().unwrap().commit();
+        self.signal.wakeup();
     }
 
     /// This function marks specific rectangular regions of your complete layer as opaque.
@@ -414,6 +423,7 @@ impl SpellWin {
         self.opaque_region.add(x, y, width, height);
         self.set_config_internal();
         self.layer.as_ref().unwrap().commit();
+        self.signal.wakeup();
     }
 
     /// This function removes specific rectangular regions of your complete layer from being opaque.
@@ -428,6 +438,7 @@ impl SpellWin {
         self.opaque_region.subtract(x, y, width, height);
         self.set_config_internal();
         self.layer.as_ref().unwrap().commit();
+        self.signal.wakeup();
     }
 
     /// Grabs the focus of keyboard. Can be used in combination with other functions
@@ -444,6 +455,7 @@ impl SpellWin {
                 .unwrap()
                 .set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
             self.layer.as_ref().unwrap().commit();
+            self.signal.wakeup();
         }
     }
 
@@ -460,6 +472,7 @@ impl SpellWin {
                 .unwrap()
                 .set_keyboard_interactivity(KeyboardInteractivity::None);
             self.layer.as_ref().unwrap().commit();
+            self.signal.wakeup();
         }
     }
 
@@ -470,6 +483,7 @@ impl SpellWin {
         self.config.exclusive_zone = Some(val);
         self.layer.as_ref().unwrap().set_exclusive_zone(val);
         self.layer.as_ref().unwrap().commit();
+        self.signal.wakeup();
     }
 
     /// Opens a popup given the [`PopupConf`]. It returns the ID of the popup if
@@ -483,6 +497,7 @@ impl SpellWin {
             let popup = T::create_new(core);
             let id = self.popup_manager.add_popup(popup);
             info!("Popup created with id: {}", id);
+            self.signal.wakeup();
             Ok(id)
         } else {
             warn!("couldn't create a popup");
@@ -548,61 +563,71 @@ impl SpellAssociatedNew for SpellWin {
 /// for calling wayland specific features of `SpellWin`. It can be accessed from
 /// [`crate::wayland_adapter::SpellWin::get_handler`].
 #[derive(Clone, Debug)]
-pub struct WinHandle(pub LoopHandle<'static, SpellWin>);
+pub struct WinHandle(pub LoopHandle<'static, SpellWin>, LoopSignal);
 
 impl WinHandle {
     /// Internally calls [`crate::wayland_adapter::SpellWin::hide`]
     pub fn hide(&self) {
         self.0.insert_idle(|win| win.hide());
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::show_again`]
     pub fn show_again(&self) {
         self.0.insert_idle(|win| win.show_again());
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::toggle`]
     pub fn toggle(&self) {
         self.0.insert_idle(|win| win.toggle());
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::grab_focus`]
     pub fn grab_focus(&self) {
         self.0.insert_idle(|win| win.grab_focus());
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::remove_focus`]
     pub fn remove_focus(&self) {
         self.0.insert_idle(|win| win.remove_focus());
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::add_input_region`]
     pub fn add_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.0
             .insert_idle(move |win| win.add_input_region(x, y, width, height));
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_input_region`]
     pub fn subtract_input_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.0
             .insert_idle(move |win| win.subtract_input_region(x, y, width, height));
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::add_opaque_region`]
     pub fn add_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.0
             .insert_idle(move |win| win.add_opaque_region(x, y, width, height));
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::subtract_opaque_region`]
     pub fn subtract_opaque_region(&self, x: i32, y: i32, width: i32, height: i32) {
         self.0
             .insert_idle(move |win| win.subtract_opaque_region(x, y, width, height));
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::set_exclusive_zone`]
     pub fn set_exclusive_zone(&self, val: i32) {
         self.0.insert_idle(move |win| win.set_exclusive_zone(val));
+        self.1.wakeup();
     }
 
     /// Internally calls [`crate::wayland_adapter::SpellWin::open_popup`]. Since,
@@ -619,6 +644,7 @@ impl WinHandle {
                 callback(id);
             }
         });
+        self.1.wakeup();
         Ok(0)
     }
 
@@ -627,5 +653,6 @@ impl WinHandle {
         self.0.insert_idle(move |win| {
             win.close_popup(id);
         });
+        self.1.wakeup();
     }
 }
