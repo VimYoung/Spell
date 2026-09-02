@@ -216,6 +216,18 @@ easy to learn (you can even get its sense in just few mins [here](https://docs.s
 other UI toolkits, it has awesome integration for rust. A compatibility that
 is hard to find.
 
+## AI Policy
+
+I think it is high time to add this section now to avoid any confusion. I want
+to make it clear that the project started for my own personal use. Hence, I don't
+have any constraints to deliver with fast release cycles. To maintain learning,
+I prefer to never write code from LLMs here. I also prefer that contribution be
+made by the person and not models.
+
+I am not against the use of LLMs, it is just that I tend to avoid it in my side
+projects. Having some time to directly code without the prompt-wait-improve cycle
+is good.
+
 ## Batteries 🔋
 
 Not a lot of batteries included for now, future implementations of common functionalities

@@ -23,7 +23,6 @@ use std::{
 mod application;
 mod notification_manager;
 
-
 /// This public static is only set when a notification server instance is passed in
 /// [`cast_spell`](crate::cast_spell).
 /// It is created to maintain the compliance with freedesktop's desktop notification
@@ -36,24 +35,33 @@ pub static NOTIFICATION_EVENT: OnceLock<BlockingNotification> = OnceLock::new();
 /// Event enum used to route notification signals back to the primary dbus thread.
 pub enum DbusSignalEvent {
     /// Sent when an action is triggered.
-    ActionInvoked { 
+    ActionInvoked {
         /// The id of the notification.
-        id: u32, 
+        id: u32,
         /// The specific action key associated with the specyfic action,
-        action_key: String 
+        action_key: String,
     },
     /// Sent when a notification is closed.
-    NotificationClosed { 
+    NotificationClosed {
         /// The id of the notification.
-        id: u32, 
+        id: u32,
         /// The reason for the notification being closed.
-        reason: u32 
+        reason: u32,
     },
 }
 
 /// Holds blocking methods to notify when a notification has bee closed.
+#[derive(Debug)]
 pub struct BlockingNotification {
     sender: tokio::sync::mpsc::UnboundedSender<DbusSignalEvent>,
+}
+
+impl std::error::Error for BlockingNotification {}
+
+impl std::fmt::Display for BlockingNotification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sender: {:?}", self.sender)
+    }
 }
 
 impl BlockingNotification {
@@ -69,8 +77,11 @@ impl BlockingNotification {
         reason: CloseReason,
     ) -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("Close triggered for ID: {}, Reason: {:?}", id, reason);
-        
-        let _ = self.sender.send(DbusSignalEvent::NotificationClosed { id, reason: reason as u32 });
+
+        let _ = self.sender.send(DbusSignalEvent::NotificationClosed {
+            id,
+            reason: reason as u32,
+        });
         Ok(())
     }
 
@@ -80,9 +91,16 @@ impl BlockingNotification {
         id: u32,
         action_key: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::info!("Action triggered for ID: {}, Action Key: '{}'", id, action_key);
+        tracing::info!(
+            "Action triggered for ID: {}, Action Key: '{}'",
+            id,
+            action_key
+        );
 
-        let _ = self.sender.send(DbusSignalEvent::ActionInvoked { id, action_key: action_key.to_string() });
+        let _ = self.sender.send(DbusSignalEvent::ActionInvoked {
+            id,
+            action_key: action_key.to_string(),
+        });
         Ok(())
     }
 }

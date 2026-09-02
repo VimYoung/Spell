@@ -12,7 +12,10 @@ use zbus::{fdo::Error as BusError, interface, object_server::SignalEmitter, zvar
 
 /// It is an internal function used in the expansion of [`cast_spell`](crate::cast_spell) macro
 /// if the macro has a notification instance to run.
-pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
+pub fn set_notification(
+    win: &SpellWin,
+    ui: Box<dyn NotificationManager>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (sender, rx) = channel::channel::<NotifyEvent>();
     let (tx, dbus_rx) = tokio::sync::mpsc::unbounded_channel::<DbusSignalEvent>();
 
@@ -29,9 +32,8 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
         });
     });
 
-    let _ = NOTIFICATION_EVENT.set(BlockingNotification::new(tx));
-    let _ = win
-        .get_handler()
+    NOTIFICATION_EVENT.set(BlockingNotification::new(tx))?;
+    win.get_handler()
         .0
         .insert_source(rx, move |event, _, _| match event {
             channel::Event::Msg(msg) => match msg {
@@ -47,7 +49,8 @@ pub fn set_notification(win: &SpellWin, ui: Box<dyn NotificationManager>) {
                 }
             },
             channel::Event::Closed => info!("Notification Channel to async thread is closed!"),
-        });
+        })?;
+    Ok(())
 }
 
 pub(crate) enum NotifyEvent {

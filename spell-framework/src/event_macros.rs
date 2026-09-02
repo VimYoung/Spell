@@ -341,7 +341,7 @@ macro_rules! cast_spell {
     // Notification Logic
     (@notification $noti:expr, $ui_noti: expr) => {
         // runs ONCE
-        $crate::vault::set_notification($noti, Box::new($ui_noti)as Box<dyn $crate::vault::NotificationManager>)
+        $crate::vault::set_notification($noti, Box::new($ui_noti)as Box<dyn $crate::vault::NotificationManager>)?
         // let _notification = &$noti;
     };
 
