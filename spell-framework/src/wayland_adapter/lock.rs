@@ -7,7 +7,7 @@ use crate::{
         lock::{self, wayland::SpellSlintLock},
     },
 };
-use i_slint_core::items::MouseCursor;
+use i_slint_core::cursor::MouseCursorInner;
 use nonstick::{
     AuthnFlags, ConversationAdapter, Result as PamResult, Transaction, TransactionBuilder,
 };
@@ -152,7 +152,9 @@ impl SpellLock {
             pointer_data: None,
             cursor_shape: cursor_manager,
             last_cursor_enter_serial: None,
-            current_wayland_cursor: MouseCursor::Default,
+            current_wayland_cursor: MouseCursorInner::BuiltIn(
+                i_slint_core::items::BuiltInMouseCursor::Default,
+            ),
         };
         let (sender, rx) = channel::channel::<bool>();
         let mut spell_lock = SpellLock {

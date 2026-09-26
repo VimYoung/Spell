@@ -1,4 +1,4 @@
-use i_slint_core::items::MouseCursor;
+use i_slint_core::{cursor::MouseCursorInner, items::BuiltInMouseCursor};
 // This module contains mapping to strings and pointerdata objects common to both
 // lock and window.
 use slint::{
@@ -23,35 +23,42 @@ pub(crate) struct PointerState {
     pub(crate) pointer: Option<wl_pointer::WlPointer>,
     pub(crate) pointer_data: Option<PointerData<()>>,
     pub(crate) cursor_shape: CursorShapeManager,
-    pub(crate) current_wayland_cursor: MouseCursor,
+    pub(crate) current_wayland_cursor: MouseCursorInner,
     pub(crate) last_cursor_enter_serial: Option<u32>,
 }
 
 impl PointerState {
     /// Updates the cursor shape
     ///
-    /// If the cursor is [MouseCursor::None], the cursor will be hidden
+    /// If the cursor is [BuiltInMouseCursor::None], the cursor will be hidden
     ///
-    /// If the cursor is not [MouseCursor::None], the cursor will be set to the shape corresponding to the cursor
+    /// If the cursor is not [BuiltInMouseCursor::None], the cursor will be set to the shape corresponding to the cursor
     ///
-    /// The cursor is only updated when it doesn't match the current cursor
+    /// The cursor is only updated when it doesn't match the current cursor, currently
+    /// there is no support for setting images as cursors via new slint API.
     pub(crate) fn update_cursor(
         &mut self,
-        mouse_cursor: MouseCursor,
+        mouse_cursor: &MouseCursorInner,
         queue: &QueueHandle<SpellWin>,
     ) {
         if let Some(serial) = self.last_cursor_enter_serial
             && let Some(pointer) = self.pointer.as_ref()
-            && mouse_cursor != self.current_wayland_cursor
+            && *mouse_cursor != self.current_wayland_cursor
         {
-            if mouse_cursor == MouseCursor::None {
-                pointer.set_cursor(serial, None, 0, 0);
-            } else {
-                self.cursor_shape
-                    .get_shape_device(pointer, queue)
-                    .set_shape(serial, mouse_cursor_to_shape(mouse_cursor));
+            match mouse_cursor {
+                MouseCursorInner::BuiltIn(builtin_type) => {
+                    if *builtin_type == BuiltInMouseCursor::None {
+                        pointer.set_cursor(serial, None, 0, 0);
+                    } else {
+                        self.cursor_shape
+                            .get_shape_device(pointer, queue)
+                            .set_shape(serial, mouse_cursor_to_shape(builtin_type.clone()));
+                    }
+                    self.current_wayland_cursor = MouseCursorInner::BuiltIn(builtin_type.clone());
+                }
+                // FIXME: This needs to be handled properly
+                MouseCursorInner::CustomMouseCursor { .. } | _ => {}
             }
-            self.current_wayland_cursor = mouse_cursor;
         }
     }
 }
@@ -82,36 +89,36 @@ pub(super) fn map_pointer_button(button: u32) -> PointerEventButton {
 ///
 /// [MouseCursor::None] is handled internally by the program because there
 /// is no wayland cursor shape for it
-pub(super) fn mouse_cursor_to_shape(cursor: MouseCursor) -> Shape {
+pub(super) fn mouse_cursor_to_shape(cursor: BuiltInMouseCursor) -> Shape {
     match cursor {
-        MouseCursor::Default => Shape::Default,
-        MouseCursor::Help => Shape::Help,
-        MouseCursor::Pointer => Shape::Pointer,
-        MouseCursor::Progress => Shape::Progress,
-        MouseCursor::Wait => Shape::Wait,
-        MouseCursor::Crosshair => Shape::Crosshair,
-        MouseCursor::Text => Shape::Text,
-        MouseCursor::Alias => Shape::Alias,
-        MouseCursor::Copy => Shape::Copy,
-        MouseCursor::Move => Shape::Move,
-        MouseCursor::NoDrop => Shape::NoDrop,
-        MouseCursor::NotAllowed => Shape::NotAllowed,
-        MouseCursor::Grab => Shape::Grab,
-        MouseCursor::Grabbing => Shape::Grabbing,
-        MouseCursor::ColResize => Shape::ColResize,
-        MouseCursor::RowResize => Shape::RowResize,
-        MouseCursor::NResize => Shape::NResize,
-        MouseCursor::EResize => Shape::EResize,
-        MouseCursor::SResize => Shape::SResize,
-        MouseCursor::WResize => Shape::WResize,
-        MouseCursor::NeResize => Shape::NeResize,
-        MouseCursor::NwResize => Shape::NwResize,
-        MouseCursor::SeResize => Shape::SeResize,
-        MouseCursor::SwResize => Shape::SwResize,
-        MouseCursor::EwResize => Shape::EwResize,
-        MouseCursor::NsResize => Shape::NsResize,
-        MouseCursor::NeswResize => Shape::NeswResize,
-        MouseCursor::NwseResize => Shape::NwseResize,
+        BuiltInMouseCursor::Default => Shape::Default,
+        BuiltInMouseCursor::Help => Shape::Help,
+        BuiltInMouseCursor::Pointer => Shape::Pointer,
+        BuiltInMouseCursor::Progress => Shape::Progress,
+        BuiltInMouseCursor::Wait => Shape::Wait,
+        BuiltInMouseCursor::Crosshair => Shape::Crosshair,
+        BuiltInMouseCursor::Text => Shape::Text,
+        BuiltInMouseCursor::Alias => Shape::Alias,
+        BuiltInMouseCursor::Copy => Shape::Copy,
+        BuiltInMouseCursor::Move => Shape::Move,
+        BuiltInMouseCursor::NoDrop => Shape::NoDrop,
+        BuiltInMouseCursor::NotAllowed => Shape::NotAllowed,
+        BuiltInMouseCursor::Grab => Shape::Grab,
+        BuiltInMouseCursor::Grabbing => Shape::Grabbing,
+        BuiltInMouseCursor::ColResize => Shape::ColResize,
+        BuiltInMouseCursor::RowResize => Shape::RowResize,
+        BuiltInMouseCursor::NResize => Shape::NResize,
+        BuiltInMouseCursor::EResize => Shape::EResize,
+        BuiltInMouseCursor::SResize => Shape::SResize,
+        BuiltInMouseCursor::WResize => Shape::WResize,
+        BuiltInMouseCursor::NeResize => Shape::NeResize,
+        BuiltInMouseCursor::NwResize => Shape::NwResize,
+        BuiltInMouseCursor::SeResize => Shape::SeResize,
+        BuiltInMouseCursor::SwResize => Shape::SwResize,
+        BuiltInMouseCursor::EwResize => Shape::EwResize,
+        BuiltInMouseCursor::NsResize => Shape::NsResize,
+        BuiltInMouseCursor::NeswResize => Shape::NeswResize,
+        BuiltInMouseCursor::NwseResize => Shape::NwseResize,
         _ => Shape::Default,
     }
 }

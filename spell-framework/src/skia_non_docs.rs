@@ -1,7 +1,11 @@
 // use i_slint_core::item_rendering::DirtyRegion;
 use i_slint_core::window::WindowAdapterInternal;
-use i_slint_core::{items::MouseCursor, partial_renderer::DirtyRegion, platform::WindowAdapter};
+use i_slint_core::{
+    cursor::MouseCursorInner, partial_renderer::DirtyRegion, platform::WindowAdapter,
+};
 
+use slint::PlatformError;
+use slint::platform::WindowEventDispatchResult;
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window};
 #[cfg(not(docsrs))]
@@ -121,7 +125,7 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
-    pub(crate) current_cursor: Cell<MouseCursor>,
+    pub(crate) current_cursor: RefCell<MouseCursorInner>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -138,8 +142,8 @@ impl WindowAdapterInternal for SpellSkiaWinAdapterReal {
     ///? According to the slint docs, they are planning on making it public
     ///? Both this trait impl & the MouseCursor enum are currently private, but still accessible
     ///? through the slint internal crate.
-    fn set_mouse_cursor(&self, cursor: MouseCursor) {
-        self.current_cursor.set(cursor);
+    fn set_mouse_cursor(&self, cursor: MouseCursorInner) {
+        *self.current_cursor.borrow_mut() = cursor;
     }
 }
 
@@ -199,7 +203,9 @@ impl SpellSkiaWinAdapterReal {
             buffer_slint: buffer,
             scale_factor: Cell::new(1.),
             needs_redraw: Cell::new(true),
-            current_cursor: Cell::new(MouseCursor::Default),
+            current_cursor: RefCell::new(MouseCursorInner::BuiltIn(
+                i_slint_core::items::BuiltInMouseCursor::Default,
+            )),
         })
     }
 
@@ -223,8 +229,8 @@ impl SpellSkiaWinAdapterReal {
     pub(crate) fn try_dispatch_event(
         &self,
         event: slint::platform::WindowEvent,
-    ) -> Result<(), slint::PlatformError> {
-        self.window.try_dispatch_event(event)
+    ) -> Result<WindowEventDispatchResult, PlatformError> {
+        self.window.dispatch_event_with_result(event)
     }
 
     pub(crate) fn changed_scale_factor(&self, scale: u32) -> (Buffer, u32, u32, f32) {

@@ -9,7 +9,7 @@ use crate::{
         window,
     },
 };
-use i_slint_core::items::MouseCursor;
+use i_slint_core::cursor::MouseCursorInner;
 use smithay_client_toolkit::{
     self as sctk,
     compositor::{CompositorState, Region},
@@ -141,7 +141,9 @@ impl SpellWin {
             pointer: None,
             pointer_data: None,
             cursor_shape: cursor_manager,
-            current_wayland_cursor: MouseCursor::Default,
+            current_wayland_cursor: MouseCursorInner::BuiltIn(
+                i_slint_core::items::BuiltInMouseCursor::Default,
+            ),
             last_cursor_enter_serial: None,
         };
         let input_region = Region::new(&compositor).expect("Couldn't create region");

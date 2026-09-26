@@ -2,7 +2,10 @@ use crate::wayland_adapter::{
     SpellLock,
     common::{self, get_string},
 };
-use slint::{SharedString, platform::WindowEvent};
+use slint::{
+    SharedString,
+    platform::{WindowEvent, WindowEventDispatchResult},
+};
 use smithay_client_toolkit::{
     reexports::{
         client::{Connection, QueueHandle, protocol::wl_pointer},
@@ -58,7 +61,10 @@ impl TouchHandler for SpellLock {
                     y: position.1 as f32,
                 },
             })
-            .unwrap_or_else(|err| warn!("Touch move event failed with error: {:?}", err));
+            .unwrap_or_else(|err| {
+                warn!("Touch move event failed with error: {:?}", err);
+                WindowEventDispatchResult::Rejected
+            });
     }
 
     fn shape(
@@ -108,11 +114,11 @@ impl PointerHandler for SpellLock {
                     continue;
                 }
             }
-            match event.kind {
+            let result = match event.kind {
                 Enter { .. } => {
                     info!("Pointer entered: {:?}", event.position);
 
-                    // TODO this code is redundent, as it doesn't set the cursor shape.
+                    // TODO: this code is redundent, as it doesn't set the cursor shape.
                     let pointer = &self.pointer_state.pointer.as_ref().unwrap();
                     let serial_no: Option<u32> = self
                         .pointer_state
@@ -126,14 +132,17 @@ impl PointerHandler for SpellLock {
                             .get_shape_device(pointer, qh)
                             .set_shape(no, Shape::Pointer);
                     }
+                    // TODO: This doesn't convey the ascence properly ig.
+                    WindowEventDispatchResult::Accepted
                 }
                 Leave { .. } => {
                     info!("Pointer left: {:?}", event.position);
                     self.slint_part.as_ref().unwrap().adapters[0]
                         .try_dispatch_event(WindowEvent::PointerExited)
                         .unwrap_or_else(|err| {
-                            warn!("Pointer left event failed with error: {:?}", err)
-                        });
+                            warn!("Pointer left event failed with error: {:?}", err);
+                            WindowEventDispatchResult::Rejected
+                        })
                 }
                 Motion { .. } => {
                     // debug!("Pointer entered @{:?}", event.position);
@@ -145,8 +154,9 @@ impl PointerHandler for SpellLock {
                             },
                         })
                         .unwrap_or_else(|err| {
-                            warn!("Pointer move event failed with error: {:?}", err)
-                        });
+                            warn!("Pointer move event failed with error: {:?}", err);
+                            WindowEventDispatchResult::Rejected
+                        })
                 }
                 Press { button, .. } => {
                     trace!("Press {:x} @ {:?}", button, event.position);
@@ -160,8 +170,9 @@ impl PointerHandler for SpellLock {
                             button: common::map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
-                            warn!("Pointer press event failed with error: {:?}", err)
-                        });
+                            warn!("Pointer press event failed with error: {:?}", err);
+                            WindowEventDispatchResult::Rejected
+                        })
                 }
                 Release { button, .. } => {
                     trace!("Release {:x} @ {:?}", button, event.position);
@@ -175,8 +186,9 @@ impl PointerHandler for SpellLock {
                             button: common::map_pointer_button(button),
                         })
                         .unwrap_or_else(|err| {
-                            warn!("Pointer release event failed with error: {:?}", err)
-                        });
+                            warn!("Pointer release event failed with error: {:?}", err);
+                            WindowEventDispatchResult::Rejected
+                        })
                 }
                 Axis {
                     horizontal,
@@ -194,9 +206,15 @@ impl PointerHandler for SpellLock {
                             delta_y: vertical.absolute as f32,
                         })
                         .unwrap_or_else(|err| {
-                            warn!("Pointer scroll event failed with error: {:?}", err)
-                        });
+                            warn!("Pointer scroll event failed with error: {:?}", err);
+                            WindowEventDispatchResult::Rejected
+                        })
                 }
+            };
+            if let WindowEventDispatchResult::Rejected = result {
+                // Lower logging level because rejected if nothing consimes the
+                // result also.
+                trace!("Window dispatch event is rejected");
             }
         }
     }
@@ -245,7 +263,10 @@ impl KeyboardHandler for SpellLock {
         info!("Key pressed with value : {:?}", string_val);
         self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyPressed { text: string_val })
-            .unwrap_or_else(|err| warn!("Key press event failed with error: {:?}", err));
+            .unwrap_or_else(|err| {
+                warn!("Key press event failed with error: {:?}", err);
+                WindowEventDispatchResult::Rejected
+            });
         //}
     }
 
@@ -266,7 +287,10 @@ impl KeyboardHandler for SpellLock {
         let string_val: SharedString = get_string(event);
         self.slint_part.as_ref().unwrap().adapters[0]
             .try_dispatch_event(WindowEvent::KeyReleased { text: string_val })
-            .unwrap_or_else(|err| warn!("Key release event failed with error: {:?}", err));
+            .unwrap_or_else(|err| {
+                warn!("Key release event failed with error: {:?}", err);
+                WindowEventDispatchResult::Rejected
+            });
     }
 
     // TODO needs to be implemented to enable functionalities of ctl, shift, alt etc.

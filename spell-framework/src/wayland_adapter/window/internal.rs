@@ -54,9 +54,10 @@ impl SpellWin {
             // FIXME: Rendering should take place between the sources, here it
             // should just be setting the buffers.
             let redraw_val: bool = window_adapter.unwrap().draw_if_needed();
-            self.states
-                .pointer_state
-                .update_cursor(self.adapter.as_ref().unwrap().current_cursor.get(), qh);
+            self.states.pointer_state.update_cursor(
+                &(*self.adapter.as_ref().unwrap().current_cursor.borrow()),
+                qh,
+            );
 
             let buffer = &self.buffer;
             if self.first_configure.get() || redraw_val {
