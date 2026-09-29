@@ -140,8 +140,18 @@ impl NotificationHandler {
         expire_timeout: i32,
     ) -> Result<u32, BusError> {
         info!("Notifcation event received");
+        let id = if replaces_id == 0 {
+            let id = self.next_id;
+            self.next_id = self.next_id.wrapping_add(1);
+            if self.next_id == 0 {
+                self.next_id = 1;
+            }
+            id
+        } else {
+            replaces_id
+        };
         let notification = Notification {
-            id: replaces_id,
+            id,
             appname: app_name,
             summary,
             subtitle: None,
@@ -270,16 +280,7 @@ impl NotificationHandler {
             .clone()
             .send(NotifyEvent::Noti(notification.clone()));
         self.notifications.push(notification);
-        if replaces_id == 0 {
-            let id = self.next_id;
-            self.next_id = self.next_id.wrapping_add(1);
-            if self.next_id == 0 {
-                self.next_id = 1;
-            }
-            Ok(id)
-        } else {
-            Ok(replaces_id)
-        }
+        Ok(id)
     }
 
     async fn close_notification(
