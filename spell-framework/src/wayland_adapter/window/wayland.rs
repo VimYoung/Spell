@@ -248,7 +248,7 @@ impl FractionalScaleHandler for SpellWin {
     fn preferred_scale(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_surface::WlSurface,
         scale: u32,
     ) {
@@ -261,29 +261,24 @@ impl FractionalScaleHandler for SpellWin {
             self.adapter.as_ref().unwrap().size.get().width as i32,
             self.adapter.as_ref().unwrap().size.get().height as i32,
         );
-        let (buffer, width, height, scale_factor) =
+        let (width, height, scale_factor) =
             self.adapter.as_ref().unwrap().changed_scale_factor(scale);
         self.config.evaluated_width = width;
         self.config.evaluated_height = height;
-        self.buffer = Some(buffer);
         self.adapter
             .as_ref()
             .unwrap()
             .try_dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor })
             .unwrap();
-        self.viewport.as_ref().unwrap().set_source(
-            0.,
-            0.,
-            self.adapter.as_ref().unwrap().size.get().width.into(),
-            self.adapter.as_ref().unwrap().size.get().height.into(),
-        );
 
         self.viewport
             .as_ref()
             .unwrap()
             .set_destination(width_old as i32, height_old as i32);
         self.adapter.as_ref().unwrap().request_redraw();
-        self.layer.as_ref().unwrap().commit();
+        if !self.first_configure.get() {
+            self.converter(qh);
+        }
     }
 }
 

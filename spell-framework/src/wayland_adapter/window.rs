@@ -95,9 +95,9 @@ pub struct SpellWin {
     natural_scroll: bool,
     is_hidden: Cell<bool>,
     config: WindowConf,
-    input_region: Region,
+    input_region: RefCell<Option<Region>>,
     opaque_region: Region,
-    viewport: Option<Viewport>,
+    viewport: Option<Rc<Viewport>>,
     xdg_shell: XdgShell,
     popup_manager: window::popup::PopupManager,
     event_loop: Rc<RefCell<EventLoop<'static, SpellWin>>>,
@@ -146,7 +146,6 @@ impl SpellWin {
             ),
             last_cursor_enter_serial: None,
         };
-        let input_region = Region::new(&compositor).expect("Couldn't create region");
         let opaque_region = Region::new(&compositor).expect("Couldn't create opaque region");
 
         let mut win = SpellWin {
@@ -174,7 +173,7 @@ impl SpellWin {
             is_hidden: Cell::new(false),
             config: window_conf.clone(),
             layer_name: layer_name.clone(),
-            input_region,
+            input_region: RefCell::new(None),
             opaque_region,
             viewport: None,
             xdg_shell,
@@ -251,12 +250,6 @@ impl SpellWin {
             &win.states.shm,
         )
         .expect("Failed to create pool");
-        win.input_region.add(
-            0,
-            0,
-            window_conf.evaluated_width as i32,
-            window_conf.evaluated_height as i32,
-        );
 
         let stride = window_conf.evaluated_width as i32 * 4;
         let (way_pri_buffer, _) = pool
@@ -276,8 +269,8 @@ impl SpellWin {
             window_conf.evaluated_height,
         );
         // win.popup_manager.set_pool(pool_mut.clone());
+        adapter_value.buffer.borrow_mut().replace(way_pri_buffer);
         win.adapter = Some(adapter_value.clone());
-        win.buffer = Some(way_pri_buffer);
 
         let (slint_event_sender, slint_event_receiver) =
             calloop::channel::channel::<Box<dyn FnOnce() + Send>>();
@@ -301,6 +294,14 @@ impl SpellWin {
             target_output,
         );
 
+        layer.set_input_region(None);
+
+        win.adapter
+            .as_ref()
+            .unwrap()
+            .layer
+            .borrow_mut()
+            .replace(layer.clone());
         win.layer = Some(layer);
         win.set_config_internal();
 
@@ -312,10 +313,18 @@ impl SpellWin {
         // This needs to occur after layer creation so as to ensure that layer
         // used in window is not null during use to scale. Details in issue 34.
         let fractional_scale = win.states.fractional_scale_state.get_scale(surface, &qh);
-        let viewport = win
-            .states
-            .viewporter_state
-            .get_viewport(surface, &qh, fractional_scale);
+        let viewport = Rc::new(win.states.viewporter_state.get_viewport(
+            surface,
+            &qh,
+            fractional_scale,
+        ));
+
+        win.adapter
+            .as_ref()
+            .unwrap()
+            .viewport
+            .borrow_mut()
+            .replace(Rc::clone(&viewport));
         win.viewport = Some(viewport);
 
         win.layer.as_ref().unwrap().commit();
@@ -356,6 +365,7 @@ impl SpellWin {
         if !self.is_hidden.replace(true) {
             info!("Win: Hiding window");
             self.layer.as_ref().unwrap().wl_surface().attach(None, 0, 0);
+            self.layer.as_ref().unwrap().commit();
             self.signal.wakeup();
         }
     }
@@ -365,7 +375,6 @@ impl SpellWin {
         if self.is_hidden.replace(false) {
             info!("Win: Showing window again");
             self.set_config_internal();
-            self.first_configure.set(true);
             self.layer.as_ref().unwrap().commit();
             self.signal.wakeup();
         }
@@ -381,6 +390,29 @@ impl SpellWin {
         }
     }
 
+    fn modify_input_region(&self, modify: impl FnOnce(&mut Region)) {
+        let mut region_borrow = self.input_region.borrow_mut();
+        let region = region_borrow.get_or_insert_with(|| {
+            let r = Region::new(&self.states.compositor_state).expect("Couldn't create region");
+            let w = self
+                .adapter
+                .as_ref()
+                .map_or(self.config.evaluated_width, |a| a.size_original.get().width);
+            let h = self
+                .adapter
+                .as_ref()
+                .map_or(self.config.evaluated_height, |a| {
+                    a.size_original.get().height
+                });
+            r.add(0, 0, w as i32, h as i32);
+            r
+        });
+        modify(region);
+        drop(region_borrow);
+        self.set_config_internal();
+        self.layer.as_ref().unwrap().commit();
+    }
+
     /// This function adds specific rectangular regions of your complete layer to receive
     /// input events from pointer and/or touch. The coordinates are in surface local
     /// format from top left corener. By default, The whole layer is considered for input
@@ -391,10 +423,7 @@ impl SpellWin {
             "Win: input region added: [x: {}, y: {}, width: {}, height: {}]",
             x, y, width, height
         );
-        self.input_region.add(x, y, width, height);
-        self.set_config_internal();
-        self.layer.as_ref().unwrap().commit();
-        self.signal.wakeup();
+        self.modify_input_region(|region| region.add(x, y, width, height));
     }
 
     /// This function subtracts specific rectangular regions of your complete layer from receiving
@@ -406,10 +435,7 @@ impl SpellWin {
             "Win: input region removed: [x: {}, y: {}, width: {}, height: {}]",
             x, y, width, height
         );
-        self.input_region.subtract(x, y, width, height);
-        self.set_config_internal();
-        self.layer.as_ref().unwrap().commit();
-        self.signal.wakeup();
+        self.modify_input_region(|region| region.subtract(x, y, width, height));
     }
 
     /// This function marks specific rectangular regions of your complete layer as opaque.

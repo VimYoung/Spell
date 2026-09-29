@@ -8,6 +8,9 @@ use slint::PlatformError;
 use slint::platform::WindowEventDispatchResult;
 #[cfg(not(docsrs))]
 use slint::{PhysicalSize, Window};
+use smithay_client_toolkit::shell::WaylandSurface;
+#[cfg(feature = "i-slint-renderer-skia")]
+use smithay_client_toolkit::shell::wlr_layer::LayerSurface;
 #[cfg(not(docsrs))]
 #[cfg(feature = "i-slint-renderer-skia")]
 use smithay_client_toolkit::{
@@ -39,11 +42,18 @@ pub struct SkiaSoftwareBufferReal {
 impl SkiaSoftwareBufferReal {
     fn refresh_buffer(&self, width: i32, height: i32) -> Buffer {
         let stride = width * 4;
-        let (buffer, _raw_canvas) = self
-            .pool
-            .borrow_mut()
-            .create_buffer(width, height, stride, wl_shm::Format::Argb8888)
-            .unwrap();
+        let required_bytes = (stride * height) as usize;
+        let mut pool = self.pool.borrow_mut();
+
+        let (buffer, _) = match pool.create_buffer(width, height, stride, wl_shm::Format::Argb8888)
+        {
+            Ok(res) => res,
+            Err(_) => {
+                pool.resize(required_bytes * 2).expect("Resizing SlotPool");
+                pool.create_buffer(width, height, stride, wl_shm::Format::Argb8888)
+                    .expect("Creating buffer after resize")
+            }
+        };
         *self.primary_slot.borrow_mut() = buffer.slot();
         buffer
     }
@@ -110,6 +120,11 @@ impl RenderBuffer for SkiaSoftwareBufferReal {
 
 #[cfg(feature = "i-slint-renderer-skia")]
 use i_slint_renderer_skia::{SkiaRenderer, SkiaSharedContext, software_surface::SoftwareSurface};
+
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::wayland_adapter;
+#[cfg(feature = "i-slint-renderer-skia")]
+use crate::wayland_adapter::viewporter::Viewport;
 #[cfg(feature = "i-slint-renderer-skia")]
 /// It is the main struct handling the rendering of pixels in the wayland window. It implements slint's
 /// [WindowAdapter](https://docs.rs/slint/latest/slint/platform/trait.WindowAdapter.html) trait.
@@ -123,9 +138,12 @@ pub struct SpellSkiaWinAdapterReal {
     pub(crate) size_original: Cell<PhysicalSize>,
     pub(crate) renderer: SkiaRenderer,
     pub(crate) buffer_slint: Rc<SkiaSoftwareBufferReal>,
+    pub(crate) buffer: RefCell<Option<Buffer>>,
     pub(crate) needs_redraw: Cell<bool>,
     pub(crate) scale_factor: Cell<f32>,
     pub(crate) current_cursor: RefCell<MouseCursorInner>,
+    pub(crate) layer: RefCell<Option<LayerSurface>>,
+    pub(crate) viewport: RefCell<Option<Rc<Viewport>>>,
 }
 
 impl Debug for SpellSkiaWinAdapterReal {
@@ -162,11 +180,31 @@ impl WindowAdapter for SpellSkiaWinAdapterReal {
 
     fn set_size(&self, size: slint::WindowSize) {
         info!("Set_size is called");
-        self.size.set(size.to_physical(self.scale_factor.get()));
+        let physical_size = size.to_physical(self.scale_factor.get());
+        let logical_size = size.to_logical(self.scale_factor.get());
+
+        let new_buffer = self
+            .buffer_slint
+            .refresh_buffer(physical_size.width as i32, physical_size.height as i32);
+        self.buffer.borrow_mut().replace(new_buffer);
+
+        if let Some(layer) = self.layer.borrow().as_ref() {
+            layer.set_size(logical_size.width as u32, logical_size.height as u32);
+            if let Some(viewport) = self.viewport.borrow().as_ref() {
+                viewport.set_destination(logical_size.width as i32, logical_size.height as i32);
+            }
+        }
+
+        self.size_original.set(PhysicalSize {
+            width: logical_size.width as u32,
+            height: logical_size.height as u32,
+        });
+        self.size.set(physical_size);
+
         self.window
-            .dispatch_event(slint::platform::WindowEvent::Resized {
-                size: size.to_logical(self.scale_factor.get()),
-            })
+            .dispatch_event(slint::platform::WindowEvent::Resized { size: logical_size });
+
+        self.request_redraw();
     }
 
     fn request_redraw(&self) {
@@ -201,11 +239,14 @@ impl SpellSkiaWinAdapterReal {
             size_original: Cell::new(PhysicalSize { width, height }),
             renderer,
             buffer_slint: buffer,
+            buffer: RefCell::new(None),
             scale_factor: Cell::new(1.),
             needs_redraw: Cell::new(true),
             current_cursor: RefCell::new(MouseCursorInner::BuiltIn(
                 i_slint_core::items::BuiltInMouseCursor::Default,
             )),
+            layer: RefCell::new(None),
+            viewport: RefCell::new(None),
         })
     }
 
@@ -233,7 +274,7 @@ impl SpellSkiaWinAdapterReal {
         self.window.dispatch_event_with_result(event)
     }
 
-    pub(crate) fn changed_scale_factor(&self, scale: u32) -> (Buffer, u32, u32, f32) {
+    pub(crate) fn changed_scale_factor(&self, scale: u32) -> (u32, u32, f32) {
         let width: u32 = (self.size.get().width * scale + 60) / 120;
         let height: u32 = (self.size.get().height * scale + 60) / 120;
         let scale_factor: f32 = scale as f32 / 120.0;
@@ -241,13 +282,11 @@ impl SpellSkiaWinAdapterReal {
         self.size.set(PhysicalSize { width, height });
         info!("Physical Size: width: {}, height: {}", width, height);
         // self.needs_redraw.set(true);
-        (
-            self.buffer_slint
-                .refresh_buffer(width as i32, height as i32),
-            width,
-            height,
-            scale_factor,
-        )
+        let buffer = self
+            .buffer_slint
+            .refresh_buffer(width as i32, height as i32);
+        self.buffer.borrow_mut().replace(buffer);
+        (width, height, scale_factor)
     }
 
     // fn last_dirty_region_bounding_box_size(&self) -> Option<slint::LogicalSize> {

@@ -22,7 +22,7 @@ pub struct FractionalScaleState {
 
 /// An owned instance of WpFractionalScaleV1, when this is dropped, the underlying interface is
 /// destroyed, and hence events for the corresponding surface are no longer emitted.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FractionalScale {
     fractional_scale: WpFractionalScaleV1,
 }

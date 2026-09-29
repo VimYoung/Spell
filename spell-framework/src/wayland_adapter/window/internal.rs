@@ -36,10 +36,12 @@ use tracing_subscriber::EnvFilter;
 
 impl SpellWin {
     pub(super) fn set_config_internal(&self) {
+        let input_region: std::cell::Ref<'_, Option<smithay_client_toolkit::compositor::Region>> =
+            self.input_region.borrow();
         set_config(
             &self.config,
             self.layer.as_ref().unwrap(),
-            Some(self.input_region.wl_region()),
+            input_region.as_ref().map(|r| r.wl_region()),
             Some(self.opaque_region.wl_region()),
         );
     }
@@ -59,7 +61,6 @@ impl SpellWin {
                 qh,
             );
 
-            let buffer = &self.buffer;
             if self.first_configure.get() || redraw_val {
                 // if self.first_configure {
                 self.first_configure.set(false);
@@ -86,11 +87,15 @@ impl SpellWin {
                 //     }
                 // }
                 // Request our next frame
-                self.layer.as_ref().unwrap().wl_surface().attach(
-                    Some(buffer.as_ref().unwrap().wl_buffer()),
-                    0,
-                    0,
-                );
+            }
+            if let Some(adapter) = self.adapter.as_ref() {
+                if let Some(buffer) = adapter.buffer.borrow().as_ref() {
+                    self.layer.as_ref().unwrap().wl_surface().attach(
+                        Some(buffer.wl_buffer()),
+                        0,
+                        0,
+                    );
+                }
             }
 
             self.layer.as_ref().unwrap().wl_surface().frame(
@@ -303,9 +308,7 @@ fn set_config(
         window_conf.margin.3,
     );
     layer.set_keyboard_interactivity(window_conf.board_interactivity.get());
-    if let Some(in_region) = input_region {
-        layer.set_input_region(Some(in_region));
-    }
+    layer.set_input_region(input_region);
     if let Some(op_region) = opaque_region {
         layer.set_opaque_region(Some(op_region));
     }
