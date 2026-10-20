@@ -229,13 +229,13 @@ impl SpellWin {
                 window_conf.evaluated_height = output_info
                     .as_ref()
                     .expect("Output info couldn't be retrieved")
-                    .1 as u32
+                    .2 as u32
             }
             Dimension::Percentage(y) => {
                 window_conf.evaluated_height = output_info
                     .as_ref()
                     .expect("Output info couldn't be retrieved")
-                    .1 as u32
+                    .2 as u32
                     / y;
             }
         }
