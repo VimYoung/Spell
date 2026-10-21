@@ -220,6 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .width(560u32)
         .height(720u32)
         .anchor_1(LayerAnchor::TOP)
+        .anchor_2(LayerAnchor::LEFT)
         .margins(50, 0, 0, 0)
         .layer_type(LayerType::Top)
         .build()

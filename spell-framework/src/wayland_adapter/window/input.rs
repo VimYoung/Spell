@@ -142,9 +142,7 @@ impl PointerHandler for SpellWin {
                             );
                             WindowEventDispatchResult::Rejected
                         });
-                    if let WindowEventDispatchResult::Accepted = result {
-                        self.states.pointer_state.last_cursor_enter_serial = Some(serial);
-                    }
+                    self.states.pointer_state.last_cursor_enter_serial = Some(serial);
                     result
                 }
                 Leave { .. } => {
@@ -158,7 +156,7 @@ impl PointerHandler for SpellWin {
                         })
                 }
                 Motion { .. } => {
-                    trace!("Pointer entered @{:?}", event.position);
+                    trace!("Pointer moved @{:?}", event.position);
 
                     adapter
                         .try_dispatch_event(WindowEvent::PointerMoved {
