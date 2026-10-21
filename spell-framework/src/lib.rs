@@ -168,6 +168,17 @@ pub fn cast_spells_new(
             },
         );
     }
+
+    // Dispatch each window once before entering the event loop
+    for win in windows.iter_mut() {
+        let span = win.get_span();
+        let _guard = span.enter();
+
+        if let Err(error) = win.on_call() {
+            warn!("Error executing initial dispatch: {}", error);
+        }
+    }
+
     event_loop.run(None, &mut windows, |_| {})?;
     Ok(())
 }
