@@ -6,7 +6,7 @@
 mod common;
 mod fractional_scaling;
 mod lock;
-mod viewporter;
+pub(crate) mod viewporter;
 mod window;
 
 pub use window::SpellWin;
